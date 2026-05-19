@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Definição dos Papéis (RBAC) do Design System
+enum Role {
+  SUPER_ADMIN    // Acesso Total e Gestão de Usuários
+  COORDENADOR    // Visualização de Relatórios e Alocação
+  SECRETARIA     // Edição de Agendamentos e Presença
+}
+
+// 2. Tabela Principal de Usuários (Acesso ao Nexus)
+model User {
+  id           String         @id @default(uuid())
+  keycloakId   String         @unique // Vínculo direto com o UUID do Single Sign-On
+  userid       String         @unique // Código único (Ex: u2501234 em formato DM Mono)
+  name         String         // Nome do colaborador (Ex: Carlos Lima, Ricardo Dias)
+  email        String         @unique
+  role         Role           @default(SECRETARIA)
+  isActive     Boolean        @default(true)
+  
+  // Relacionamentos
+  systemAccess SystemAccess[] // Quais sistemas específicos este usuário pode abrir
+  logs         AuditLog[]     // Rastro de auditoria de acessos
+  
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  @@map("users") // Força o nome da tabela em minúsculo no Postgres
+}
+
+// 3. Tabela de Módulos / Sistemas do Ecossistema UniHub
+model SystemModule {
+  id          String         @id @default(uuid())
+  name        String         @unique // Ex: Cátedra Flow, AVA Reports, Backoffice
+  slug        String         @unique // Ex: catedra, ava, backoffice (usado nas rotas do Nuxt)
+  description String?        // Finalidade do sistema
+  colorCode   String         @default("#27AE60") // Cor identificadora (Navy, Teal, Green)
+  iconClass   String         @default("ti-apps") // Ícone do Tabler Outline
+  pathUrl     String         // Rota interna (Ex: /catedra)
+  isActive    Boolean        @default(true)
+
+  // Relacionamentos
+  usersAccess SystemAccess[]
+
+  createdAt    DateTime       @default(now()) @map("created_at")
+  @@map("system_modules")
+}
+
+// 4. Tabela Pivot Granular: Quem acessa o quê
+model SystemAccess {
+  userId         String       @map("user_id")
+  systemModuleId String       @map("system_module_id")
+  grantedAt      DateTime     @default(now()) @map("granted_at")
+
+  // Chaves estrangeiras
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  systemModule SystemModule @relation(fields: [systemModuleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, systemModuleId]) // Chave primária composta
+  @@map("users_system_access")
+}
+
+// 5. Tabela de Auditoria (Essencial para Painéis Administrativos Estilo Adianti)
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String   // Ex: "LOGIN", "ACCESS_MODULE_CATEDRA", "UPDATE_AGENDAMENTO"
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  timestamp DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
