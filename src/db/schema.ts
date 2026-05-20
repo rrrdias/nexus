@@ -65,3 +65,65 @@ export const auditLogs = pgTable("audit_log", {
   userAgent: text("userAgent"),
   timestamp: timestamp("timestamp", { mode: "date" }).defaultNow().notNull(),
 })
+
+// ==========================================
+// Módulo: AVA Reports (Sincronização do Moodle)
+// ==========================================
+
+export const avaProgressReport = pgTable("ava_progress_report", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sourceInstitution: text("sourceInstitution").notNull(), // Ex: 'ead', 'uni', 'faceg'
+  
+  // Dados brutos vindos do json
+  alunoId: text("aluno_id"),
+  usuario: text("usuario"),
+  aluno: text("aluno"),
+  matricula: text("matricula"),
+  periodo: text("periodo"),
+  enrolmentStatus: text("enrolment_status"),
+  lastaccess: text("lastaccess"),
+  curso: text("curso"),
+  fase1: text("fase1"),
+  fase2: text("fase2"),
+  fase3: text("fase3"),
+  cursoPerfil: text("curso_perfil"),
+  periodoPerfil: text("periodo_perfil"),
+  unidadeFisica: text("unidade_fisica"),
+  progressoTotal: text("progresso_total"),
+  listaFase1: text("lista_fase1"),
+  listaFase2: text("lista_fase2"),
+  listaFase3: text("lista_fase3"),
+  diasSemAcesso: text("dias_sem_acesso"),
+
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const avaGradesReport = pgTable("ava_grades_report", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sourceInstitution: text("sourceInstitution").notNull(), // Ex: 'ead', 'uni', 'faceg'
+
+  // Dados brutos vindos do json
+  courseId: text("course_id"),
+  courseFullname: text("course_fullname"),
+  courseShortname: text("course_shortname"),
+  userId: text("user_id"),
+  userIdentification: text("user_identification"),
+  userUsername: text("user_username"),
+  studentName: text("student_name"),
+  userEmail: text("user_email"),
+  userPhone1: text("user_phone1"),
+  userPhone2: text("user_phone2"),
+  enrolmentStatus: text("enrolment_status"),
+  cursoPerfil: text("curso_perfil"),
+  periodoPerfil: text("periodo_perfil"),
+  unidadeFisica: text("unidade_fisica"),
+  periodo: text("periodo"),
+  fase1: text("fase1"),
+  fase2: text("fase2"),
+  fase3: text("fase3"),
+  media: text("media"),
+  customCourse: text("custom_course"),
+  lastaccess: text("lastaccess"),
+
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})

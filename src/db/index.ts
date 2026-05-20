@@ -13,12 +13,12 @@ const globalForDb = globalThis as unknown as {
   db: ReturnType<typeof drizzle<typeof schema>> | undefined
 }
 
-// Em desenvolvimento, limitamos o número de conexões para evitar "too many clients"
+// Em desenvolvimento, aumentamos um pouco o limite mas mantemos controlado
 const conn = globalForDb.conn ?? postgres(connectionString, { 
   prepare: false,
-  max: process.env.NODE_ENV === 'development' ? 5 : undefined,
-  idle_timeout: 20,
-  connect_timeout: 10
+  max: process.env.NODE_ENV === 'development' ? 10 : undefined,
+  idle_timeout: 30,
+  connect_timeout: 15
 })
 
 if (process.env.NODE_ENV !== 'production') globalForDb.conn = conn

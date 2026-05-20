@@ -83,12 +83,37 @@ export async function Sidebar() {
           <span className="text-[12px] font-medium">Dashboard</span>
         </Link>
 
-        {modules.map((sys) => (
-          <Link key={sys.id} href={sys.pathUrl} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-colors">
-            <Box className="w-5 h-5" />
-            <span className="text-[12px] font-medium">{sys.name}</span>
-          </Link>
-        ))}
+        {modules.map((sys) => {
+          if (sys.name === 'AVA Reports') {
+            return (
+              <details key={sys.id} className="group">
+                <summary className="flex items-center justify-between px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                  <div className="flex items-center gap-3">
+                    <Box className="w-5 h-5" />
+                    <span className="text-[12px] font-medium">{sys.name}</span>
+                  </div>
+                  <svg className="w-4 h-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="pl-11 pr-3 py-2 space-y-2 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10">
+                  <Link href="/relatorios/progresso" className="block text-[11px] text-white/40 hover:text-white py-1 transition-colors">Progresso EaD</Link>
+                  <Link href="/relatorios/progresso/uni" className="block text-[11px] text-white/40 hover:text-white py-1 transition-colors">Progresso Disciplinas Online Uni</Link>
+                  <Link href="/relatorios/progresso/uniego" className="block text-[11px] text-white/40 hover:text-white py-1 transition-colors">Progresso Disciplinas Online UNIEGO</Link>
+                  <Link href="/relatorios/progresso/raizes" className="block text-[11px] text-white/40 hover:text-white py-1 transition-colors">Progresso Disciplinas Online Raizes</Link>
+                  <Link href="/relatorios/progresso/eefn" className="block text-[11px] text-white/40 hover:text-white py-1 transition-colors">Progresso Disciplinas Online EEFN</Link>
+                </div>
+              </details>
+            )
+          }
+
+          return (
+            <Link key={sys.id} href={sys.pathUrl} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-colors">
+              <Box className="w-5 h-5" />
+              <span className="text-[12px] font-medium">{sys.name}</span>
+            </Link>
+          )
+        })}
 
         {/* @ts-ignore */}
         {session?.user?.isSuperAdmin && (
