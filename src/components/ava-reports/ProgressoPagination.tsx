@@ -24,7 +24,7 @@ export function ProgressoPagination({ currentPage, totalPages, totalRecords, pag
   const navigate = (page: number) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set("page", String(page))
-    startTransition(() => router.push(`${pathname}?${params.toString()}`))
+    startTransition(() => router.push(`${pathname}?${params.toString()}`, { scroll: false }))
   }
 
   // Gera os números de páginas visíveis (janela de 5)

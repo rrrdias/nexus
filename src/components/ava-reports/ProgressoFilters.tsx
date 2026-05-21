@@ -57,7 +57,7 @@ export function ProgressoFilters() {
     params.set("page", "1") // Reset page on search
 
     startTransition(() => {
-      router.push(`${pathname}?${params.toString()}`)
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
     })
   }
 
@@ -74,7 +74,7 @@ export function ProgressoFilters() {
       periodo: "2026-1",
     })
     startTransition(() => {
-      router.push(pathname)
+      router.push(pathname, { scroll: false })
     })
   }
 

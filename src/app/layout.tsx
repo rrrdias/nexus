@@ -29,7 +29,7 @@ export default async function RootLayout({
   const session = await auth()
 
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="h-screen overflow-hidden">
       <body className={`${fontSans.variable} ${fontMono.variable} font-sans flex h-screen bg-[#F4F5F7] antialiased overflow-hidden`}>
         {session ? (
           <>
