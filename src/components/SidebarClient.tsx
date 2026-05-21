@@ -77,7 +77,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       )}
 
       {/* Header com Logotipo */}
-      <div className={`py-4 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
+      <div className={`h-16 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
         <div className="w-8 h-8 rounded-md bg-green-brand flex items-center justify-center shrink-0 shadow-inner">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
             <circle cx="8.5" cy="8.5" r="3" fill="#1C2B4A" opacity=".9"/>
@@ -91,7 +91,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             <line x1="11.5" y1="11.5" x2="14.5" y2="14.5" stroke="#1C2B4A" strokeWidth="1.2" opacity=".4"/>
           </svg>
         </div>
-        <div className={`transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${collapsedState ? "w-0 opacity-0 pointer-events-none" : "w-auto opacity-100"}`}>
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${collapsedState ? "w-0 h-0 opacity-0 pointer-events-none absolute" : "w-auto opacity-100 relative"}`}>
           <h1 className="text-white font-extrabold text-[15px] tracking-tight whitespace-nowrap">Nexus<span className="text-green-brand font-normal">Hub</span></h1>
           <p className="text-[8px] font-semibold text-white/35 uppercase tracking-widest font-mono whitespace-nowrap">NEXUS APPLICATION</p>
         </div>
