@@ -5,6 +5,7 @@ import { db } from "@/db"
 import { users, userGroups, usersSystemAccess, groups, systemModules } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { hashPassword } from "@/lib/password"
 
 async function assertSuperAdmin() {
   const session = await auth()
@@ -77,7 +78,7 @@ export async function createUser(formData: FormData) {
   const [created] = await db.insert(users).values({
     name: name.trim(),
     email: email.trim(),
-    password, // TODO: bcrypt em produção
+    password: await hashPassword(password.trim()),
     userid: userid?.trim() || undefined,
     isActive,
   }).returning()
@@ -110,7 +111,7 @@ export async function updateUser(userId: string, formData: FormData) {
     isActive,
   }
   if (password?.trim()) {
-    updateData.password = password.trim() // TODO: bcrypt em produção
+    updateData.password = await hashPassword(password.trim())
   }
 
   await db.update(users).set(updateData).where(eq(users.id, userId))

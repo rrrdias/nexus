@@ -1,8 +1,60 @@
 "use server"
 
+import { auth } from "@/auth"
 import { db } from "@/db"
-import { avaProgressReport, avaGradesReport } from "@/db/schema"
+import {
+  avaProgressReport,
+  avaGradesReport,
+  groupSystemAccess,
+  systemModules,
+  userGroups,
+  usersSystemAccess,
+} from "@/db/schema"
 import { eq, ilike, and, sql } from "drizzle-orm"
+
+type SessionUser = {
+  id?: string
+  isSuperAdmin?: boolean
+  isDisabled?: boolean
+}
+
+async function assertAvaAccess() {
+  const session = await auth()
+  const user = session?.user as SessionUser | undefined
+
+  if (!user?.id || user.isDisabled) {
+    throw new Error("Acesso negado.")
+  }
+
+  if (user.isSuperAdmin) return
+
+  const directAccess = await db.select({ id: systemModules.id })
+    .from(usersSystemAccess)
+    .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
+    .where(and(
+      eq(usersSystemAccess.userId, user.id),
+      eq(systemModules.slug, "ava"),
+      eq(systemModules.isActive, true)
+    ))
+    .limit(1)
+
+  if (directAccess.length > 0) return
+
+  const groupAccess = await db.select({ id: systemModules.id })
+    .from(userGroups)
+    .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
+    .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+    .where(and(
+      eq(userGroups.userId, user.id),
+      eq(systemModules.slug, "ava"),
+      eq(systemModules.isActive, true)
+    ))
+    .limit(1)
+
+  if (groupAccess.length === 0) {
+    throw new Error("Acesso negado.")
+  }
+}
 
 function parseProgress(value: any) {
   if (value === null || value === undefined || value === "" || value === "-") return null
@@ -20,6 +72,8 @@ function calculateFaseStatus(mediaFase: number, dataInicio: Date, dataFim: Date)
 }
 
 export async function getProgressData(page: number, size: number, filters: any) {
+  await assertAvaAccess()
+
   try {
     const conditions = []
     
@@ -263,6 +317,8 @@ export async function getProgressData(page: number, size: number, filters: any) 
 }
 
 export async function getProgressExportData(filters: any) {
+  await assertAvaAccess()
+
   try {
     const conditions = []
     if (filters.sourceInstitution) {
@@ -366,7 +422,13 @@ export async function getProgressExportData(filters: any) {
 }
 
 export async function syncMoodleData(institution?: string, type?: 'grades' | 'progress') {
+  await assertAvaAccess()
+
   try {
+    if (!process.env.CRON_SECRET) {
+      throw new Error("CRON_SECRET não configurado.")
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
     let url = `${baseUrl}/api/ava-sync?`
     
@@ -395,6 +457,8 @@ export async function syncMoodleData(institution?: string, type?: 'grades' | 'pr
 }
 
 export async function getGradesData(page: number, size: number, filters: any) {
+  await assertAvaAccess()
+
   try {
     const offset = (page - 1) * size
     const conditions = []

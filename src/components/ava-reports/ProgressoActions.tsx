@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Download } from "lucide-react"
-import * as XLSX from "xlsx"
 
 import { syncMoodleData, getProgressExportData } from "@/app/actions/ava-reports"
 
@@ -181,22 +180,39 @@ export async function exportProgressData({
       "Progresso Total (%)": item.progressoTotal || "-"
     }))
 
-    const worksheet = XLSX.utils.json_to_sheet(exportRows)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Progresso")
-    
-    // Fit columns width
-    const wscols = Object.keys(exportRows[0]).map(key => ({
-      wch: Math.max(key.length + 3, ...exportRows.map(r => String((r as any)[key] || "").length + 2))
-    }))
-    worksheet["!cols"] = wscols
-
-    const filename = `${title.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.xlsx`
-    XLSX.writeFile(workbook, filename)
+    const csv = toCsv(exportRows)
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${safeFilename(title)}_${new Date().toISOString().split("T")[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   } catch (error) {
     console.error("Erro ao exportar:", error)
-    alert("Ocorreu um erro ao gerar a planilha.")
+    alert("Ocorreu um erro ao gerar o arquivo.")
   }
+}
+
+function toCsv(rows: Record<string, unknown>[]) {
+  const headers = Object.keys(rows[0] ?? {})
+  const lines = [
+    headers.map(escapeCsvCell).join(";"),
+    ...rows.map(row => headers.map(header => escapeCsvCell(row[header])).join(";")),
+  ]
+
+  return lines.join("\r\n")
+}
+
+function escapeCsvCell(value: unknown) {
+  const text = String(value ?? "")
+  const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text
+
+  return `"${safeText.replace(/"/g, '""')}"`
+}
+
+function safeFilename(value: string) {
+  return value.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "relatorio"
 }
 
 export function ProgressoActions({ filters, institution }: { filters: any, institution?: string }) {
@@ -257,7 +273,7 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
         className="text-green-brand border-green-brand/20 hover:bg-green-brand/5 font-semibold"
       >
         <Download className={`w-4 h-4 mr-2 ${isExporting ? "animate-pulse" : ""}`} />
-        {isExporting ? "Exportando..." : "Exportar Excel"}
+        {isExporting ? "Exportando..." : "Exportar CSV"}
       </Button>
     </div>
   )
