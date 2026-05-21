@@ -13,7 +13,7 @@ export default async function LoginPage({
   const { error } = await searchParams
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-1 p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-3 text-center pb-8">
           <div className="mx-auto w-12 h-12 bg-green-brand rounded-xl flex items-center justify-center shadow-lg shadow-green-brand/20">
@@ -34,7 +34,7 @@ export default async function LoginPage({
         </CardHeader>
         <CardContent>
           {error && (
-            <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-600 text-sm font-medium text-center">
+            <div className="mb-4 p-3 rounded-md bg-red/10 border border-red/20 text-red text-sm font-medium text-center">
               {error === "CredentialsSignin" 
                 ? "Usuário/Email ou senha incorretos." 
                 : "Ocorreu um erro ao tentar acessar o sistema."}
@@ -56,11 +56,11 @@ export default async function LoginPage({
             {/* Opcional: Mostrar erro se existir no searchParams */}
             {/* Nota: Em Next.js 15+, searchParams é uma Promise */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold leading-none text-[#5F6775]">Usuário ou Email</label>
+              <label className="text-sm font-semibold leading-none text-gray-4">Usuário ou Email</label>
               <Input name="login" type="text" placeholder="nome.sobrenome ou email" required />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold leading-none text-[#5F6775]">Senha</label>
+              <label className="text-sm font-semibold leading-none text-gray-4">Senha</label>
               <Input name="password" type="password" required />
             </div>
             <Button type="submit" className="w-full bg-green-dark hover:bg-green-brand text-white mt-4 h-11 font-bold">
@@ -68,7 +68,7 @@ export default async function LoginPage({
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center text-xs text-slate-500 pt-4 border-t mt-4">
+        <CardFooter className="flex justify-center text-xs text-gray-4 pt-4 border-t border-gray-2 mt-4">
           © 2026 Nexus Corporate Hub
         </CardFooter>
       </Card>
