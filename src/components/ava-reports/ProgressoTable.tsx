@@ -2,8 +2,20 @@
 
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, MoreHorizontal, ListTodo, MessageSquare } from "lucide-react"
 import { ActivityListDialog } from "./ActivityListDialog"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu"
 
 // ──────────────────────────────────────────
 // Helpers
@@ -116,6 +128,148 @@ function buildWhatsAppUrl(phone: string | null, aluno: string | null): string | 
   const num = digits.startsWith("55") ? digits : `55${digits}`
   const msg = encodeURIComponent(`Olá, ${aluno || "aluno"}! Entramos em contato referente ao seu progresso nas atividades.`)
   return `https://wa.me/${num}?text=${msg}`
+}
+
+function buildMoodleUrl(institution: string | null, alunoId: string | null): string | null {
+  if (!alunoId) return null
+  const inst = String(institution || "").trim().toLowerCase()
+  let baseUrl = ""
+  
+  if (inst === "ead") {
+    baseUrl = "https://avaead.unievangelica.edu.br"
+  } else if (inst === "uni") {
+    baseUrl = "https://avagrad.unievangelica.edu.br"
+  } else if (inst === "uniego") {
+    baseUrl = "https://ava.uniego.edu.br"
+  } else if (inst === "raizes") {
+    baseUrl = "https://ava.faculdaderaizes.edu.br"
+  } else if (inst === "eefn") {
+    baseUrl = "https://ava.aee.edu.br"
+  } else {
+    return null
+  }
+  
+  return `${baseUrl}/message/index.php?id=${alunoId}`
+}
+
+// ──────────────────────────────────────────
+// Ações da Linha (Dropdown Menu com Submenus)
+// ──────────────────────────────────────────
+function RowActions({ row, phoneFormatted, waUrl }: {
+  row: any
+  phoneFormatted: string | null
+  waUrl: string | null
+}) {
+  const [activeDialog, setActiveDialog] = useState<"fase1" | "fase2" | "fase3" | null>(null)
+
+  const hasFase1 = row.listaFase1 && row.listaFase1.trim().length > 0
+  const hasFase2 = row.listaFase2 && row.listaFase2.trim().length > 0
+  const hasFase3 = row.listaFase3 && row.listaFase3.trim().length > 0
+
+  const moodleUrl = buildMoodleUrl(row.sourceInstitution, row.alunoId)
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="w-8 h-8 p-0 rounded-full hover:bg-slate-100/80 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors focus:outline-none cursor-pointer"
+        >
+          <MoreHorizontal className="w-4 h-4" />
+          <span className="sr-only">Ações</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200/80 shadow-md rounded-md p-1 z-50">
+          <DropdownMenuItem
+            disabled={!waUrl}
+            onClick={() => waUrl && window.open(waUrl, "_blank")}
+            className="flex items-center gap-2 text-[11px] text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer py-1.5 px-2 rounded-md disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+            <span>Enviar WhatsApp</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            disabled={!moodleUrl}
+            onClick={() => moodleUrl && window.open(moodleUrl, "_blank")}
+            className="flex items-center gap-2 text-[11px] text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer py-1.5 px-2 rounded-md disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Mensagem no AVA</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator className="my-1 border-t border-slate-100" />
+
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger
+              className="flex items-center gap-2 text-[11px] text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer py-1.5 px-2 rounded-md"
+            >
+              <ListTodo className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span>Ver Atividades</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent className="w-40 bg-white border border-slate-200/80 shadow-md rounded-md p-1 z-50">
+                <DropdownMenuItem
+                  disabled={!hasFase1}
+                  onClick={() => setActiveDialog("fase1")}
+                  className="flex items-center justify-between text-[11px] text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer py-1.5 px-2 rounded-md disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <span>Fase 1</span>
+                  {row.fase1 !== null && <span className="text-[10px] text-slate-400 font-bold">{row.fase1}%</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!hasFase2}
+                  onClick={() => setActiveDialog("fase2")}
+                  className="flex items-center justify-between text-[11px] text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer py-1.5 px-2 rounded-md disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <span>Fase 2</span>
+                  {row.fase2 !== null && <span className="text-[10px] text-slate-400 font-bold">{row.fase2}%</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!hasFase3}
+                  onClick={() => setActiveDialog("fase3")}
+                  className="flex items-center justify-between text-[11px] text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer py-1.5 px-2 rounded-md disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  <span>Fase 3</span>
+                  {row.fase3 !== null && <span className="text-[10px] text-slate-400 font-bold">{row.fase3}%</span>}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Dialogs */}
+      {activeDialog === "fase1" && hasFase1 && (
+        <ActivityListDialog
+          fase="Fase 1"
+          faseLabel="Fase 1"
+          listaRaw={row.listaFase1}
+          fasePercent={String(parseProgressNum(row.fase1) || 0)}
+          open={true}
+          onClose={() => setActiveDialog(null)}
+        />
+      )}
+      {activeDialog === "fase2" && hasFase2 && (
+        <ActivityListDialog
+          fase="Fase 2"
+          faseLabel="Fase 2"
+          listaRaw={row.listaFase2}
+          fasePercent={String(parseProgressNum(row.fase2) || 0)}
+          open={true}
+          onClose={() => setActiveDialog(null)}
+        />
+      )}
+      {activeDialog === "fase3" && hasFase3 && (
+        <ActivityListDialog
+          fase="Fase 3"
+          faseLabel="Fase 3"
+          listaRaw={row.listaFase3}
+          fasePercent={String(parseProgressNum(row.fase3) || 0)}
+          open={true}
+          onClose={() => setActiveDialog(null)}
+        />
+      )}
+    </>
+  )
 }
 
 // ──────────────────────────────────────────
@@ -231,27 +385,8 @@ export function ProgressoTable({ data }: { data: any[] }) {
                 </td>
 
                 {/* Ações */}
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-1.5">
-                    {waUrl ? (
-                      <a
-                        href={waUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`WhatsApp: ${phoneFormatted}`}
-                        className="w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors shadow-sm"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 text-white" />
-                      </a>
-                    ) : (
-                      <div
-                        title="Telefone não disponível"
-                        className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 text-gray-300" />
-                      </div>
-                    )}
-                  </div>
+                <td className="px-3 py-2 text-center">
+                  <RowActions row={row} phoneFormatted={phoneFormatted} waUrl={waUrl} />
                 </td>
               </tr>
             )
