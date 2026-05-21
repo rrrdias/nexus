@@ -341,7 +341,7 @@ export function DashboardProgresso({ title, metrics, institution }: { title: str
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <ProgressoTable data={metrics.data} />
+          <ProgressoTable data={metrics.data} institution={institution} />
           <ProgressoPagination
             currentPage={metrics.page}
             totalPages={metrics.total_pages}

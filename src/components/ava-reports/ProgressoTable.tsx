@@ -275,7 +275,7 @@ function RowActions({ row, phoneFormatted, waUrl }: {
 // ──────────────────────────────────────────
 // Componente Principal
 // ──────────────────────────────────────────
-export function ProgressoTable({ data }: { data: any[] }) {
+export function ProgressoTable({ data, institution }: { data: any[], institution?: string }) {
   if (!data || data.length === 0) {
     return (
       <div className="p-12 text-center">
@@ -284,9 +284,13 @@ export function ProgressoTable({ data }: { data: any[] }) {
     )
   }
 
+  const showPolo = institution === "ead" || institution === "uni"
+
   const headers = [
     "Matrícula", "Nome Completo", "Telefone", "Disciplina",
-    "Curso", "Período", "Polo", "Último Acesso", "Inativ.",
+    "Curso", "Período",
+    ...(showPolo ? ["Polo"] : []),
+    "Último Acesso", "Inativ.",
     "Status", "Fase 1", "Fase 2", "Fase 3", "Total", "Ações"
   ]
 
@@ -334,24 +338,24 @@ export function ProgressoTable({ data }: { data: any[] }) {
                 </td>
 
                 {/* Disciplina */}
-                <td className="px-3 py-2 text-[#1976D2] font-medium max-w-[200px]">
-                  <span
-                    className="block truncate"
-                    title={row.curso || undefined}
-                    style={{ maxWidth: 200 }}
-                  >
-                    {row.curso || "-"}
-                  </span>
+                <td className="px-3 py-2 text-[#1976D2] font-medium min-w-[180px] max-w-[240px] whitespace-normal break-words leading-snug">
+                  {row.curso || "-"}
                 </td>
 
                 {/* Curso */}
-                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{row.cursoPerfil || "-"}</td>
+                <td className="px-3 py-2 text-gray-600 min-w-[140px] max-w-[200px] whitespace-normal break-words leading-snug">
+                  {row.cursoPerfil || "-"}
+                </td>
 
                 {/* Período */}
                 <td className="px-3 py-2 text-gray-600 text-center whitespace-nowrap">{row.periodoPerfil || row.periodo || "-"}</td>
 
                 {/* Polo */}
-                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{row.unidadeFisica || "-"}</td>
+                {showPolo && (
+                  <td className="px-3 py-2 text-gray-600 min-w-[150px] max-w-[220px] whitespace-normal break-words leading-snug">
+                    {row.unidadeFisica || "-"}
+                  </td>
+                )}
 
                 {/* Último Acesso */}
                 <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{row.lastaccess || "-"}</td>
