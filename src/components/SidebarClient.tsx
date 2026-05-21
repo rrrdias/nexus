@@ -17,6 +17,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
   const [mounted, setMounted] = useState(false)
   const [isReportsOpen, setIsReportsOpen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [justCollapsed, setJustCollapsed] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -34,6 +35,13 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
     const nextState = !isCollapsed
     setIsCollapsed(nextState)
     localStorage.setItem("sidebar-collapsed", nextState ? "true" : "false")
+    
+    if (nextState) {
+      setJustCollapsed(true)
+    } else {
+      setJustCollapsed(false)
+    }
+
     setTimeout(() => {
       setIsTransitioning(false)
     }, 300)
@@ -44,7 +52,14 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
   const collapsedState = mounted ? isCollapsed : false
 
   return (
-    <aside className={`bg-navy flex flex-col h-full shadow-2xl z-30 transition-all duration-300 ease-in-out relative shrink-0 ${collapsedState ? "w-[72px] overflow-visible" : "w-64"}`}>
+    <aside 
+      onMouseEnter={() => {
+        if (justCollapsed) {
+          setJustCollapsed(false)
+        }
+      }}
+      className={`bg-navy flex flex-col h-full shadow-2xl z-30 transition-all duration-300 ease-in-out relative shrink-0 ${collapsedState ? "w-[72px] overflow-visible" : "w-64"}`}
+    >
       {/* Botão de Toggle Flutuante */}
       {mounted && (
         <button 
@@ -122,7 +137,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
           {/* Balão Tooltip Lateral */}
           {collapsedState && (
             <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
-              isTransitioning ? "!opacity-0 !invisible !pointer-events-none" : ""
+              isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
             }`}>
               Dashboard
             </span>
@@ -161,7 +176,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                 {collapsedState ? (
                   /* Collapsed state: Floating submenu on hover */
                   <div className={`absolute left-full top-0 ml-3 w-64 bg-navy border border-white/10 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto before:content-[''] before:absolute before:-left-16 before:-top-8 before:-bottom-8 before:w-16 ${
-                    isTransitioning ? "!opacity-0 !invisible !pointer-events-none" : ""
+                    isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                   }`}>
                     <div className="px-4 py-1.5 border-b border-white/5 text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1 select-none">
                       {sys.name}
@@ -217,7 +232,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
               {/* Balão Tooltip Lateral */}
               {collapsedState && (
                 <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
-                  isTransitioning ? "!opacity-0 !invisible !pointer-events-none" : ""
+                  isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                 }`}>
                   {sys.name}
                 </span>
@@ -250,7 +265,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
               {/* Balão Tooltip Lateral */}
               {collapsedState && (
                 <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
-                  isTransitioning ? "!opacity-0 !invisible !pointer-events-none" : ""
+                  isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                 }`}>
                   Usuários e Acessos
                 </span>
@@ -269,7 +284,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
               {/* Balão Tooltip Lateral */}
               {collapsedState && (
                 <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
-                  isTransitioning ? "!opacity-0 !invisible !pointer-events-none" : ""
+                  isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                 }`}>
                   Grupos e Permissões
                 </span>
@@ -295,7 +310,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
           {/* Balão Tooltip Lateral */}
           {collapsedState && (
             <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
-              isTransitioning ? "!opacity-0 !invisible !pointer-events-none" : ""
+              isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
             }`}>
               Sair do sistema
             </span>
