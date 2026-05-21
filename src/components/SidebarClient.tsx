@@ -111,7 +111,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[165px] opacity-100 ml-3"
           }`}>
             <span className="text-white text-sm font-medium tracking-tight truncate whitespace-nowrap">{session.user.name}</span>
-            <span className="text-green-400 text-[10px] font-bold uppercase tracking-wider mt-0.5 truncate whitespace-nowrap">
+            <span className="text-green-dark text-[10px] font-bold uppercase tracking-wider mt-0.5 truncate whitespace-nowrap">
               {/* @ts-ignore */}
               {session.user.groups?.length > 0 ? session.user.groups.join(', ') : 'Sem Grupo'}
             </span>
@@ -132,7 +132,11 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
         {/* Dashboard Link */}
         <Link 
           href="/" 
-          className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none ${pathname === '/' ? 'bg-navy-light text-white font-semibold' : ''}`}
+          className={`flex items-center rounded-lg transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none border-l-2 ${
+            pathname === '/'
+              ? 'bg-[rgba(45,206,108,0.12)] text-white font-semibold border-green-brand'
+              : 'text-white/50 hover:bg-navy-light hover:text-white border-transparent'
+          }`}
         >
           <LayoutDashboard className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
           <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
@@ -141,7 +145,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
           {/* Balão Tooltip Lateral */}
           {collapsedState && (
-            <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
+            <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
               isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
             }`}>
               Dashboard
@@ -162,7 +166,11 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                       setIsReportsOpen(!isReportsOpen)
                     }
                   }}
-                  className={`flex items-center justify-between rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-300 ease-in-out cursor-pointer w-full h-10 px-2.5 focus:outline-none ${isActive ? 'bg-navy-light/40 text-white font-medium' : ''}`}
+              className={`flex items-center justify-between rounded-lg transition-all duration-300 ease-in-out cursor-pointer w-full h-10 px-2.5 focus:outline-none border-l-2 ${
+                isActive
+                  ? 'bg-[rgba(45,206,108,0.12)] text-white font-medium border-green-brand'
+                  : 'text-white/50 hover:bg-navy-light hover:text-white border-transparent'
+              }`}
                 >
                   <div className="flex items-center">
                     <Box className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
@@ -227,7 +235,11 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             <Link 
               key={sys.id} 
               href={sys.pathUrl} 
-              className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none ${isActive ? 'bg-navy-light text-white font-semibold' : ''}`}
+              className={`flex items-center rounded-lg transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none border-l-2 ${
+                isActive
+                  ? 'bg-[rgba(45,206,108,0.12)] text-white font-semibold border-green-brand'
+                  : 'text-white/50 hover:bg-navy-light hover:text-white border-transparent'
+              }`}
             >
               <Box className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
               <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
@@ -236,7 +248,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
               {/* Balão Tooltip Lateral */}
               {collapsedState && (
-                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
+                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
                   isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                 }`}>
                   {sys.name}
@@ -260,7 +272,11 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             
             <Link 
               href="/admin/users" 
-              className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none ${pathname.startsWith('/admin/users') ? 'bg-navy-light text-white font-semibold' : ''}`}
+              className={`flex items-center rounded-lg transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none border-l-2 ${
+                pathname.startsWith('/admin/users')
+                  ? 'bg-[rgba(45,206,108,0.12)] text-white font-semibold border-green-brand'
+                  : 'text-white/50 hover:bg-navy-light hover:text-white border-transparent'
+              }`}
             >
               <Users className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
               <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
@@ -269,7 +285,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
               {/* Balão Tooltip Lateral */}
               {collapsedState && (
-                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
+                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
                   isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                 }`}>
                   Usuários e Acessos
@@ -279,7 +295,11 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             
             <Link 
               href="/admin/groups" 
-              className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none ${pathname.startsWith('/admin/groups') ? 'bg-navy-light text-white font-semibold' : ''}`}
+              className={`flex items-center rounded-lg transition-all duration-300 ease-in-out group relative w-full h-10 px-2.5 justify-start focus:outline-none border-l-2 ${
+                pathname.startsWith('/admin/groups')
+                  ? 'bg-[rgba(45,206,108,0.12)] text-white font-semibold border-green-brand'
+                  : 'text-white/50 hover:bg-navy-light hover:text-white border-transparent'
+              }`}
             >
               <ShieldCheck className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
               <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
@@ -288,7 +308,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
               {/* Balão Tooltip Lateral */}
               {collapsedState && (
-                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
+                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
                   isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                 }`}>
                   Grupos e Permissões
@@ -314,7 +334,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
           {/* Balão Tooltip Lateral */}
           {collapsedState && (
-            <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950 ${
+            <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
               isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
             }`}>
               Sair do sistema
