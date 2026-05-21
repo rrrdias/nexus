@@ -90,7 +90,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       )}
 
       {/* Links de Navegação */}
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {!collapsedState ? (
           <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest px-3 mb-2 mt-4 select-none">Módulos</div>
         ) : (
@@ -103,13 +103,12 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${pathname === '/' ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
         >
           <LayoutDashboard className="w-5 h-5 shrink-0" />
-          {!collapsedState ? (
-            <span className="text-[12px] font-medium">Dashboard</span>
-          ) : (
-            <span className="absolute left-[62px] bg-slate-950 border border-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
-              Dashboard
-            </span>
-          )}
+          {!collapsedState && <span className="text-[12px] font-medium">Dashboard</span>}
+
+          {/* Balão Tooltip Premium (Expandido & Retraído) */}
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-950 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-950">
+            Dashboard
+          </span>
         </Link>
 
         {/* Módulos do Usuário */}
@@ -118,10 +117,10 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
           
           if (sys.name === 'AVA Reports') {
             if (!collapsedState) {
-              // Modo Expandido: Acordeão Detalhado
+              // Modo Expandido: Acordeão Detalhado com Tooltip na Summary
               return (
-                <details key={sys.id} className="group" open={pathname.startsWith('/relatorios')}>
-                  <summary className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden ${isActive ? 'bg-navy-light/40 text-white font-medium' : ''}`}>
+                <details key={sys.id} className="group relative" open={pathname.startsWith('/relatorios')}>
+                  <summary className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden group/sum relative ${isActive ? 'bg-navy-light/40 text-white font-medium' : ''}`}>
                     <div className="flex items-center gap-3">
                       <Box className="w-5 h-5 shrink-0" />
                       <span className="text-[12px] font-medium">{sys.name}</span>
@@ -129,6 +128,11 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                     <svg className="w-4 h-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
+
+                    {/* Balão Tooltip Premium no hover da summary */}
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover/sum:opacity-100 translate-y-1 group-hover/sum:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
+                      {sys.name}
+                    </span>
                   </summary>
                   <div className="pl-11 pr-3 py-2 space-y-2 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10">
                     <Link href="/relatorios/progresso" className={`block text-[11px] hover:text-white py-1 transition-colors ${pathname === '/relatorios/progresso' ? 'text-green-brand font-medium' : 'text-white/40'}`}>Progresso EaD</Link>
@@ -140,7 +144,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                 </details>
               )
             } else {
-              // Modo Retraído: Dropdown/Submenu Flutuante (Estilo Adianti)
+              // Modo Retraído: Dropdown/Submenu Flutuante (Estilo Adianti) com cabeçalho identificador
               return (
                 <div key={sys.id} className="group relative flex justify-center">
                   <button className={`flex items-center justify-center w-10 h-10 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 ${isActive ? 'bg-navy-light text-white' : ''}`}>
@@ -183,13 +187,12 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${isActive ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
             >
               <Box className="w-5 h-5 shrink-0" />
-              {!collapsedState ? (
-                <span className="text-[12px] font-medium">{sys.name}</span>
-              ) : (
-                <span className="absolute left-[62px] bg-slate-950 border border-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
-                  {sys.name}
-                </span>
-              )}
+              {!collapsedState && <span className="text-[12px] font-medium">{sys.name}</span>}
+
+              {/* Balão Tooltip Premium (Expandido & Retraído) */}
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
+                {sys.name}
+              </span>
             </Link>
           )
         })}
@@ -209,13 +212,12 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${pathname.startsWith('/admin/users') ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
             >
               <Users className="w-5 h-5 shrink-0" />
-              {!collapsedState ? (
-                <span className="text-[12px] font-medium">Usuários e Acessos</span>
-              ) : (
-                <span className="absolute left-[62px] bg-slate-950 border border-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
-                  Usuários e Acessos
-                </span>
-              )}
+              {!collapsedState && <span className="text-[12px] font-medium">Usuários e Acessos</span>}
+
+              {/* Balão Tooltip Premium (Expandido & Retraído) */}
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
+                Usuários e Acessos
+              </span>
             </Link>
             
             <Link 
@@ -223,13 +225,12 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${pathname.startsWith('/admin/groups') ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
             >
               <ShieldCheck className="w-5 h-5 shrink-0" />
-              {!collapsedState ? (
-                <span className="text-[12px] font-medium">Grupos e Permissões</span>
-              ) : (
-                <span className="absolute left-[62px] bg-slate-950 border border-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
-                  Grupos e Permissões
-                </span>
-              )}
+              {!collapsedState && <span className="text-[12px] font-medium">Grupos e Permissões</span>}
+
+              {/* Balão Tooltip Premium (Expandido & Retraído) */}
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
+                Grupos e Permissões
+              </span>
             </Link>
           </>
         )}
@@ -246,19 +247,28 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             >
               <LogOut className="w-5 h-5 shrink-0 text-red-400/80 hover:text-red-400" />
             </button>
-            <span className="absolute left-[62px] bottom-3 bg-slate-950 border border-slate-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
+
+            {/* Balão Tooltip Premium (Retraído) */}
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
               Sair do sistema
             </span>
           </div>
         ) : (
-          <Button 
-            variant="ghost" 
-            onClick={() => window.location.href = "/api/auth/signout"}
-            className="w-full justify-start text-white/50 hover:text-white hover:bg-navy-light text-[12px] transition-all duration-200 cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 mr-2 text-red-400/80" />
-            Sair do sistema
-          </Button>
+          <div className="group relative">
+            <Button 
+              variant="ghost" 
+              onClick={() => window.location.href = "/api/auth/signout"}
+              className="w-full justify-start text-white/50 hover:text-white hover:bg-navy-light text-[12px] transition-all duration-200 cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 mr-2 text-red-400/80" />
+              Sair do sistema
+            </Button>
+
+            {/* Balão Tooltip Premium (Expandido) */}
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
+              Sair do sistema
+            </span>
+          </div>
         )}
       </div>
     </aside>
