@@ -77,7 +77,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       )}
 
       {/* Header com Logotipo */}
-      <div className={`h-16 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
+      <div className={`h-16 shrink-0 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
         <div className="w-8 h-8 rounded-md bg-green-brand flex items-center justify-center shrink-0 shadow-inner">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
             <circle cx="8.5" cy="8.5" r="3" fill="#1C2B4A" opacity=".9"/>
@@ -99,7 +99,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
       {/* Perfil do Usuário */}
       {session?.user && (
-        <div className={`transition-all duration-300 select-none flex items-center border ${
+        <div className={`transition-all duration-300 select-none flex items-center shrink-0 border ${
           collapsedState 
             ? "mt-4 mx-2 p-1 bg-white/0 border-white/0 justify-center" 
             : "p-3 mt-4 bg-white/5 border-white/10 mx-4 rounded-lg"
@@ -300,7 +300,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       </nav>
 
       {/* Rodapé com botão Sair */}
-      <div className={`border-t border-white/10 transition-all duration-300 p-4 w-full ${collapsedState ? "px-2" : ""}`}>
+      <div className={`border-t border-white/10 transition-all duration-300 p-4 w-full shrink-0 ${collapsedState ? "px-2" : ""}`}>
         <div className="group relative flex justify-center w-full">
           <button 
             onClick={() => window.location.href = "/api/auth/signout"}
