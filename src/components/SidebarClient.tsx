@@ -18,12 +18,16 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
   const [isReportsOpen, setIsReportsOpen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [justCollapsed, setJustCollapsed] = useState(false)
+  // collapsedUIState atrasa a troca de accordion → floating até após a animação terminar,
+  // evitando que o floating seja montado enquanto o cursor ainda está sobre a sidebar
+  const [collapsedUIState, setCollapsedUIState] = useState(false)
 
   useEffect(() => {
     setMounted(true)
     const saved = localStorage.getItem("sidebar-collapsed")
     if (saved === "true") {
       setIsCollapsed(true)
+      setCollapsedUIState(true)
     }
     if (pathname.startsWith('/relatorios')) {
       setIsReportsOpen(true)
@@ -37,14 +41,24 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
     localStorage.setItem("sidebar-collapsed", nextState ? "true" : "false")
     
     if (nextState) {
+      // Recolhendo: fecha submenu imediatamente para evitar ghost hover
+      setIsReportsOpen(false)
       setJustCollapsed(true)
+      // collapsedUIState só ativa DEPOIS da animação (400ms)
+      // para evitar que o floating seja montado com o cursor ainda sobre a sidebar
+      setTimeout(() => {
+        setCollapsedUIState(true)
+      }, 400)
     } else {
+      // Expandindo: reverte collapsedUIState imediatamente (o accordion pode aparecer logo)
+      setCollapsedUIState(false)
       setJustCollapsed(false)
     }
 
+    // 400ms cobre a animação CSS (300ms) + swap de render do React
     setTimeout(() => {
       setIsTransitioning(false)
-    }, 300)
+    }, 400)
   }
 
   // Se não estiver montado no cliente, renderiza o estado padrão (expandido) 
@@ -185,8 +199,8 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                   />
                 </button>
                 
-                {/* Submenu Area - Dual rendering based on collapsedState via CSS */}
-                {collapsedState ? (
+                {/* Submenu Area - Dual rendering based on collapsedUIState com delay */}
+                {collapsedUIState ? (
                   /* Collapsed state: Floating submenu on hover */
                   <div className={`absolute left-full top-0 ml-3 w-64 bg-navy border border-white/10 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto before:content-[''] before:absolute before:-left-16 before:-top-8 before:-bottom-8 before:w-16 ${
                     isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
