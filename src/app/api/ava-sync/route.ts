@@ -111,7 +111,7 @@ async function syncProgress(institution: string, getUrl: string | undefined, att
         const exists = await db.query.avaProgressReport.findFirst({
           where: and(
             eq(avaProgressReport.sourceInstitution, institution),
-            eq(avaProgressReport.matricula, matricula),
+            eq(avaProgressReport.alunoId, String(item.aluno_id || '')),
             eq(avaProgressReport.curso, curso)
           )
         })
@@ -122,6 +122,7 @@ async function syncProgress(institution: string, getUrl: string | undefined, att
           usuario: item.usuario,
           aluno: item.aluno,
           matricula,
+          userPhone1: item.user_phone1 || null,
           periodo: item.periodo,
           enrolmentStatus: item.enrolment_status,
           lastaccess: item.lastaccess,

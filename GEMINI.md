@@ -39,11 +39,15 @@
 
 ```
 # Preencha após a leitura do repositório:
-NOME_DO_PROJETO   = Nexus Core
-LINGUAGEM_PRIMARIA = TypeScript / React
-FRAMEWORK         = Next.js 16.2.6
+NOME_DO_PROJETO   = Nexus Core (Sistemas Acadêmicos Integrados)
+LINGUAGEM_PRIMARIA = TypeScript / React 19
+FRAMEWORK         = Next.js 16.2.6 (Turbopack App Router)
+ESTILIZACAO       = Tailwind CSS v4 / Shadcn UI
+BANCO_DE_DADOS    = PostgreSQL via Drizzle ORM
+AUTENTICACAO      = NextAuth v5
 AMBIENTE_ALVO     = Desenvolvimento / Produção
 BRANCH_PRINCIPAL  = master
+PORTA_PADRAO      = 3002
 ```
 
 ---
@@ -301,15 +305,18 @@ Variáveis privadas  → prefixo _           (_internalCache, _config)
 Enums               → PascalCase          (UserRole, PaymentStatus)
 ```
 
-**Estrutura de Arquivos:**
+**Estrutura de Arquivos (Next.js App Router):**
 
 ```
 src/
-├── domain/         ← entidades e interfaces de negócio
-├── application/    ← casos de uso e serviços
-├── infrastructure/ ← implementações externas (DB, API, cache)
-├── interfaces/     ← controllers, rotas, adapters
-└── shared/         ← utilitários e tipos compartilhados
+├── app/            ← páginas, layouts, Server Actions e API Routes (Next.js)
+├── components/     ← componentes de UI reutilizáveis (shadcn) e específicos por módulo
+│   ├── ava-reports/← componentes do módulo AVA Reports (tabela, cards, filtros, dialogs)
+│   └── ui/         ← componentes primitivos do Shadcn
+├── db/             ← configuração de banco de dados (Drizzle client, schemas e migrações)
+├── lib/            ← funções utilitárias e helpers compartilhados (ex: utils.ts)
+├── auth.ts         ← configurações e handlers de autenticação (NextAuth v5)
+└── proxy.ts        ← proxy reverso local para desenvolvimento integrado
 ```
 
 **Regras de Qualidade:**
@@ -484,6 +491,38 @@ Para projetos grandes, este arquivo pode importar sub-documentos usando a sintax
 @./docs/ARCHITECTURE.md
 @./docs/AGENT_INSTRUCTIONS.md
 ```
+
+## Módulo AVA Reports (AVA Sync)
+
+Este módulo centraliza o monitoramento, sincronização de dados e gerenciamento de notas e progresso de estudantes de graduação EaD e disciplinas online do ecossistema educacional. A migração foi executada a partir de uma base em Python/Nuxt legada e reescrita de maneira nativa, performática e integrada ao banco de dados unificado da plataforma.
+
+### 1. Arquitetura de Sincronização
+- **API Centralizada**: Em `src/app/api/ava-sync/route.ts`, gerenciada por token do sistema (`CRON_SECRET`), permitindo que robôs de sincronização agendados (cron jobs) invoquem a API em lote ou para uma instituição e tipo específicos.
+- **Processamento em Lote (Chunks)**: O tráfego e gravação de milhares de registros do Moodle são processados em chunks de 50 registros por ciclo com pausas de 50ms para evitar estouros de conexões ou CPU no banco de dados e APIs externas.
+- **Drizzle ORM & Postgres**: Gravação direta via UPSERT relacional usando o banco de dados. Os dados coletados não são armazenados em disco como JSON (diferente do sistema legado).
+
+### 2. Lógica e Convenções de Negócio
+- **Padrão de Paginação**: O page size padrão para todas as tabelas e grids gerenciais é fixado em **30 registros** por página para melhor renderização e usabilidade.
+- **Estrutura de Atividades nas Fases**: O progresso detalhado de cada fase (`listaFase1`, `listaFase2`, `listaFase3`) vem estruturado em string única delimitada por pipes (`|`) e separada por dois pontos (`:`), no formato:
+  `"Nome da Atividade:Status de Conclusão:Data de Conclusão|Atividade 2:Status:Data"`
+- **Cálculo de Inatividade**: Exibido em dias decorridos baseado no valor consolidado no banco (`dias_sem_acesso`) ou calculado no frontend a partir do campo `lastaccess` (ex: "08/05/2026" - DD/MM/YYYY) confrontado com a data atual.
+- **Datas Limiares das Fases (Calendário 2026-1)**:
+  - **Fase 1**: 13/02/2026 – 29/03/2026 (Média esperada ativa: >= 40% no decorrer, >= 100% após término)
+  - **Fase 2**: 30/03/2026 – 11/05/2026 (Média esperada ativa: >= 40% no decorrer, >= 100% após término)
+  - **Fase 3**: 12/05/2026 – 19/06/2026 (Média esperada ativa: >= 40% no decorrer, >= 100% após término)
+
+### 3. Diretrizes de Design e UX (Identidade Nexus Hub)
+- **Tabela Gerencial**: Cabeçalho de tabela estruturado estritamente na cor clara de fundo `bg-[#F4F5F7]` com textos informativos pequenos `text-[#9AA0AC]`, alinhado à estética elegante do Nexus e fugindo do design clássico azul-marinho (Navy) do legado.
+- **Cartões de Métricas Globais**:
+  - Cards de topo responsivos com barras de status indicando o progresso das Fases 1, 2 e 3 em tempo real.
+  - Cores semânticas harmoniosas baseadas no HSL do Nexus (ex: `#1C2B4A` Navy, `#27AE60` Green-brand, Amber-500, Red-500).
+- **Ações Rápidas**:
+  - Integração com WhatsApp Web no telefone formatado (`userPhone1`) contendo mensagens automáticas customizadas com base no progresso e nome do aluno.
+  - Balões de fases clicáveis que abrem diálogos contendo a listagem dinâmica de atividades.
+  - Exportação nativa em planilha Excel via biblioteca `xlsx`.
+
+### 4. Práticas de Desenvolvimento Relevantes
+- **⚠️ Preservação de Codificação (UTF-8 Obrigatório)**: O compilador Next.js 16/Turbopack é altamente estrito com caracteres especiais e formatos inválidos de codificação de arquivos. **NUNCA** salve códigos TSX através de scripts ou redirecionamentos de terminal (como `Set-Content` do PowerShell) sem especificar explicitamente a codificação UTF-8 (`-Encoding UTF8` ou de preferência usando a API nativa de escrita de arquivos do agente), evitando assim falhas de build por UTF-8 corrompido.
 
 ---
 

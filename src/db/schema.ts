@@ -79,6 +79,7 @@ export const avaProgressReport = pgTable("ava_progress_report", {
   usuario: text("usuario"),
   aluno: text("aluno"),
   matricula: text("matricula"),
+  userPhone1: text("user_phone1"),
   periodo: text("periodo"),
   enrolmentStatus: text("enrolment_status"),
   lastaccess: text("lastaccess"),
