@@ -285,7 +285,7 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
       </div>
 
       <AlertDialog open={isConfirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent className="rounded-2xl border-0 shadow-2xl p-6">
+        <AlertDialogContent className="rounded-2xl border-0 shadow-2xl p-6 bg-white max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-extrabold text-navy">
               Iniciar Sincronização
@@ -293,16 +293,16 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
             <AlertDialogDescription className="text-gray-4 text-[14px]">
               Deseja iniciar a sincronização de dados {institution ? `de ${institution.toUpperCase()}` : 'GLOBAL'} com o Moodle? 
               <br/><br/>
-              Este processo trará as últimas notas e percentuais de conclusão em tempo real, mas <strong>pode levar alguns minutos</strong> dependendo do volume de dados.
+              Este processo trará os <strong>percentuais de progresso e conclusão das fases</strong> em tempo real, mas pode levar alguns minutos dependendo do volume de dados.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel className="border-gray-2 text-gray-9 hover:bg-gray-1 font-semibold rounded-lg h-11">
+          <AlertDialogFooter className="mt-8 border-t-0 bg-transparent p-0 m-0 sm:justify-end gap-3 flex-row justify-end">
+            <AlertDialogCancel className="border-gray-2 text-gray-9 hover:bg-gray-1 font-semibold rounded-lg h-11 px-6 mt-0">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmSync}
-              className="bg-navy hover:bg-navy-light text-white font-semibold rounded-lg h-11 transition-colors"
+              className="bg-navy hover:bg-navy-light text-white font-semibold rounded-lg h-11 px-6 transition-colors"
             >
               Confirmar Sincronização
             </AlertDialogAction>
