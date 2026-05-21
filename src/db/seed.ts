@@ -1,6 +1,6 @@
 import { db } from './index';
 import { users, systemModules, usersSystemAccess, auditLogs, groups, userGroups, groupSystemAccess } from './schema';
-import { eq } from 'drizzle-orm';
+import { hashPassword } from '../lib/password';
 
 async function main() {
   console.log('🌱 Iniciando seed do Core DB com Drizzle...');
@@ -48,12 +48,17 @@ async function main() {
 
   console.log('✅ Grupos criados!');
 
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error('SEED_ADMIN_PASSWORD is required');
+  }
+
   // Usuário Administrador
   const adminResult = await db.insert(users).values({
     userid: 'ricardo.dias',
     name: 'Ricardo Dias',
     email: 'rrrdias25@gmail.com',
-    password: 'senha_secreta_admin', // Use hashing em produção
+    password: await hashPassword(adminPassword),
   }).returning();
   const adminUser = adminResult[0];
 

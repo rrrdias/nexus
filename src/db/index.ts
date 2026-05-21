@@ -2,7 +2,11 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://admin:1213122@127.0.0.1:5432/core_db'
+const connectionString = process.env.DATABASE_URL
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL is required')
+}
 
 /**
  * Cache the database connection in development. This avoids creating a new connection on every HMR

@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import { hashPassword, isPasswordHash, verifyPassword } from "@/lib/password"
 
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -11,9 +12,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Senha", type: "password" },
       },
       async authorize(credentials) {
-        console.log("Authorize called with:", { login: credentials?.login })
-        if (!credentials?.login || !credentials?.password) {
-          console.log("Missing login or password")
+        const login = String(credentials?.login ?? "").trim()
+        const password = String(credentials?.password ?? "")
+
+        if (!login || !password) {
           return null
         }
 
@@ -25,25 +27,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           const user = await db.select().from(users).where(
             or(
-              eq(users.userid, credentials.login as string),
-              eq(users.email, credentials.login as string)
+              eq(users.userid, login),
+              eq(users.email, login)
             )
           ).limit(1)
 
-          console.log("User query result:", user.length > 0 ? { id: user[0].id, userid: user[0].userid, email: user[0].email, isActive: user[0].isActive } : "Usuário não encontrado")
-          
           if (user.length === 0) return null
 
           // Bloqueia login de usuários inativos
           if (user[0].isActive === false) {
-            console.log("User is inactive")
             return null
           }
 
-          // Em produção, use bcrypt.compare(credentials.password, user[0].password)
-          if (user[0].password !== credentials.password) {
-            console.log("Password mismatch")
+          const passwordMatches = await verifyPassword(password, user[0].password)
+          if (!passwordMatches) {
             return null
+          }
+
+          if (!isPasswordHash(user[0].password)) {
+            await db.update(users)
+              .set({ password: await hashPassword(password) })
+              .where(eq(users.id, user[0].id))
           }
 
           const groupsData = await db.select({
@@ -53,8 +57,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .from(userGroups)
           .innerJoin(groups, eq(userGroups.groupId, groups.id))
           .where(eq(userGroups.userId, user[0].id))
-
-          console.log("User groups:", groupsData.map(g => g.name))
 
           return {
             ...user[0],
