@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { db } from "@/db"
 import { avaProgressReport, avaGradesReport } from "@/db/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, or } from "drizzle-orm"
+import { timingSafeEqual } from "node:crypto"
 
 // Função auxiliar para processar em chunks e evitar sobrecarga
 async function processInChunks<T>(items: T[], chunkSize: number, processor: (chunk: T[]) => Promise<void>) {
@@ -14,31 +15,93 @@ async function processInChunks<T>(items: T[], chunkSize: number, processor: (chu
 
 async function syncGrades(institution: string, getUrl: string | undefined, attUrl: string | undefined) {
   if (!getUrl) return { source: `${institution}_grades`, status: 'skipped', reason: 'URL missing' }
-  
+
   console.log(`[SYNC] Iniciando Notas ${institution}...`)
+
+  // Timeout de 15 segundos para evitar requisições presas no Moodle
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+
   try {
-    const res = await fetch(getUrl, { cache: 'no-store' })
-    if (!res.ok) return { source: `${institution}_grades`, status: 'error', reason: `Fetch failed: ${res.status}` }
-    
-    const data = await res.json()
-    if (!Array.isArray(data)) return { source: `${institution}_grades`, status: 'error', reason: 'Invalid data format' }
+    let res
+    try {
+      res = await fetch(getUrl, { cache: 'no-store', signal: controller.signal })
+    } catch (fetchError: any) {
+      if (fetchError.name === 'AbortError') {
+        return { source: `${institution}_grades`, status: 'skipped', reason: 'Timeout na resposta do Moodle (15s)' }
+      }
+      return { source: `${institution}_grades`, status: 'skipped', reason: `Erro de conexão: ${fetchError.message}` }
+    } finally {
+      clearTimeout(timeoutId)
+    }
+
+    if (!res.ok) {
+      return { source: `${institution}_grades`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` }
+    }
+
+    const textContent = await res.text()
+    if (!textContent || textContent.trim() === '') {
+      return { source: `${institution}_grades`, status: 'skipped', reason: 'Arquivo de relatório vazio (Moodle gerando)' }
+    }
+
+    const cleanText = textContent.trim()
+    if (cleanText.startsWith('<!DOCTYPE') || cleanText.startsWith('<html') || cleanText.startsWith('<xml')) {
+      return { source: `${institution}_grades`, status: 'skipped', reason: 'Moodle retornou HTML/Erro (Relatório sendo gerado ou não autorizado)' }
+    }
+
+    let data
+    try {
+      data = JSON.parse(cleanText)
+    } catch (parseError: any) {
+      return { source: `${institution}_grades`, status: 'skipped', reason: `JSON inválido retornado pelo Moodle: ${parseError.message.substring(0, 50)}` }
+    }
+
+    if (!Array.isArray(data)) {
+      if (data && typeof data === 'object' && ('exception' in data || 'error' in data || 'message' in data)) {
+        return { source: `${institution}_grades`, status: 'skipped', reason: `Erro no Moodle: ${(data as any).message || (data as any).exception || 'Desconhecido'}` }
+      }
+      return { source: `${institution}_grades`, status: 'skipped', reason: 'Formato de dados inválido (esperado array)' }
+    }
 
     let inserted = 0
     let updated = 0
 
     await processInChunks(data, 50, async (chunk) => {
-      for (const item of chunk) {
+      // Filtra registros válidos
+      const validItems = chunk.filter(item => {
         const userId = String(item.user_id || item.aluno_id || '')
         const courseId = String(item.course_id || '')
-        if (!userId || !courseId) continue
+        return userId && courseId
+      })
 
-        const exists = await db.query.avaGradesReport.findFirst({
-          where: and(
-            eq(avaGradesReport.sourceInstitution, institution),
-            eq(avaGradesReport.userId, userId),
-            eq(avaGradesReport.courseId, courseId)
-          )
-        })
+      if (validItems.length === 0) return
+
+      // SELECT em lote para o chunk
+      const conditions = validItems.map(item => and(
+        eq(avaGradesReport.sourceInstitution, institution),
+        eq(avaGradesReport.userId, String(item.user_id || item.aluno_id || '')),
+        eq(avaGradesReport.courseId, String(item.course_id || ''))
+      ))
+
+      const existing = await db.select()
+        .from(avaGradesReport)
+        .where(or(...conditions))
+
+      // Mapeia registros existentes para busca O(1)
+      const existingMap = new Map<string, any>()
+      for (const row of existing) {
+        const key = `${row.userId}_${row.courseId}`
+        existingMap.set(key, row)
+      }
+
+      const inserts: any[] = []
+      const updates: { id: string; values: any }[] = []
+
+      for (const item of validItems) {
+        const userId = String(item.user_id || item.aluno_id || '')
+        const courseId = String(item.course_id || '')
+        const key = `${userId}_${courseId}`
+        const exists = existingMap.get(key)
 
         const values = {
           sourceInstitution: institution,
@@ -67,12 +130,24 @@ async function syncGrades(institution: string, getUrl: string | undefined, attUr
         }
 
         if (exists) {
-          await db.update(avaGradesReport).set(values).where(eq(avaGradesReport.id, exists.id))
-          updated++
+          updates.push({ id: exists.id, values })
         } else {
-          await db.insert(avaGradesReport).values(values)
-          inserted++
+          inserts.push(values)
         }
+      }
+
+      // Executa Bulk Insert das novas inserções no chunk
+      if (inserts.length > 0) {
+        await db.insert(avaGradesReport).values(inserts)
+        inserted += inserts.length
+      }
+
+      // Executa atualizações em paralelo dentro do chunk para otimizar tempo
+      if (updates.length > 0) {
+        await Promise.all(updates.map(u =>
+          db.update(avaGradesReport).set(u.values).where(eq(avaGradesReport.id, u.id))
+        ))
+        updated += updates.length
       }
     })
 
@@ -90,35 +165,98 @@ async function syncGrades(institution: string, getUrl: string | undefined, attUr
 
 async function syncProgress(institution: string, getUrl: string | undefined, attUrl: string | undefined) {
   if (!getUrl) return { source: `${institution}_progress`, status: 'skipped', reason: 'URL missing' }
-  
+
   console.log(`[SYNC] Iniciando Progresso ${institution}...`)
+
+  // Timeout de 15 segundos para evitar requisições presas no Moodle
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+
   try {
-    const res = await fetch(getUrl, { cache: 'no-store' })
-    if (!res.ok) return { source: `${institution}_progress`, status: 'error', reason: `Fetch failed: ${res.status}` }
-    
-    const data = await res.json()
-    if (!Array.isArray(data)) return { source: `${institution}_progress`, status: 'error', reason: 'Invalid data format' }
+    let res
+    try {
+      res = await fetch(getUrl, { cache: 'no-store', signal: controller.signal })
+    } catch (fetchError: any) {
+      if (fetchError.name === 'AbortError') {
+        return { source: `${institution}_progress`, status: 'skipped', reason: 'Timeout na resposta do Moodle (15s)' }
+      }
+      return { source: `${institution}_progress`, status: 'skipped', reason: `Erro de conexão: ${fetchError.message}` }
+    } finally {
+      clearTimeout(timeoutId)
+    }
+
+    if (!res.ok) {
+      return { source: `${institution}_progress`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` }
+    }
+
+    const textContent = await res.text()
+    if (!textContent || textContent.trim() === '') {
+      return { source: `${institution}_progress`, status: 'skipped', reason: 'Arquivo de relatório vazio (Moodle gerando)' }
+    }
+
+    const cleanText = textContent.trim()
+    if (cleanText.startsWith('<!DOCTYPE') || cleanText.startsWith('<html') || cleanText.startsWith('<xml')) {
+      return { source: `${institution}_progress`, status: 'skipped', reason: 'Moodle retornou HTML/Erro (Relatório sendo gerado ou não autorizado)' }
+    }
+
+    let data
+    try {
+      data = JSON.parse(cleanText)
+    } catch (parseError: any) {
+      return { source: `${institution}_progress`, status: 'skipped', reason: `JSON inválido retornado pelo Moodle: ${parseError.message.substring(0, 50)}` }
+    }
+
+    if (!Array.isArray(data)) {
+      if (data && typeof data === 'object' && ('exception' in data || 'error' in data || 'message' in data)) {
+        return { source: `${institution}_progress`, status: 'skipped', reason: `Erro no Moodle: ${(data as any).message || (data as any).exception || 'Desconhecido'}` }
+      }
+      return { source: `${institution}_progress`, status: 'skipped', reason: 'Formato de dados inválido (esperado array)' }
+    }
 
     let inserted = 0
     let updated = 0
 
     await processInChunks(data, 50, async (chunk) => {
-      for (const item of chunk) {
+      // Filtra registros válidos
+      const validItems = chunk.filter(item => {
         const matricula = String(item.matricula || '')
         const curso = String(item.curso || '')
-        if (!matricula || !curso) continue
+        return matricula && curso
+      })
 
-        const exists = await db.query.avaProgressReport.findFirst({
-          where: and(
-            eq(avaProgressReport.sourceInstitution, institution),
-            eq(avaProgressReport.alunoId, String(item.aluno_id || '')),
-            eq(avaProgressReport.curso, curso)
-          )
-        })
+      if (validItems.length === 0) return
+
+      // SELECT em lote para o chunk
+      const conditions = validItems.map(item => and(
+        eq(avaProgressReport.sourceInstitution, institution),
+        eq(avaProgressReport.alunoId, String(item.aluno_id || '')),
+        eq(avaProgressReport.curso, String(item.curso || ''))
+      ))
+
+      const existing = await db.select()
+        .from(avaProgressReport)
+        .where(or(...conditions))
+
+      // Mapeia registros existentes para busca O(1)
+      const existingMap = new Map<string, any>()
+      for (const row of existing) {
+        const key = `${row.alunoId}_${row.curso}`
+        existingMap.set(key, row)
+      }
+
+      const inserts: any[] = []
+      const updates: { id: string; values: any }[] = []
+
+      for (const item of validItems) {
+        const matricula = String(item.matricula || '')
+        const curso = String(item.curso || '')
+        const alunoId = String(item.aluno_id || '')
+        const key = `${alunoId}_${curso}`
+        const exists = existingMap.get(key)
 
         const values = {
           sourceInstitution: institution,
-          alunoId: String(item.aluno_id || ''),
+          alunoId,
           usuario: item.usuario,
           aluno: item.aluno,
           matricula,
@@ -142,12 +280,24 @@ async function syncProgress(institution: string, getUrl: string | undefined, att
         }
 
         if (exists) {
-          await db.update(avaProgressReport).set(values).where(eq(avaProgressReport.id, exists.id))
-          updated++
+          updates.push({ id: exists.id, values })
         } else {
-          await db.insert(avaProgressReport).values(values)
-          inserted++
+          inserts.push(values)
         }
+      }
+
+      // Executa Bulk Insert das novas inserções no chunk
+      if (inserts.length > 0) {
+        await db.insert(avaProgressReport).values(inserts)
+        inserted += inserts.length
+      }
+
+      // Executa atualizações em paralelo dentro do chunk para otimizar tempo
+      if (updates.length > 0) {
+        await Promise.all(updates.map(u =>
+          db.update(avaProgressReport).set(u.values).where(eq(avaProgressReport.id, u.id))
+        ))
+        updated += updates.length
       }
     })
 
@@ -169,7 +319,11 @@ export async function GET(request: Request) {
   const type = searchParams.get('type')?.toLowerCase() // 'grades' ou 'progress'
 
   const authHeader = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 503 })
+  }
+
+  if (!isAuthorized(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -211,4 +365,14 @@ export async function GET(request: Request) {
     console.error("Erro no sync global do Moodle:", error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
+}
+
+function isAuthorized(authHeader: string | null, secret: string) {
+  const expected = `Bearer ${secret}`
+  if (!authHeader) return false
+
+  const actualBuffer = Buffer.from(authHeader)
+  const expectedBuffer = Buffer.from(expected)
+
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
 }
