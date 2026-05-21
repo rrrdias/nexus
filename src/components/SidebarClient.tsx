@@ -144,13 +144,13 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             } else {
               // Modo Retraído: Dropdown/Submenu Flutuante (Estilo Adianti)
               return (
-                <div key={sys.id} className="group relative flex justify-center">
+                <div key={sys.id} className="group relative flex justify-center w-10 h-10 mx-auto">
                   <button className={`flex items-center justify-center w-10 h-10 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 ${isActive ? 'bg-navy-light text-white' : ''}`}>
                     <Box className="w-5 h-5 shrink-0" />
                   </button>
                   
                   {/* Submenu Flutuante Lateral */}
-                  <div className="absolute left-[52px] top-0 ml-2 w-64 bg-navy border border-slate-700/60 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-250 z-50 pointer-events-none group-hover:pointer-events-auto">
+                  <div className="absolute left-full top-0 ml-3 w-64 bg-navy border border-slate-700/60 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto before:content-[''] before:absolute before:-left-16 before:-top-8 before:-bottom-8 before:w-16">
                     <div className="px-4 py-1.5 border-b border-white/5 text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1 select-none">
                       {sys.name}
                     </div>
