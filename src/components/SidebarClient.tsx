@@ -53,8 +53,13 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
   return (
     <aside 
-      onMouseEnter={() => {
-        if (justCollapsed) {
+      onMouseEnter={(e) => {
+        if (justCollapsed && !isTransitioning && e.clientX <= 72) {
+          setJustCollapsed(false)
+        }
+      }}
+      onMouseMove={(e) => {
+        if (justCollapsed && !isTransitioning && e.clientX <= 72) {
           setJustCollapsed(false)
         }
       }}
