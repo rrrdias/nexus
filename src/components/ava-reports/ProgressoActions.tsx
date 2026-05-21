@@ -297,12 +297,12 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 border-t-0 bg-transparent p-0 m-0 sm:justify-end gap-3 flex-row justify-end">
-            <AlertDialogCancel className="border-gray-2 text-gray-9 hover:bg-gray-1 font-semibold rounded-lg h-11 px-6 mt-0">
+            <AlertDialogCancel className="border border-red/40 text-red hover:bg-red/10 hover:border-red hover:text-red font-semibold rounded-lg h-11 px-6 mt-0 transition-colors">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmSync}
-              className="bg-navy hover:bg-navy-light text-white font-semibold rounded-lg h-11 px-6 transition-colors"
+              className="bg-green-dark hover:bg-green-brand text-white font-semibold rounded-lg h-11 px-6 transition-colors border border-transparent"
             >
               Confirmar Sincronização
             </AlertDialogAction>
