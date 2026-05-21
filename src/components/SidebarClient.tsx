@@ -16,6 +16,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isReportsOpen, setIsReportsOpen] = useState(false)
+  const [isProgressOpen, setIsProgressOpen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [justCollapsed, setJustCollapsed] = useState(false)
   // collapsedUIState atrasa a troca de accordion → floating até após a animação terminar,
@@ -31,6 +32,9 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
     }
     if (pathname.startsWith('/relatorios')) {
       setIsReportsOpen(true)
+      if (pathname.startsWith('/relatorios/progresso')) {
+        setIsProgressOpen(true)
+      }
     }
   }, [pathname])
 
@@ -205,39 +209,61 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                   <div className={`absolute left-full top-0 ml-3 w-64 bg-navy border border-white/10 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto before:content-[''] before:absolute before:-left-16 before:-top-8 before:-bottom-8 before:w-16 ${
                     isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                   }`}>
-                    <div className="px-4 py-1.5 border-b border-white/5 text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1 select-none">
+                    <div className="px-4 py-1.5 border-b border-white/5 text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2 select-none">
                       {sys.name}
                     </div>
                     <div className="px-2 py-1 space-y-1">
+                      <div className="px-3 py-1 text-[9px] font-bold text-white/30 uppercase tracking-widest mt-1">
+                        Progresso
+                      </div>
                       <Link href="/relatorios/progresso" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
-                        Progresso EaD
+                        EaD
                       </Link>
                       <Link href="/relatorios/progresso/uni" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/uni' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
-                        Progresso Online Uni
+                        Online Uni
                       </Link>
                       <Link href="/relatorios/progresso/uniego" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/uniego' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
-                        Progresso Online UNIEGO
+                        Online UNIEGO
                       </Link>
                       <Link href="/relatorios/progresso/raizes" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/raizes' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
-                        Progresso Online Raízes
+                        Online Raízes
                       </Link>
                       <Link href="/relatorios/progresso/eefn" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/eefn' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
-                        Progresso Online EEFN
+                        Online EEFN
                       </Link>
                     </div>
                   </div>
                 ) : (
                   /* Expanded state: Accordion sub-list with smooth height/opacity transition */
                   <div 
-                    className={`pl-11 pr-3 space-y-2 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10 overflow-hidden transition-all duration-300 ease-in-out ${
-                      isReportsOpen && !isTransitioning ? "max-h-60 opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
+                    className={`pl-11 pr-3 space-y-1 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10 overflow-hidden transition-all duration-300 ease-in-out ${
+                      isReportsOpen && !isTransitioning ? "max-h-[500px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
                     }`}
                   >
-                    <Link href="/relatorios/progresso" className={`block text-[11px] hover:text-white py-1 transition-colors ${pathname === '/relatorios/progresso' ? 'text-green-brand font-medium' : 'text-white/40'}`}>Progresso EaD</Link>
-                    <Link href="/relatorios/progresso/uni" className={`block text-[11px] hover:text-white py-1 transition-colors ${pathname === '/relatorios/progresso/uni' ? 'text-green-brand font-medium' : 'text-white/40'}`}>Progresso Online Uni</Link>
-                    <Link href="/relatorios/progresso/uniego" className={`block text-[11px] hover:text-white py-1 transition-colors ${pathname === '/relatorios/progresso/uniego' ? 'text-green-brand font-medium' : 'text-white/40'}`}>Progresso Online UNIEGO</Link>
-                    <Link href="/relatorios/progresso/raizes" className={`block text-[11px] hover:text-white py-1 transition-colors ${pathname === '/relatorios/progresso/raizes' ? 'text-green-brand font-medium' : 'text-white/40'}`}>Progresso Online Raízes</Link>
-                    <Link href="/relatorios/progresso/eefn" className={`block text-[11px] hover:text-white py-1 transition-colors ${pathname === '/relatorios/progresso/eefn' ? 'text-green-brand font-medium' : 'text-white/40'}`}>Progresso Online EEFN</Link>
+                    {/* Grupo: Progresso */}
+                    <div className="group/progress relative w-full">
+                      <button 
+                        onClick={(e) => { e.preventDefault(); setIsProgressOpen(!isProgressOpen); }}
+                        className={`flex items-center justify-between rounded-md transition-all duration-300 ease-in-out cursor-pointer w-full h-8 px-2 focus:outline-none ${
+                          pathname.startsWith('/relatorios/progresso')
+                            ? 'text-white font-medium bg-white/5'
+                            : 'text-white/60 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <span className="text-[11px]">Progresso</span>
+                        <ChevronRight className={`w-3.5 h-3.5 transition-all duration-300 opacity-50 ${isProgressOpen ? "rotate-90" : ""}`} />
+                      </button>
+                      
+                      <div className={`pl-4 space-y-0.5 relative before:content-[''] before:absolute before:left-3 before:top-1 before:bottom-2 before:w-[1px] before:bg-white/5 overflow-hidden transition-all duration-300 ease-in-out ${
+                        isProgressOpen ? "max-h-60 opacity-100 py-1" : "max-h-0 opacity-0 py-0 pointer-events-none"
+                      }`}>
+                        <Link href="/relatorios/progresso" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/progresso' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/40 hover:bg-navy-light/40'}`}>EaD</Link>
+                        <Link href="/relatorios/progresso/uni" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/uni' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/40 hover:bg-navy-light/40'}`}>Online Uni</Link>
+                        <Link href="/relatorios/progresso/uniego" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/uniego' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/40 hover:bg-navy-light/40'}`}>Online UNIEGO</Link>
+                        <Link href="/relatorios/progresso/raizes" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/raizes' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/40 hover:bg-navy-light/40'}`}>Online Raízes</Link>
+                        <Link href="/relatorios/progresso/eefn" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/eefn' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/40 hover:bg-navy-light/40'}`}>Online EEFN</Link>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
