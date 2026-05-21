@@ -36,7 +36,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
   const collapsedState = mounted ? isCollapsed : false
 
   return (
-    <aside className={`bg-navy flex flex-col h-full shadow-2xl z-30 transition-all duration-300 ease-in-out relative shrink-0 ${collapsedState ? "w-[72px]" : "w-64"}`}>
+    <aside className={`bg-navy flex flex-col h-full shadow-2xl z-30 transition-all duration-300 ease-in-out relative shrink-0 ${collapsedState ? "w-[72px] overflow-visible" : "w-64"}`}>
       {/* Botão de Toggle Flutuante */}
       {mounted && (
         <button 
@@ -49,7 +49,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       )}
 
       {/* Header com Logotipo */}
-      <div className={`p-6 flex items-center gap-3 border-b border-white/10 select-none ${collapsedState ? "justify-center" : ""}`}>
+      <div className={`py-6 flex items-center gap-3 border-b border-white/10 select-none ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
         <div className="w-8 h-8 rounded-md bg-green-brand flex items-center justify-center shrink-0 shadow-inner">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
             <circle cx="8.5" cy="8.5" r="3" fill="#1C2B4A" opacity=".9"/>
@@ -73,7 +73,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
 
       {/* Perfil do Usuário */}
       {session?.user && (
-        <div className={`p-4 mt-4 bg-slate-800/40 rounded-lg flex items-center gap-3 border border-slate-700/30 transition-all duration-300 select-none ${collapsedState ? "mx-2 px-2 justify-center" : "mx-4"}`}>
+        <div className={`transition-all duration-300 select-none ${collapsedState ? "mt-4 flex justify-center" : "p-4 mt-4 bg-slate-800/40 rounded-lg flex items-center gap-3 border border-slate-700/30 mx-4"}`}>
           <div className="w-10 h-10 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold text-sm shrink-0 shadow-md border border-slate-600">
             {initials}
           </div>
@@ -90,7 +90,8 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       )}
 
       {/* Links de Navegação */}
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+      {/* Quando colapsado, usamos overflow-visible para permitir que tooltips e submenus flutuem sem causar barras de rolagem ou clipping */}
+      <nav className={`flex-1 px-4 py-6 space-y-2 ${collapsedState ? "overflow-visible" : "overflow-y-auto overflow-x-hidden"}`}>
         {!collapsedState ? (
           <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest px-3 mb-2 mt-4 select-none">Módulos</div>
         ) : (
@@ -100,15 +101,17 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
         {/* Dashboard Link */}
         <Link 
           href="/" 
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${pathname === '/' ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
+          className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${collapsedState ? "w-10 h-10 justify-center px-0" : "gap-3 px-3 py-2.5 w-full"} ${pathname === '/' ? 'bg-navy-light text-white font-semibold' : ''}`}
         >
           <LayoutDashboard className="w-5 h-5 shrink-0" />
           {!collapsedState && <span className="text-[12px] font-medium">Dashboard</span>}
 
-          {/* Balão Tooltip Premium (Expandido & Retraído) */}
-          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-950 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-950">
-            Dashboard
-          </span>
+          {/* Balão Tooltip Lateral (Apenas quando colapsado) */}
+          {collapsedState && (
+            <span className="absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-slate-700/80 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950">
+              Dashboard
+            </span>
+          )}
         </Link>
 
         {/* Módulos do Usuário */}
@@ -117,10 +120,10 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
           
           if (sys.name === 'AVA Reports') {
             if (!collapsedState) {
-              // Modo Expandido: Acordeão Detalhado com Tooltip na Summary
+              // Modo Expandido: Acordeão Detalhado (Sem Tooltip)
               return (
-                <details key={sys.id} className="group relative" open={pathname.startsWith('/relatorios')}>
-                  <summary className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden group/sum relative ${isActive ? 'bg-navy-light/40 text-white font-medium' : ''}`}>
+                <details key={sys.id} className="group" open={pathname.startsWith('/relatorios')}>
+                  <summary className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-colors cursor-pointer list-none [&::-webkit-details-marker]:hidden ${isActive ? 'bg-navy-light/40 text-white font-medium' : ''}`}>
                     <div className="flex items-center gap-3">
                       <Box className="w-5 h-5 shrink-0" />
                       <span className="text-[12px] font-medium">{sys.name}</span>
@@ -128,11 +131,6 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                     <svg className="w-4 h-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-
-                    {/* Balão Tooltip Premium no hover da summary */}
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover/sum:opacity-100 translate-y-1 group-hover/sum:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
-                      {sys.name}
-                    </span>
                   </summary>
                   <div className="pl-11 pr-3 py-2 space-y-2 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10">
                     <Link href="/relatorios/progresso" className={`block text-[11px] hover:text-white py-1 transition-colors ${pathname === '/relatorios/progresso' ? 'text-green-brand font-medium' : 'text-white/40'}`}>Progresso EaD</Link>
@@ -144,7 +142,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                 </details>
               )
             } else {
-              // Modo Retraído: Dropdown/Submenu Flutuante (Estilo Adianti) com cabeçalho identificador
+              // Modo Retraído: Dropdown/Submenu Flutuante (Estilo Adianti)
               return (
                 <div key={sys.id} className="group relative flex justify-center">
                   <button className={`flex items-center justify-center w-10 h-10 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 ${isActive ? 'bg-navy-light text-white' : ''}`}>
@@ -152,7 +150,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
                   </button>
                   
                   {/* Submenu Flutuante Lateral */}
-                  <div className="absolute left-[56px] top-0 ml-2 w-64 bg-navy border border-slate-700/60 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-250 z-50 pointer-events-none group-hover:pointer-events-auto">
+                  <div className="absolute left-[52px] top-0 ml-2 w-64 bg-navy border border-slate-700/60 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-250 z-50 pointer-events-none group-hover:pointer-events-auto">
                     <div className="px-4 py-1.5 border-b border-white/5 text-[11px] font-bold text-white/40 uppercase tracking-wider mb-1 select-none">
                       {sys.name}
                     </div>
@@ -184,15 +182,17 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             <Link 
               key={sys.id} 
               href={sys.pathUrl} 
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${isActive ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
+              className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${collapsedState ? "w-10 h-10 justify-center px-0" : "gap-3 px-3 py-2.5 w-full"} ${isActive ? 'bg-navy-light text-white font-semibold' : ''}`}
             >
               <Box className="w-5 h-5 shrink-0" />
               {!collapsedState && <span className="text-[12px] font-medium">{sys.name}</span>}
 
-              {/* Balão Tooltip Premium (Expandido & Retraído) */}
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
-                {sys.name}
-              </span>
+              {/* Balão Tooltip Lateral (Apenas quando colapsado) */}
+              {collapsedState && (
+                <span className="absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-slate-700/80 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950">
+                  {sys.name}
+                </span>
+              )}
             </Link>
           )
         })}
@@ -209,66 +209,62 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
             
             <Link 
               href="/admin/users" 
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${pathname.startsWith('/admin/users') ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
+              className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${collapsedState ? "w-10 h-10 justify-center px-0" : "gap-3 px-3 py-2.5 w-full"} ${pathname.startsWith('/admin/users') ? 'bg-navy-light text-white font-semibold' : ''}`}
             >
               <Users className="w-5 h-5 shrink-0" />
               {!collapsedState && <span className="text-[12px] font-medium">Usuários e Acessos</span>}
 
-              {/* Balão Tooltip Premium (Expandido & Retraído) */}
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
-                Usuários e Acessos
-              </span>
+              {/* Balão Tooltip Lateral (Apenas quando colapsado) */}
+              {collapsedState && (
+                <span className="absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-slate-700/80 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950">
+                  Usuários e Acessos
+                </span>
+              )}
             </Link>
             
             <Link 
               href="/admin/groups" 
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${pathname.startsWith('/admin/groups') ? 'bg-navy-light text-white font-semibold' : ''} ${collapsedState ? "justify-center" : ""}`}
+              className={`flex items-center rounded-lg text-white/50 hover:bg-navy-light hover:text-white transition-all duration-200 group relative ${collapsedState ? "w-10 h-10 justify-center px-0" : "gap-3 px-3 py-2.5 w-full"} ${pathname.startsWith('/admin/groups') ? 'bg-navy-light text-white font-semibold' : ''}`}
             >
               <ShieldCheck className="w-5 h-5 shrink-0" />
               {!collapsedState && <span className="text-[12px] font-medium">Grupos e Permissões</span>}
 
-              {/* Balão Tooltip Premium (Expandido & Retraído) */}
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
-                Grupos e Permissões
-              </span>
+              {/* Balão Tooltip Lateral (Apenas quando colapsado) */}
+              {collapsedState && (
+                <span className="absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-slate-700/80 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950">
+                  Grupos e Permissões
+                </span>
+              )}
             </Link>
           </>
         )}
       </nav>
 
       {/* Rodapé com botão Sair */}
-      <div className={`p-4 border-t border-white/10 ${collapsedState ? "flex justify-center" : ""}`}>
+      <div className={`border-t border-white/10 transition-all duration-300 ${collapsedState ? "py-4 flex justify-center" : "p-4"}`}>
         {collapsedState ? (
-          <div className="group relative">
+          <div className="group relative flex justify-center">
             <button 
               onClick={() => window.location.href = "/api/auth/signout"}
               className="flex items-center justify-center w-10 h-10 rounded-lg text-white/50 hover:text-white hover:bg-navy-light hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
-              title="Sair do sistema"
             >
               <LogOut className="w-5 h-5 shrink-0 text-red-400/80 hover:text-red-400" />
             </button>
 
-            {/* Balão Tooltip Premium (Retraído) */}
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
+            {/* Balão Tooltip Lateral (Apenas quando colapsado) */}
+            <span className="absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-slate-950 border border-slate-700/80 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-slate-950">
               Sair do sistema
             </span>
           </div>
         ) : (
-          <div className="group relative">
-            <Button 
-              variant="ghost" 
-              onClick={() => window.location.href = "/api/auth/signout"}
-              className="w-full justify-start text-white/50 hover:text-white hover:bg-navy-light text-[12px] transition-all duration-200 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4 mr-2 text-red-400/80" />
-              Sair do sistema
-            </Button>
-
-            {/* Balão Tooltip Premium (Expandido) */}
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-955 bg-slate-955/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-955">
-              Sair do sistema
-            </span>
-          </div>
+          <Button 
+            variant="ghost" 
+            onClick={() => window.location.href = "/api/auth/signout"}
+            className="w-full justify-start text-white/50 hover:text-white hover:bg-navy-light text-[12px] transition-all duration-200 cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 mr-2 text-red-400/80" />
+            Sair do sistema
+          </Button>
         )}
       </div>
     </aside>
