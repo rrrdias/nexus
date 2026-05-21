@@ -69,7 +69,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       {mounted && (
         <button 
           onClick={toggleSidebar}
-          className="absolute top-6 -right-3 w-6 h-6 rounded-full bg-green-brand border-2 border-navy text-navy flex items-center justify-center shadow-lg hover:scale-110 hover:bg-green-400 active:scale-95 transition-all z-40 focus:outline-none cursor-pointer"
+          className="absolute top-5 -right-3 w-6 h-6 rounded-full bg-green-brand border-2 border-navy text-navy flex items-center justify-center shadow-lg hover:scale-110 hover:bg-green-400 active:scale-95 transition-all z-40 focus:outline-none cursor-pointer"
           title={collapsedState ? "Expandir menu" : "Recolher menu"}
         >
           {collapsedState ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
@@ -77,7 +77,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       )}
 
       {/* Header com Logotipo */}
-      <div className={`py-6 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
+      <div className={`py-4 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
         <div className="w-8 h-8 rounded-md bg-green-brand flex items-center justify-center shrink-0 shadow-inner">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
             <circle cx="8.5" cy="8.5" r="3" fill="#1C2B4A" opacity=".9"/>
