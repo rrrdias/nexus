@@ -215,17 +215,23 @@ function safeFilename(value: string) {
   return value.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "relatorio"
 }
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 export function ProgressoActions({ filters, institution }: { filters: any, institution?: string }) {
   const [isSyncing, setIsSyncing] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [isConfirmOpen, setConfirmOpen] = useState(false)
 
-  const handleSync = async () => {
-    const msg = institution 
-      ? `Deseja iniciar a sincronização de ${institution.toUpperCase()} com o Moodle? Isso pode levar alguns minutos.`
-      : "Deseja iniciar a sincronização GLOBAL com o Moodle? Isso pode levar alguns minutos."
-
-    if (!confirm(msg)) return
-    
+  const confirmSync = async () => {
     setIsSyncing(true)
     try {
       const result = await syncMoodleData(institution, "progress")
@@ -253,28 +259,56 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
   }
 
   return (
-    <div className="flex gap-2">
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={handleSync} 
-        disabled={isSyncing}
-        className="text-navy border-navy/20 hover:bg-navy/5 font-semibold"
-      >
-        <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
-        {isSyncing ? "Sincronizando..." : "Sincronizar Moodle"}
-      </Button>
-      
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={handleExport}
-        disabled={isExporting}
-        className="text-green-brand border-green-brand/20 hover:bg-green-brand/5 font-semibold"
-      >
-        <Download className={`w-4 h-4 mr-2 ${isExporting ? "animate-pulse" : ""}`} />
-        {isExporting ? "Exportando..." : "Exportar CSV"}
-      </Button>
-    </div>
+    <>
+      <div className="flex gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setConfirmOpen(true)} 
+          disabled={isSyncing}
+          className="text-navy border-navy/20 hover:bg-navy/5 font-semibold"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
+          {isSyncing ? "Sincronizando..." : "Sincronizar Moodle"}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleExport}
+          disabled={isExporting}
+          className="text-green-brand border-green-brand/20 hover:bg-green-brand/5 font-semibold"
+        >
+          <Download className={`w-4 h-4 mr-2 ${isExporting ? "animate-pulse" : ""}`} />
+          {isExporting ? "Exportando..." : "Exportar CSV"}
+        </Button>
+      </div>
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="rounded-2xl border-0 shadow-2xl p-6">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-extrabold text-navy">
+              Iniciar Sincronização
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-4 text-[14px]">
+              Deseja iniciar a sincronização de dados {institution ? `de ${institution.toUpperCase()}` : 'GLOBAL'} com o Moodle? 
+              <br/><br/>
+              Este processo trará as últimas notas e percentuais de conclusão em tempo real, mas <strong>pode levar alguns minutos</strong> dependendo do volume de dados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel className="border-gray-2 text-gray-9 hover:bg-gray-1 font-semibold rounded-lg h-11">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmSync}
+              className="bg-navy hover:bg-navy-light text-white font-semibold rounded-lg h-11 transition-colors"
+            >
+              Confirmar Sincronização
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
