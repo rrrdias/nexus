@@ -77,7 +77,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
           setJustCollapsed(false)
         }
       }}
-      className={`bg-navy flex flex-col h-full shadow-2xl z-30 transition-all duration-300 ease-in-out relative shrink-0 ${collapsedState ? "w-[72px] overflow-visible" : "w-64"}`}
+      className={`bg-navy flex flex-col h-full shadow-2xl z-30 transition-all duration-300 ease-in-out relative shrink-0 ${collapsedState ? "w-[72px] overflow-visible" : "w-[208px]"}`}
     >
       {/* Botão de Toggle Flutuante */}
       {mounted && (
@@ -91,8 +91,8 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       )}
 
       {/* Header com Logotipo */}
-      <div className={`h-16 shrink-0 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-6"}`}>
-        <div className="w-8 h-8 rounded-md bg-green-brand flex items-center justify-center shrink-0 shadow-inner">
+      <div className={`h-16 shrink-0 flex items-center gap-3 border-b border-white/10 select-none transition-all duration-300 ${collapsedState ? "px-2 justify-center" : "px-4"}`}>
+        <div className="w-7 h-7 rounded-[7px] bg-green-brand flex items-center justify-center shrink-0 shadow-inner">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
             <circle cx="8.5" cy="8.5" r="3" fill="#1C2B4A" opacity=".9"/>
             <circle cx="2.5" cy="2.5" r="1.5" fill="#1C2B4A" opacity=".55"/>
