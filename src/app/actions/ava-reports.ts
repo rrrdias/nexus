@@ -460,15 +460,253 @@ export async function getGradesData(page: number, size: number, filters: any) {
   await assertAvaAccess()
 
   try {
+    const conditions = []
+    
+    if (filters.sourceInstitution) conditions.push(eq(avaGradesReport.sourceInstitution, filters.sourceInstitution))
+    if (filters.aluno) conditions.push(ilike(avaGradesReport.studentName, `%${filters.aluno}%`))
+    if (filters.curso) conditions.push(ilike(avaGradesReport.courseFullname, `%${filters.curso}%`))
+    if (filters.usuario) conditions.push(ilike(avaGradesReport.userUsername, `%${filters.usuario}%`))
+    if (filters.matricula) conditions.push(ilike(avaGradesReport.userIdentification, `%${filters.matricula}%`))
+    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-1"
+    if (periodoFilter) conditions.push(ilike(avaGradesReport.periodo, `%${periodoFilter}%`))
+    if (filters.curso_perfil) conditions.push(ilike(avaGradesReport.cursoPerfil, `%${filters.curso_perfil}%`))
+    if (filters.periodo_perfil) conditions.push(ilike(avaGradesReport.periodoPerfil, `%${filters.periodo_perfil}%`))
+    if (filters.unidade_fisica) conditions.push(ilike(avaGradesReport.unidadeFisica, `%${filters.unidade_fisica}%`))
+    if (filters.enrolment_status) conditions.push(ilike(avaGradesReport.enrolmentStatus, `%${filters.enrolment_status}%`))
+
+    const acesso_value = filters.lastaccess
+    const filtro_inatividade = filters.dias_sem_acesso
+
+    if (acesso_value && acesso_value !== "sem_acesso" && acesso_value !== "com_acesso") {
+      conditions.push(ilike(avaGradesReport.lastaccess, `%${acesso_value}%`))
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+    const rawData = await db.select().from(avaGradesReport).where(whereClause)
+
+    const termosSemAcesso = ["nunca acessou", "sem acesso", "", "none", "nulo", "-"]
+
+    let filteredAccessData = rawData
+    if (acesso_value === "sem_acesso") {
+      filteredAccessData = rawData.filter(row => termosSemAcesso.includes(String(row.lastaccess || "").trim().toLowerCase()))
+    } else if (acesso_value === "com_acesso") {
+      filteredAccessData = rawData.filter(row => !termosSemAcesso.includes(String(row.lastaccess || "").trim().toLowerCase()))
+    }
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    const hojeTime = hoje.getTime()
+
+    let processedData = filteredAccessData.map(row => {
+      let dias: number | string = "-"
+      const acessoStr = String(row.lastaccess || "").trim()
+      
+      if (!acessoStr || termosSemAcesso.includes(acessoStr.toLowerCase())) {
+        dias = "-"
+      } else {
+        try {
+          const parts = acessoStr.split("/")
+          if (parts.length === 3) {
+            const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2])
+            if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+              const dt = new Date(y, m, d)
+              const diff = Math.floor((hojeTime - dt.getTime()) / (1000 * 60 * 60 * 24))
+              dias = diff >= 0 ? diff : 0
+            }
+          }
+        } catch (e) {
+          dias = "-"
+        }
+      }
+      return {
+        ...row,
+        diasSemAcesso: String(dias)
+      }
+    })
+
+    if (filtro_inatividade && filtro_inatividade !== "") {
+      try {
+        if (filtro_inatividade.includes("-")) {
+          const [minD, maxD] = filtro_inatividade.split("-").map(Number)
+          processedData = processedData.filter(row => {
+            const d = parseInt(row.diasSemAcesso as string)
+            return !isNaN(d) && d >= minD && d <= maxD
+          })
+        } else {
+          const match = filtro_inatividade.match(/\d+/)
+          if (match) {
+            const valMin = parseInt(match[0])
+            processedData = processedData.filter(row => {
+              const d = parseInt(row.diasSemAcesso as string)
+              return !isNaN(d) && d >= valMin
+            })
+          }
+        }
+      } catch (e) {
+        console.error("Erro no filtro de inatividade:", e)
+      }
+    }
+
+    const allFilteredData = processedData
+    const total_records = allFilteredData.length
+    const total_pages = Math.ceil(total_records / size)
+
     const offset = (page - 1) * size
+    const data = allFilteredData.slice(offset, offset + size)
+
+    // Calculo de Métricas de Notas (Usando 60 como limiar)
+    const parseGrade = (value: any) => {
+      if (value === null || value === undefined || value === "" || value === "-") return null
+      const parsed = parseFloat(String(value).replace(",", "."))
+      return isNaN(parsed) ? null : parsed
+    }
+
+    const avgFase = (key: 'fase1'|'fase2'|'fase3'|'media') => {
+      const vals = allFilteredData.map(r => parseGrade(r[key])).filter(v => v !== null) as number[]
+      if (vals.length === 0) return 0
+      const sum = vals.reduce((a, b) => a + b, 0)
+      return Number((sum / vals.length).toFixed(1))
+    }
+
+    const avg_f1 = avgFase('fase1')
+    const avg_f2 = avgFase('fase2')
+    const avg_f3 = avgFase('fase3')
+    const avg_total = avgFase('media')
+
+    const limiar = 60
+    let below_expected_count = 0
+    allFilteredData.forEach(row => {
+      const mediaFinal = parseGrade(row.media)
+      if (mediaFinal !== null && mediaFinal < limiar) {
+        below_expected_count++
+      }
+    })
+    const average_below_expected = total_records > 0 ? Math.round((below_expected_count / total_records) * 100) : 0
+
+    // Métricas de Inatividade
+    const matriculas_sem_acesso = allFilteredData.filter(r => r.diasSemAcesso === "-")
+    const count_mat_sem_acesso = matriculas_sem_acesso.length
+    const percent_mat_sem_acesso = total_records > 0 ? (count_mat_sem_acesso / total_records) * 100 : 0
+
+    const alunosUnicosSet = new Set(allFilteredData.map(r => r.userIdentification || r.studentName))
+    const total_alunos_unicos = alunosUnicosSet.size
+    const alunosSemAcessoSet = new Set(matriculas_sem_acesso.map(r => r.userIdentification || r.studentName))
+    const count_alunos_sem_acesso = alunosSemAcessoSet.size
+    const percent_alunos_sem_acesso = total_alunos_unicos > 0 ? (count_alunos_sem_acesso / total_alunos_unicos) * 100 : 0
+
+    return {
+      page, size, total_records, total_pages, data,
+      average_media: avg_total,
+      below_expected: below_expected_count,
+      average_below_expected,
+      average_fase1: avg_f1,
+      average_fase2: avg_f2,
+      average_fase3: avg_f3,
+      count_mat_sem_acesso,
+      percent_mat_sem_acesso,
+      count_alunos_sem_acesso,
+      percent_alunos_sem_acesso,
+      total_alunos_unicos
+    }
+  } catch (error) {
+    console.error("Erro em getGradesData:", error)
+    throw new Error("Falha ao buscar dados")
+  }
+}
+
+export async function exportGradesData(filters: any) {
+  await assertAvaAccess()
+
+  try {
     const conditions = []
     if (filters.sourceInstitution) conditions.push(eq(avaGradesReport.sourceInstitution, filters.sourceInstitution))
-    if (filters.student_name) conditions.push(ilike(avaGradesReport.studentName, `%${filters.student_name}%`))
+    if (filters.aluno) conditions.push(ilike(avaGradesReport.studentName, `%${filters.aluno}%`))
+    if (filters.curso) conditions.push(ilike(avaGradesReport.courseFullname, `%${filters.curso}%`))
+    if (filters.usuario) conditions.push(ilike(avaGradesReport.userUsername, `%${filters.usuario}%`))
+    if (filters.matricula) conditions.push(ilike(avaGradesReport.userIdentification, `%${filters.matricula}%`))
+    const exportPeriodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-1"
+    if (exportPeriodoFilter) conditions.push(ilike(avaGradesReport.periodo, `%${exportPeriodoFilter}%`))
+    if (filters.curso_perfil) conditions.push(ilike(avaGradesReport.cursoPerfil, `%${filters.curso_perfil}%`))
+    if (filters.periodo_perfil) conditions.push(ilike(avaGradesReport.periodoPerfil, `%${filters.periodo_perfil}%`))
+    if (filters.unidade_fisica) conditions.push(ilike(avaGradesReport.unidadeFisica, `%${filters.unidade_fisica}%`))
+    if (filters.enrolment_status) conditions.push(ilike(avaGradesReport.enrolmentStatus, `%${filters.enrolment_status}%`))
+
+    const acesso_value = filters.lastaccess
+    const filtro_inatividade = filters.dias_sem_acesso
+
+    if (acesso_value && acesso_value !== "sem_acesso" && acesso_value !== "com_acesso") {
+      conditions.push(ilike(avaGradesReport.lastaccess, `%${acesso_value}%`))
+    }
+    
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined
-    const data = await db.select().from(avaGradesReport).where(whereClause).limit(size).offset(offset)
-    const countResult = await db.select({ count: sql<number>`count(*)` }).from(avaGradesReport).where(whereClause)
-    return { page, size, total_records: Number(countResult[0]?.count || 0), total_pages: Math.ceil(Number(countResult[0]?.count || 0) / size), data }
+    const rawData = await db.select().from(avaGradesReport).where(whereClause)
+
+    const termosSemAcesso = ["nunca acessou", "sem acesso", "", "none", "nulo", "-"]
+
+    let filteredAccessData = rawData
+    if (acesso_value === "sem_acesso") {
+      filteredAccessData = rawData.filter(row => termosSemAcesso.includes(String(row.lastaccess || "").trim().toLowerCase()))
+    } else if (acesso_value === "com_acesso") {
+      filteredAccessData = rawData.filter(row => !termosSemAcesso.includes(String(row.lastaccess || "").trim().toLowerCase()))
+    }
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    const hojeTime = hoje.getTime()
+
+    let processedData = filteredAccessData.map(row => {
+      let dias: number | string = "-"
+      const acessoStr = String(row.lastaccess || "").trim()
+      
+      if (!acessoStr || termosSemAcesso.includes(acessoStr.toLowerCase())) {
+        dias = "-"
+      } else {
+        try {
+          const parts = acessoStr.split("/")
+          if (parts.length === 3) {
+            const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2])
+            if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+              const dt = new Date(y, m, d)
+              const diff = Math.floor((hojeTime - dt.getTime()) / (1000 * 60 * 60 * 24))
+              dias = diff >= 0 ? diff : 0
+            }
+          }
+        } catch (e) {
+          dias = "-"
+        }
+      }
+      return {
+        ...row,
+        diasSemAcesso: String(dias)
+      }
+    })
+
+    if (filtro_inatividade && filtro_inatividade !== "") {
+      try {
+        if (filtro_inatividade.includes("-")) {
+          const [minD, maxD] = filtro_inatividade.split("-").map(Number)
+          processedData = processedData.filter(row => {
+            const d = parseInt(row.diasSemAcesso as string)
+            return !isNaN(d) && d >= minD && d <= maxD
+          })
+        } else {
+          const match = filtro_inatividade.match(/\d+/)
+          if (match) {
+            const valMin = parseInt(match[0])
+            processedData = processedData.filter(row => {
+              const d = parseInt(row.diasSemAcesso as string)
+              return !isNaN(d) && d >= valMin
+            })
+          }
+        }
+      } catch (e) {
+        console.error("Erro no filtro de inatividade:", e)
+      }
+    }
+
+    return processedData
   } catch (error) {
-    throw new Error("Falha ao buscar dados")
+    console.error("Erro ao exportar dados de notas:", error)
+    throw new Error("Falha ao exportar dados")
   }
 }
