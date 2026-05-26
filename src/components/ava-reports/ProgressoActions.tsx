@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Download } from "lucide-react"
+import { RefreshCw, Download, CheckCircle2, AlertCircle } from "lucide-react"
 
 import { syncMoodleData, getProgressExportData } from "@/app/actions/ava-reports"
 
@@ -143,17 +143,17 @@ export async function exportProgressData({
 
     if (type === "below_expected") {
       if (phase) {
-        filtered = rawData.filter(row => isBelowExpectedOnPhase(row, phase, hoje))
+        filtered = rawData.filter((row: any) => isBelowExpectedOnPhase(row, phase, hoje))
       } else {
-        filtered = rawData.filter(row => isBelowExpectedOverall(row, hoje))
+        filtered = rawData.filter((row: any) => isBelowExpectedOverall(row, hoje))
       }
     } else if (type === "critical") {
       const critCourses = phase 
         ? getCriticalCoursesForPhase(rawData, phase, hoje)
         : getCriticalCourses(rawData, hoje)
-      filtered = rawData.filter(row => row.curso && critCourses.has(row.curso))
+      filtered = rawData.filter((row: any) => row.curso && critCourses.has(row.curso))
     } else if (type === "no_access") {
-      filtered = rawData.filter(row => termosSemAcesso.includes((row.lastaccess || "").toLowerCase().trim()))
+      filtered = rawData.filter((row: any) => termosSemAcesso.includes((row.lastaccess || "").toLowerCase().trim()))
     } else if (type === "general" && phase) {
       filtered = rawData
     }
@@ -163,7 +163,7 @@ export async function exportProgressData({
       return
     }
 
-    const exportRows = filtered.map(item => ({
+    const exportRows = filtered.map((item: any) => ({
       Matrícula: item.matricula || "-",
       Aluno: item.aluno || "-",
       "Telefone (WhatsApp)": item.userPhone1 || "-",
@@ -227,21 +227,19 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export function ProgressoActions({ filters, institution }: { filters: any, institution?: string }) {
-  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<"idle" | "confirming" | "syncing" | "success" | "error">("idle")
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
-  const [isConfirmOpen, setConfirmOpen] = useState(false)
 
   const confirmSync = async () => {
-    setIsSyncing(true)
+    setSyncStatus("syncing")
     try {
-      const result = await syncMoodleData(institution, "progress")
-      alert("Sincronização de progresso concluída com sucesso!")
-      window.location.reload()
+      await syncMoodleData(institution, "progress")
+      setSyncStatus("success")
     } catch (error: any) {
       console.error(error)
-      alert(`Erro: ${error.message || "Falha na sincronização"}`)
-    } finally {
-      setIsSyncing(false)
+      setSyncError(error.message || "Falha na sincronização")
+      setSyncStatus("error")
     }
   }
 
@@ -258,13 +256,15 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
     }
   }
 
+  const isSyncing = syncStatus === "syncing"
+
   return (
     <>
       <div className="flex gap-2">
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={() => setConfirmOpen(true)} 
+          onClick={() => setSyncStatus("confirming")} 
           disabled={isSyncing}
           className="text-navy border-navy/20 hover:bg-navy/5 font-semibold"
         >
@@ -284,29 +284,112 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
         </Button>
       </div>
 
-      <AlertDialog open={isConfirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog 
+        open={syncStatus !== "idle"} 
+        onOpenChange={(open) => {
+          if (syncStatus === "syncing") return
+          if (!open) setSyncStatus("idle")
+        }}
+      >
         <AlertDialogContent className="rounded-2xl border-0 shadow-2xl p-6 bg-white max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-extrabold text-navy">
-              Iniciar Sincronização
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-4 text-[14px]">
-              Deseja iniciar a sincronização de dados {institution ? `de ${institution.toUpperCase()}` : 'GLOBAL'} com o Moodle? 
-              <br/><br/>
-              Este processo trará os <strong>percentuais de progresso e conclusão das fases</strong> em tempo real, mas pode levar alguns minutos dependendo do volume de dados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-8 border-t-0 bg-transparent p-0 m-0 sm:justify-end gap-3 flex-row justify-end">
-            <AlertDialogCancel className="border border-red/40 text-red hover:bg-red/10 hover:border-red hover:text-red font-semibold rounded-lg h-11 px-6 mt-0 transition-colors">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmSync}
-              className="bg-green-dark hover:bg-green-brand text-white font-semibold rounded-lg h-11 px-6 transition-colors border border-transparent"
-            >
-              Confirmar Sincronização
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {syncStatus === "confirming" && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-extrabold text-navy">
+                  Iniciar Sincronização
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-gray-4 text-[14px]">
+                  Deseja iniciar a sincronização de dados {institution ? `de ${institution.toUpperCase()}` : 'GLOBAL'} com o Moodle? 
+                  <br/><br/>
+                  Este processo trará os <strong>percentuais de progresso e conclusão das fases</strong> em tempo real, mas pode levar alguns minutos dependendo do volume de dados.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-8 border-t-0 bg-transparent p-0 m-0 sm:justify-end gap-3 flex-row justify-end">
+                <AlertDialogCancel className="border border-red/40 text-red hover:bg-red/10 hover:border-red hover:text-red font-semibold rounded-lg h-11 px-6 mt-0 transition-colors">
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={confirmSync}
+                  className="bg-green-dark hover:bg-green-brand text-white font-semibold rounded-lg h-11 px-6 transition-colors border border-transparent font-sans"
+                >
+                  Confirmar Sincronização
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+
+          {syncStatus === "syncing" && (
+            <div className="flex flex-col items-center text-center py-6">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 rounded-full bg-green-brand/20 blur-xl animate-pulse" />
+                <div className="relative flex items-center justify-center w-20 h-20 rounded-full border-4 border-t-green-brand border-r-green-brand/30 border-b-green-brand/10 border-l-green-brand/60 animate-spin">
+                  <RefreshCw className="w-8 h-8 text-green-dark" />
+                </div>
+              </div>
+              <AlertDialogTitle className="text-xl font-extrabold text-navy mb-2">
+                Sincronizando Dados...
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-4 text-[14px] leading-relaxed max-w-sm">
+                Buscando os dados em tempo real no Moodle. Este processo pode levar alguns minutos.
+                <br />
+                <strong className="text-navy font-bold mt-2 block">Por favor, não feche ou atualize esta página.</strong>
+              </AlertDialogDescription>
+            </div>
+          )}
+
+          {syncStatus === "success" && (
+            <div className="flex flex-col items-center text-center py-4">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 rounded-full bg-green-brand/10 blur-lg animate-ping duration-1000" />
+                <div className="relative flex items-center justify-center w-20 h-20 rounded-full bg-green-3 text-green-brand">
+                  <CheckCircle2 className="w-12 h-12 text-green-brand" />
+                </div>
+              </div>
+              <AlertDialogTitle className="text-xl font-extrabold text-navy mb-2">
+                Sincronização Concluída!
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-4 text-[14px] leading-relaxed max-w-sm mb-6">
+                Os dados de progresso e conclusão das fases foram sincronizados e atualizados com sucesso no sistema Nexus.
+              </AlertDialogDescription>
+              <AlertDialogAction 
+                onClick={() => {
+                  setSyncStatus("idle")
+                  window.location.reload()
+                }}
+                className="w-full bg-green-dark hover:bg-green-brand text-white font-semibold rounded-lg h-11 px-6 transition-colors border border-transparent font-sans"
+              >
+                Concluir e Atualizar Página
+              </AlertDialogAction>
+            </div>
+          )}
+
+          {syncStatus === "error" && (
+            <div className="flex flex-col items-center text-center py-4">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 rounded-full bg-red/10 blur-lg" />
+                <div className="relative flex items-center justify-center w-20 h-20 rounded-full bg-red/10 text-red">
+                  <AlertCircle className="w-12 h-12 text-red" />
+                </div>
+              </div>
+              <AlertDialogTitle className="text-xl font-extrabold text-red mb-2">
+                Falha na Sincronização
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-4 text-[14px] leading-relaxed max-w-sm mb-6">
+                Ocorreu um problema ao sincronizar os dados com o Moodle.
+                {syncError && (
+                  <div className="mt-3 p-3 bg-red/5 rounded-lg border border-red/10 text-left font-mono text-[12px] text-red/80 break-words max-h-32 overflow-y-auto">
+                    {syncError}
+                  </div>
+                )}
+              </AlertDialogDescription>
+              <AlertDialogAction 
+                onClick={() => setSyncStatus("idle")}
+                className="w-full bg-navy hover:bg-navy-light text-white font-semibold rounded-lg h-11 px-6 transition-colors border border-transparent font-sans"
+              >
+                Fechar e Tentar Novamente
+              </AlertDialogAction>
+            </div>
+          )}
         </AlertDialogContent>
       </AlertDialog>
     </>

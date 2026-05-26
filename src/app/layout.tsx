@@ -31,21 +31,13 @@ export default async function RootLayout({
   return (
     <html lang="pt-BR" className="h-screen overflow-hidden">
       <body className={`${fontSans.variable} ${fontMono.variable} font-sans flex h-screen bg-[#F4F5F7] antialiased overflow-hidden`}>
-        {session ? (
-          <>
-            <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-              <Topbar />
-              <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-                {children}
-              </main>
-            </div>
-          </>
-        ) : (
-          <main className="flex-1 overflow-y-auto">
+        {session ? <Sidebar /> : null}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full w-full">
+          {session ? <Topbar /> : null}
+          <main className={`flex-1 overflow-y-auto ${session ? "p-6 lg:p-8" : ""}`}>
             {children}
           </main>
-        )}
+        </div>
       </body>
     </html>
   )

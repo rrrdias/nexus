@@ -1,10 +1,8 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
-import { db } from "@/db"
-import { groups, groupSystemAccess, systemModules } from "@/db/schema"
-import { eq } from "drizzle-orm"
 import { GroupFormDialog } from "./GroupFormDialog"
-import { deleteGroup } from "@/app/actions/groups"
+import { deleteGroup, getGroups } from "@/app/actions/groups"
+import { getAllModules } from "@/app/actions/system"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Pencil, Trash2, Plus, ShieldCheck } from "lucide-react"
@@ -14,17 +12,8 @@ export default async function AdminGroupsPage() {
   // @ts-ignore
   if (!session?.user?.isSuperAdmin) redirect("/")
 
-  const allGroups = await db.select().from(groups).orderBy(groups.name)
-  const allModules = await db.select().from(systemModules).orderBy(systemModules.name)
-
-  const groupsWithModules = await Promise.all(allGroups.map(async (g) => {
-    const access = await db
-      .select({ module: systemModules })
-      .from(groupSystemAccess)
-      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
-      .where(eq(groupSystemAccess.groupId, g.id))
-    return { ...g, modules: access.map(a => a.module) }
-  }))
+  const groupsWithModules = await getGroups()
+  const allModules = await getAllModules()
 
   return (
     <div className="space-y-6">
@@ -44,7 +33,7 @@ export default async function AdminGroupsPage() {
         {groupsWithModules.length === 0 && (
           <p className="text-[#9AA0AC] italic col-span-3 text-center py-12">Nenhum grupo cadastrado.</p>
         )}
-        {groupsWithModules.map((g) => (
+        {groupsWithModules.map((g: any) => (
           <div key={g.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -57,7 +46,7 @@ export default async function AdminGroupsPage() {
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
-                <GroupFormDialog allModules={allModules} mode="edit" groupId={g.id} defaultName={g.name} defaultDescription={g.description ?? ""} defaultModuleIds={g.modules.map(m => m.id)}>
+                <GroupFormDialog allModules={allModules} mode="edit" groupId={g.id} defaultName={g.name} defaultDescription={g.description ?? ""} defaultModuleIds={g.modules.map((m: any) => m.id)}>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-[#9AA0AC] hover:text-navy">
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
@@ -75,7 +64,7 @@ export default async function AdminGroupsPage() {
               <div className="flex flex-wrap gap-1.5">
                 {g.modules.length === 0
                   ? <span className="text-[11px] text-[#9AA0AC] italic">Nenhum sistema vinculado</span>
-                  : g.modules.map(m => (
+                  : g.modules.map((m: any) => (
                     <Badge key={m.id} variant="outline" className="text-[10px] border-[#1976D2] text-[#1976D2]">{m.name}</Badge>
                   ))
                 }

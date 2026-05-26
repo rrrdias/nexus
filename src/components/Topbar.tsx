@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
-import { Search, ChevronRight } from "lucide-react"
+import { Search } from "lucide-react"
+import { TopbarBreadcrumbs } from "./TopbarBreadcrumbs"
 
 export async function Topbar() {
   const session = await auth()
@@ -11,9 +12,7 @@ export async function Topbar() {
   return (
     <header className="h-16 shrink-0 bg-white border-b border-gray-2 flex items-center justify-between px-6 shadow-sm">
       <div className="flex items-center gap-4">
-        <h2 className="text-gray-3 font-medium text-sm flex items-center gap-2">
-          Dashboard <ChevronRight className="w-3 h-3" /> <span className="text-gray-9 font-bold">Início</span>
-        </h2>
+        <TopbarBreadcrumbs />
       </div>
 
       <div className="flex items-center gap-6">

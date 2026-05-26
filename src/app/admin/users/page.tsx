@@ -1,10 +1,9 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
-import { db } from "@/db"
-import { users, groups, systemModules, userGroups, usersSystemAccess } from "@/db/schema"
-import { eq } from "drizzle-orm"
 import { UserFormDialog } from "./UserFormDialog"
-import { deleteUser } from "@/app/actions/users"
+import { deleteUser, getUsers } from "@/app/actions/users"
+import { getGroups } from "@/app/actions/groups"
+import { getAllModules } from "@/app/actions/system"
 import { ToggleUserButton } from "./ToggleUserButton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,25 +14,9 @@ export default async function AdminUsersPage() {
   // @ts-ignore
   if (!session?.user?.isSuperAdmin) redirect("/")
 
-  const allUsers = await db.select().from(users).orderBy(users.name)
-  const allGroups = await db.select().from(groups).orderBy(groups.name)
-  const allModules = await db.select().from(systemModules).orderBy(systemModules.name)
-
-  const usersWithDetails = await Promise.all(allUsers.map(async (u) => {
-    const groupList = await db
-      .select({ id: groups.id, name: groups.name })
-      .from(userGroups)
-      .innerJoin(groups, eq(userGroups.groupId, groups.id))
-      .where(eq(userGroups.userId, u.id))
-
-    const moduleList = await db
-      .select({ id: systemModules.id, name: systemModules.name })
-      .from(usersSystemAccess)
-      .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
-      .where(eq(usersSystemAccess.userId, u.id))
-
-    return { ...u, groups: groupList, modules: moduleList }
-  }))
+  const usersWithDetails = await getUsers()
+  const allGroups = await getGroups()
+  const allModules = await getAllModules()
 
   return (
     <div className="space-y-6">
@@ -64,12 +47,12 @@ export default async function AdminUsersPage() {
             {usersWithDetails.length === 0 && (
               <tr><td colSpan={5} className="text-center py-12 text-[#9AA0AC] italic">Nenhum usuário cadastrado.</td></tr>
             )}
-            {usersWithDetails.map((u) => (
+            {usersWithDetails.map((u: any) => (
               <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-navy text-white flex items-center justify-center font-bold text-xs shrink-0">
-                      {u.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
+                      {u.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
                     </div>
                     <div>
                       <p className="font-semibold text-navy text-sm">{u.name}</p>
@@ -82,7 +65,7 @@ export default async function AdminUsersPage() {
                   <div className="flex flex-wrap gap-1">
                     {u.groups.length === 0
                       ? <span className="text-[11px] text-[#9AA0AC] italic">Sem grupo</span>
-                      : u.groups.map(g => <Badge key={g.id} variant="outline" className="text-[10px] border-navy text-navy">{g.name}</Badge>)
+                      : u.groups.map((g: any) => <Badge key={g.id} variant="outline" className="text-[10px] border-navy text-navy">{g.name}</Badge>)
                     }
                   </div>
                 </td>
@@ -90,7 +73,7 @@ export default async function AdminUsersPage() {
                   <div className="flex flex-wrap gap-1">
                     {u.modules.length === 0
                       ? <span className="text-[11px] text-[#9AA0AC] italic">Nenhum</span>
-                      : u.modules.map(m => <Badge key={m.id} variant="outline" className="text-[10px] border-[#1976D2] text-[#1976D2]">{m.name}</Badge>)
+                      : u.modules.map((m: any) => <Badge key={m.id} variant="outline" className="text-[10px] border-[#1976D2] text-[#1976D2]">{m.name}</Badge>)
                     }
                   </div>
                 </td>
@@ -108,8 +91,8 @@ export default async function AdminUsersPage() {
                       defaultEmail={u.email}
                       defaultUserid={u.userid ?? ""}
                       defaultIsActive={!!u.isActive}
-                      defaultGroupIds={u.groups.map(g => g.id)}
-                      defaultModuleIds={u.modules.map(m => m.id)}
+                      defaultGroupIds={u.groups.map((g: any) => g.id)}
+                      defaultModuleIds={u.modules.map((m: any) => m.id)}
                     >
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-[#9AA0AC] hover:text-navy">
                         <Pencil className="w-3.5 h-3.5" />

@@ -93,7 +93,6 @@ function PhaseBar({
 }
 
 export function DashboardProgresso({ title, metrics, institution }: { title: string, metrics: any, institution?: string }) {
-  const [showFilters, setShowFilters] = useState(false)
   const searchParams = useSearchParams()
 
   const currentFilters = {
@@ -123,20 +122,10 @@ export function DashboardProgresso({ title, metrics, institution }: { title: str
           <p className="text-[#5F6775] text-sm mt-1">Dashboard gerencial unificado de métricas de alunos.</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant={showFilters ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className={showFilters ? "bg-navy text-white font-semibold" : "text-navy border-navy/20 font-semibold"}
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            Filtros
-          </Button>
+          <ProgressoFilters />
           <ProgressoActions filters={currentFilters} institution={institution} />
         </div>
       </div>
-
-      {showFilters && <ProgressoFilters />}
 
       {/* Cards de Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">

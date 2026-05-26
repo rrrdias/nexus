@@ -1,10 +1,8 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import { hashPassword, isPasswordHash, verifyPassword } from "@/lib/password"
-
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
   providers: [
     Credentials({
       credentials: {
@@ -19,50 +17,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
-        // Lazy import to prevent Edge Runtime from attempting to bundle Postgres
-        const { db } = await import("@/db")
-        const { users, userGroups, groups } = await import("@/db/schema")
-        const { eq, or } = await import("drizzle-orm")
-
         try {
-          const user = await db.select().from(users).where(
-            or(
-              eq(users.userid, login),
-              eq(users.email, login)
-            )
-          ).limit(1)
-
-          if (user.length === 0) return null
-
-          // Bloqueia login de usuários inativos
-          if (user[0].isActive === false) {
-            return null
-          }
-
-          const passwordMatches = await verifyPassword(password, user[0].password)
-          if (!passwordMatches) {
-            return null
-          }
-
-          if (!isPasswordHash(user[0].password)) {
-            await db.update(users)
-              .set({ password: await hashPassword(password) })
-              .where(eq(users.id, user[0].id))
-          }
-
-          const groupsData = await db.select({
-            id: groups.id,
-            name: groups.name
+          const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ email: login, password }),
+            headers: { "Content-Type": "application/json" }
           })
-          .from(userGroups)
-          .innerJoin(groups, eq(userGroups.groupId, groups.id))
-          .where(eq(userGroups.userId, user[0].id))
+          const data = await res.json()
 
-          return {
-            ...user[0],
-            groups: groupsData.map(g => g.name),
-            isSuperAdmin: groupsData.some(g => g.name === 'Super Admin')
+          if (res.ok && data.user && data.access_token) {
+            return {
+              id: data.user.id,
+              name: data.user.name,
+              email: data.user.email,
+              image: data.user.image,
+              isSuperAdmin: data.user.isSuperAdmin,
+              groups: data.user.groups,
+              accessToken: data.access_token
+            }
           }
+          return null
         } catch (error) {
           console.error("Error in authorize:", error)
           return null
@@ -73,41 +47,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.sub = user.id
+        // @ts-ignore
+        token.isSuperAdmin = user.isSuperAdmin
         // @ts-ignore
         token.groups = user.groups
         // @ts-ignore
-        token.isSuperAdmin = user.isSuperAdmin
-        token.sub = user.id
+        token.accessToken = user.accessToken
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         // @ts-ignore
-        session.user.groups = token.groups || []
-        // @ts-ignore
         session.user.isSuperAdmin = !!token.isSuperAdmin
         // @ts-ignore
+        session.user.groups = token.groups || []
+        // @ts-ignore
         session.user.id = token.sub as string
-
-        // Verificação em tempo real: consulta o banco para checar se o usuário ainda está ativo.
-        // Se foi desativado após o login, a sessão é marcada como inválida.
-        try {
-          const { db } = await import("@/db")
-          const { users } = await import("@/db/schema")
-          const { eq } = await import("drizzle-orm")
-          const dbUser = await db.select({ isActive: users.isActive })
-            .from(users)
-            .where(eq(users.id, token.sub as string))
-            .limit(1)
-
-          // @ts-ignore
-          session.user.isDisabled = dbUser.length === 0 || dbUser[0].isActive === false
-        } catch {
-          // Em caso de erro de DB, mantém a sessão como válida (fail-open)
-          // @ts-ignore
-          session.user.isDisabled = false
-        }
+        // @ts-ignore
+        session.user.accessToken = token.accessToken as string
       }
       return session
     }
