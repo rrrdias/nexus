@@ -57,6 +57,7 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:3001
       NEXT_API_URL: http://backend:3001
       AUTH_SECRET: minha-super-secret-1234567890
+      AUTH_TRUST_HOST: "true"
 
 volumes:
   nexus_core_db:
