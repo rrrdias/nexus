@@ -1,4 +1,0 @@
-<header class="topbar">
-  <span class="muted"><%= current_user.super_admin? ? "Super Admin" : "Colaborador" %></span>
-  <span class="badge"><%= current_user.name.to_s.split.map { |p| p[0] }.join[0, 2].upcase %></span>
-</header>

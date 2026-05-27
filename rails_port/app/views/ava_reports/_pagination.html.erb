@@ -1,9 +1,0 @@
-<div class="pagination">
-  <span class="muted">Pagina <%= metrics[:page] %> de <%= metrics[:total_pages] %> | <%= metrics[:total_records] %> registros</span>
-  <% if metrics[:page] > 1 %>
-    <%= link_to "Anterior", url_for(request.query_parameters.merge(page: metrics[:page] - 1)), class: "btn secondary small" %>
-  <% end %>
-  <% if metrics[:page] < metrics[:total_pages] %>
-    <%= link_to "Proxima", url_for(request.query_parameters.merge(page: metrics[:page] + 1)), class: "btn secondary small" %>
-  <% end %>
-</div>

@@ -35,3 +35,4 @@ rails_port/tmp/
 rails_port/log/
 /rails_port/tmp
 /rails_port/log
+node_modules
