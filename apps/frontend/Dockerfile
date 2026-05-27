@@ -38,17 +38,17 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/package.json /app/package-lock.json ./
-COPY --from=builder /app/apps/frontend/package.json ./apps/frontend/
-COPY --from=builder /app/apps/frontend/.next ./apps/frontend/.next
+# Copy the standalone build (which includes its own traced production node_modules)
+COPY --from=builder /app/apps/frontend/.next/standalone ./
+# Copy public and static assets since they are not copied by Next.js standalone automatically
 COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
-COPY --from=builder /app/apps/frontend/next.config.ts ./apps/frontend/
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/frontend/.next/static ./apps/frontend/.next/static
 
 USER nextjs
 
 EXPOSE 3002
 
 ENV PORT=3002
+ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "run", "start", "-w", "@nexus-core/frontend"]
+CMD ["node", "apps/frontend/server.js"]

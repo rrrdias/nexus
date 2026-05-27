@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Box, LogOut, ShieldCheck, Users, ChevronLeft, ChevronRight, Calendar, MapPin, Clock } from "lucide-react"
+import { signOut } from "next-auth/react"
 
 interface SidebarClientProps {
   session: any
@@ -487,7 +488,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       <div className={`border-t border-white/10 transition-all duration-300 p-4 w-full shrink-0 ${collapsedState ? "px-2" : ""}`}>
         <div className="group relative flex justify-center w-full">
           <button 
-            onClick={() => window.location.href = "/api/auth/signout"}
+            onClick={() => signOut({ callbackUrl: "/login" })}
             className="flex items-center rounded-lg text-white/50 hover:text-white hover:bg-navy-light transition-all duration-300 ease-in-out cursor-pointer w-full h-10 px-2.5 justify-start focus:outline-none"
           >
             <LogOut className="w-5 h-5 shrink-0 text-red-400/80 hover:text-red-400 transition-transform duration-300 group-hover:scale-110" />

@@ -24,13 +24,13 @@ export class AuthService {
     }
 
     const user = userResult[0];
-    if (!user.isActive) {
-      throw new UnauthorizedException('Usuário inativo');
-    }
-
     const isMatch = await verifyPassword(pass, user.password as string);
     if (!isMatch) {
       throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Usuário inativo');
     }
 
     const adminGroups = await this.db.select()
