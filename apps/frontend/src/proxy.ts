@@ -4,12 +4,12 @@ import { NextResponse } from "next/server"
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
-  const isOnApiAuth = req.nextUrl.pathname.startsWith('/api/auth')
-  const isOnLogin = req.nextUrl.pathname.startsWith('/login')
+  const bp = process.env.NEXT_BASE_PATH || ""
+
+  const isOnApiAuth = req.nextUrl.pathname.startsWith(`${bp}/api/auth`)
+  const isOnLogin = req.nextUrl.pathname.startsWith(`${bp}/login`)
 
   if (isOnApiAuth) return
-
-  const bp = process.env.NEXT_BASE_PATH || ""
 
   if (!isLoggedIn && !isOnLogin) {
     return NextResponse.redirect(new URL(`${bp}/login`, req.url))
