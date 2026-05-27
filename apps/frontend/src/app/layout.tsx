@@ -4,6 +4,7 @@ import "./globals.css"
 import { Sidebar } from "@/components/Sidebar"
 import { Topbar } from "@/components/Topbar"
 import { auth } from "@/auth"
+import { IdleTimeoutProvider } from "@/components/IdleTimeoutProvider"
 
 const fontSans = Plus_Jakarta_Sans({ 
   subsets: ["latin"], 
@@ -35,7 +36,13 @@ export default async function RootLayout({
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full w-full">
           {session ? <Topbar /> : null}
           <main className={`flex-1 overflow-y-auto ${session ? "p-6 lg:p-8" : ""}`}>
-            {children}
+            {session ? (
+              <IdleTimeoutProvider>
+                {children}
+              </IdleTimeoutProvider>
+            ) : (
+              children
+            )}
           </main>
         </div>
       </body>

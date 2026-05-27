@@ -2,7 +2,11 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt", maxAge: 24 * 60 * 60 },
+  session: { 
+    strategy: "jwt", 
+    maxAge: 30 * 60, // 30 minutos de sessão
+    updateAge: 10 * 60, // Atualiza o cookie a cada 10 minutos se ativo
+  },
   providers: [
     Credentials({
       credentials: {
