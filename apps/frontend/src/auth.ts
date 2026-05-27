@@ -2,7 +2,6 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  basePath: "/api/auth",
   session: { 
     strategy: "jwt", 
     maxAge: 30 * 60, // 30 minutos de sessão
