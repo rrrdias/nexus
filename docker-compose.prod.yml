@@ -42,6 +42,7 @@ services:
       dockerfile: apps/frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_BASE_PATH: "/nexus"
     container_name: nexus_core_frontend_prod
     restart: always
     depends_on:

@@ -22,6 +22,8 @@ COPY . .
 # Set environment variables for Next.js build (e.g. public API URL)
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_BASE_PATH=""
+ENV NEXT_BASE_PATH=$NEXT_BASE_PATH
 ENV NODE_ENV=production
 
 # Build the Next.js app

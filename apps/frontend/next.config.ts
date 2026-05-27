@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: "/nexus",
+  basePath: process.env.NEXT_BASE_PATH || "",
   poweredByHeader: false,
   async headers() {
     const headers = [
