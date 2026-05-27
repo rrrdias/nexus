@@ -9,24 +9,20 @@ export default auth((req) => {
 
   if (isOnApiAuth) return
 
+  const bp = process.env.NEXT_BASE_PATH || ""
+
   if (!isLoggedIn && !isOnLogin) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL(`${bp}/login`, req.url))
   }
 
   if (isLoggedIn && isOnLogin) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL(`${bp}/`, req.url))
   }
 
   // Se o usuário foi desativado após o login, força logout imediato
   // @ts-ignore
   if (isLoggedIn && req.auth?.user?.isDisabled) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/api/auth/signout'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL(`${bp}/api/auth/signout`, req.url))
   }
 })
 
