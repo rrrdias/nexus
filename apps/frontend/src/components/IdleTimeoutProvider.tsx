@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef } from "react"
-import { signOut } from "next-auth/react"
+import { logoutAction } from "@/app/actions/auth"
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutos de inatividade total
 
@@ -17,7 +17,7 @@ export function IdleTimeoutProvider({ children, basePath = "" }: { children: Rea
 
   const handleLogout = () => {
     console.log("[IdleTimeout] Usuário inativo por 15 minutos. Efetuando logout de segurança automático...")
-    signOut({ callbackUrl: `${window.location.origin}${basePath}/login` })
+    logoutAction()
   }
 
   useEffect(() => {
