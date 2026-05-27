@@ -18,7 +18,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/auth/login', {
+          const apiBaseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+          const res = await fetch(apiBaseUrl + '/api/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email: login, password }),
             headers: { "Content-Type": "application/json" }

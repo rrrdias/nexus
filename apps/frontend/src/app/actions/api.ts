@@ -11,7 +11,7 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
     await signOut({ redirectTo: "/login" })
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+  const baseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
   const url = `${baseUrl}${endpoint}`
 
   const response = await fetch(url, {
