@@ -40,7 +40,7 @@ export default async function RootLayout({
             {session ? <Topbar /> : null}
             <main className={`flex-1 overflow-y-auto ${session ? "p-6 lg:p-8" : ""}`}>
               {session ? (
-                <IdleTimeoutProvider>
+                <IdleTimeoutProvider basePath={process.env.NEXT_BASE_PATH || ""}>
                   {children}
                 </IdleTimeoutProvider>
               ) : (

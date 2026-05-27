@@ -1,4 +1,4 @@
-import { auth } from "@/auth"
+import { auth, signOut } from "@/auth"
 import { SidebarClient } from "./SidebarClient"
 import { getSidebarModules } from "@/app/actions/system"
 import { redirect } from "next/navigation"
@@ -18,7 +18,8 @@ export async function Sidebar() {
         throw e
       }
       if (e instanceof Error && (e.message === "Unauthorized" || e.message === "Acesso negado.")) {
-        redirect("/api/auth/signout")
+        const bp = process.env.NEXT_BASE_PATH || ""
+        await signOut({ redirectTo: `${bp}/login` })
       }
       console.error(e)
     }
@@ -28,11 +29,14 @@ export async function Sidebar() {
     ? session.user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
     : '??'
 
+  const basePath = process.env.NEXT_BASE_PATH || ""
+
   return (
     <SidebarClient 
       session={session} 
       modules={modules} 
       initials={initials} 
+      basePath={basePath}
     />
   )
 }

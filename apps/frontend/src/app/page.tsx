@@ -125,8 +125,16 @@ function DashboardSemVinculo({ session, greeting }: { session: any, greeting: st
   )
 }
 
+import { redirect } from "next/navigation"
+
 export default async function DashboardPage() {
   const session = await auth()
+  
+  if (!session) {
+    const basePath = process.env.NEXT_BASE_PATH || ""
+    redirect(`${basePath}/login`)
+  }
+
   const isSuperAdmin = !!(session?.user as any)?.isSuperAdmin
 
   // Fetch the live list of allowed modules in real-time from database

@@ -34,7 +34,7 @@ services:
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET}
-    command: sh -c "cd apps/backend && npx drizzle-kit push --force && node dist/main.js"
+    command: sh -c "cd apps/backend && npm run db:push --force && node dist/main.js"
 
   frontend:
     build:
@@ -55,6 +55,7 @@ services:
       NEXT_API_URL: http://backend:3001
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TRUST_HOST: "true"
+      AUTH_URL: ${AUTH_URL:-http://localhost:3002/nexus}
 
 volumes:
   nexus_core_db_prod:

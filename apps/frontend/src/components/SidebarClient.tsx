@@ -10,9 +10,10 @@ interface SidebarClientProps {
   session: any
   modules: any[]
   initials: string
+  basePath?: string
 }
 
-export function SidebarClient({ session, modules, initials }: SidebarClientProps) {
+export function SidebarClient({ session, modules, initials, basePath = "" }: SidebarClientProps) {
   const pathname = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -488,7 +489,7 @@ export function SidebarClient({ session, modules, initials }: SidebarClientProps
       <div className={`border-t border-white/10 transition-all duration-300 p-4 w-full shrink-0 ${collapsedState ? "px-2" : ""}`}>
         <div className="group relative flex justify-center w-full">
           <button 
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={() => signOut({ callbackUrl: `${window.location.origin}${basePath}/login` })}
             className="flex items-center rounded-lg text-white/50 hover:text-white hover:bg-navy-light transition-all duration-300 ease-in-out cursor-pointer w-full h-10 px-2.5 justify-start focus:outline-none"
           >
             <LogOut className="w-5 h-5 shrink-0 text-red-400/80 hover:text-red-400 transition-transform duration-300 group-hover:scale-110" />
