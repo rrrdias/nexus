@@ -34,7 +34,7 @@ services:
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET}
-    command: sh -c "npx drizzle-kit push --config=apps/backend/drizzle.config.ts && node apps/backend/dist/main.js"
+    command: sh -c "cd apps/backend && npx drizzle-kit push --force && node dist/main.js"
 
   frontend:
     build:

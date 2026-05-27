@@ -523,6 +523,8 @@ Este módulo centraliza o monitoramento, sincronização de dados e gerenciament
 
 ### 4. Práticas de Desenvolvimento Relevantes
 - **⚠️ Preservação de Codificação (UTF-8 Obrigatório)**: O compilador Next.js 16/Turbopack é altamente estrito com caracteres especiais e formatos inválidos de codificação de arquivos. **NUNCA** salve códigos TSX através de scripts ou redirecionamentos de terminal (como `Set-Content` do PowerShell) sem especificar explicitamente a codificação UTF-8 (`-Encoding UTF8` ou de preferência usando a API nativa de escrita de arquivos do agente), evitando assim falhas de build por UTF-8 corrompido.
+- **⚠️ Estrutura de Compilação do Backend (TypeScript & Drizzle)**: Quando adicionar arquivos de configuração (como `drizzle.config.ts`) na raiz de uma aplicação NestJS, certifique-se de que eles estão incluídos no `exclude` do `tsconfig.build.json`. Caso contrário, a compilação do TypeScript preservará a árvore de diretórios aninhando os arquivos compilados em `dist/src/main.js` em vez de `dist/main.js`, o que quebra a execução do container de produção.
+- **⚠️ Execução de Migrações do Drizzle no Docker**: Para rodar sincronizações de banco ou migrações via Docker (`drizzle-kit push`), mude sempre o diretório de trabalho (`cd apps/backend`) antes de executar o comando e utilize a flag `--force` para evitar falhas por falta de terminal interativo (TTY) ao atualizar esquemas em tabelas com registros.
 
 ---
 
