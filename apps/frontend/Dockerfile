@@ -17,7 +17,6 @@ RUN npm ci --workspace=@nexus-core/frontend --include=dev
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
 COPY . .
 
 # Set environment variables for Next.js build (e.g. public API URL)
@@ -42,7 +41,6 @@ COPY --from=builder /app/apps/frontend/package.json ./apps/frontend/
 COPY --from=builder /app/apps/frontend/.next ./apps/frontend/.next
 COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
 COPY --from=builder /app/apps/frontend/next.config.ts ./apps/frontend/
-COPY --from=builder /app/apps/frontend/node_modules ./apps/frontend/node_modules
 COPY --from=builder /app/node_modules ./node_modules
 
 USER nextjs

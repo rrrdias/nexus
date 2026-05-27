@@ -17,7 +17,6 @@ RUN npm ci --workspace=@nexus-core/backend --include=dev
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY . .
 
 # Build the NestJS app
@@ -37,7 +36,6 @@ COPY --from=builder /app/apps/backend/package.json ./apps/backend/
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/apps/backend/drizzle ./apps/backend/drizzle
 COPY --from=builder /app/apps/backend/drizzle.config.ts ./apps/backend/
-COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY --from=builder /app/node_modules ./node_modules
 
 # Ensure we have drizzle migrations folder copied in the right path for scripts
