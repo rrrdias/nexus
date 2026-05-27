@@ -1,0 +1,80 @@
+<h1 class="page-title">Usuarios</h1>
+<p class="muted">Gerencie colaboradores, grupos e acessos diretos.</p>
+
+<div class="card" style="margin-top: 20px;">
+  <div class="card-header">Novo usuario</div>
+  <div class="card-body">
+    <%= form_with model: User.new, url: admin_users_path, local: true, class: "grid grid-2" do |form| %>
+      <div><%= form.label :name, "Nome" %><%= form.text_field :name, required: true %></div>
+      <div><%= form.label :email, "Email" %><%= form.email_field :email, required: true %></div>
+      <div><%= form.label :userid, "Userid" %><%= form.text_field :userid %></div>
+      <div><%= form.label :password, "Senha" %><%= form.password_field :password, required: true %></div>
+      <div>
+        <label>Grupos</label>
+        <%= select_tag "group_ids[]", options_from_collection_for_select(@groups, :id, :name), multiple: true %>
+      </div>
+      <div>
+        <label>Modulos Diretos</label>
+        <%= select_tag "module_ids[]", options_from_collection_for_select(@modules, :id, :name), multiple: true %>
+      </div>
+      <label><%= form.check_box :isActive, checked: true %> Ativo</label>
+      <div><%= form.submit "Criar usuario", class: "btn" %></div>
+    <% end %>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+  <div class="card-header">Usuarios cadastrados</div>
+  <div class="card-body">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Email</th>
+          <th>Grupos</th>
+          <th>Modulos</th>
+          <th>Status</th>
+          <th>Acoes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @users.each do |user| %>
+          <tr>
+            <td><strong><%= user.name %></strong><br><span class="muted"><%= user.userid %></span></td>
+            <td><%= user.email %></td>
+            <td><%= user.groups.map(&:name).join(", ").presence || "-" %></td>
+            <td><%= user.direct_system_modules.map(&:name).join(", ").presence || "-" %></td>
+            <td><span class="badge <%= user.active ? "" : "badge-danger" %>"><%= user.active ? "Ativo" : "Inativo" %></span></td>
+            <td class="actions">
+              <%= button_to(user.active ? "Desativar" : "Ativar", toggle_active_admin_user_path(user), method: :patch, class: "btn secondary small") %>
+              <%= button_to "Excluir", admin_user_path(user), method: :delete, class: "btn danger small", form: { data: { turbo_confirm: "Excluir usuario?" } } %>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="6">
+              <details>
+                <summary>Editar <%= user.name %></summary>
+                <%= form_with model: user, url: admin_user_path(user), method: :patch, local: true, class: "grid grid-2", style: "margin-top: 12px;" do |form| %>
+                  <div><%= form.label :name, "Nome" %><%= form.text_field :name, required: true %></div>
+                  <div><%= form.label :email, "Email" %><%= form.email_field :email, required: true %></div>
+                  <div><%= form.label :userid, "Userid" %><%= form.text_field :userid %></div>
+                  <div><%= form.label :password, "Nova senha" %><%= form.password_field :password %></div>
+                  <div>
+                    <label>Grupos</label>
+                    <%= select_tag "group_ids[]", options_from_collection_for_select(@groups, :id, :name, user.group_ids), multiple: true %>
+                  </div>
+                  <div>
+                    <label>Modulos Diretos</label>
+                    <%= select_tag "module_ids[]", options_from_collection_for_select(@modules, :id, :name, user.direct_system_module_ids), multiple: true %>
+                  </div>
+                  <label><%= form.check_box :isActive, checked: user.active %> Ativo</label>
+                  <div><%= form.submit "Salvar", class: "btn" %></div>
+                <% end %>
+              </details>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

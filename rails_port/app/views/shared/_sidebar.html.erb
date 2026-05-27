@@ -1,0 +1,197 @@
+<aside id="sidebar" class="sidebar">
+  <script>
+    (function() {
+      var collapsed = localStorage.getItem("sidebar-collapsed") === "true";
+      if (collapsed) {
+        document.getElementById("sidebar").classList.add("collapsed");
+      }
+    })();
+  </script>
+
+  <button id="sidebar-toggle" class="sidebar-toggle" onclick="toggleSidebar()" title="Recolher menu">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+
+  <div class="brand">
+    <div class="brand-logo-container">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+        <circle cx="8.5" cy="8.5" r="3" fill="#1C2B4A" opacity=".9"/>
+        <circle cx="2.5" cy="2.5" r="1.5" fill="#1C2B4A" opacity=".55"/>
+        <circle cx="14.5" cy="2.5" r="1.5" fill="#1C2B4A" opacity=".55"/>
+        <circle cx="2.5" cy="14.5" r="1.5" fill="#1C2B4A" opacity=".55"/>
+        <circle cx="14.5" cy="14.5" r="1.5" fill="#1C2B4A" opacity=".55"/>
+        <line x1="5.5" y1="5.5" x2="2.5" y2="2.5" stroke="#1C2B4A" strokeWidth="1.2" opacity=".4"/>
+        <line x1="11.5" y1="5.5" x2="14.5" y2="2.5" stroke="#1C2B4A" strokeWidth="1.2" opacity=".4"/>
+        <line x1="5.5" y1="11.5" x2="2.5" y2="14.5" stroke="#1C2B4A" strokeWidth="1.2" opacity=".4"/>
+        <line x1="11.5" y1="11.5" x2="14.5" y2="14.5" stroke="#1C2B4A" strokeWidth="1.2" opacity=".4"/>
+      </svg>
+    </div>
+    <div class="brand-title">
+      <h1>Nexus<span>Hub</span></h1>
+      <p>NEXUS APPLICATION</p>
+    </div>
+  </div>
+
+  <div class="user-box">
+    <% initials = current_user.name.to_s.split.map(&:first).join.upcase[0..1] rescue "U" %>
+    <div class="user-avatar"><%= initials %></div>
+    <div class="user-details">
+      <strong><%= current_user.name %></strong>
+      <span class="user-group">
+        <% if current_user.groups.exists? %>
+          <%= current_user.groups.map(&:name).join(', ') %>
+        <% else %>
+          Sem Grupo
+        <% end %>
+      </span>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="section-header">
+      <div class="section-divider"></div>
+      <span class="section-title">Módulos</span>
+    </div>
+
+    <a href="<%= root_path %>" class="nav-link <%= current_page?(root_path) ? 'active' : '' %>" data-tooltip="Dashboard">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+      <span>Dashboard</span>
+    </a>
+
+    <% current_user.accessible_modules.each do |mod| %>
+      <% is_active = request.path.start_with?(mod.path_url.to_s.split("/")[1..2].join("/")) || (mod.name == "AVA Reports" && request.path.start_with?("/reports", "/relatorios")) %>
+      
+      <% if mod.name == "AVA Reports" %>
+        <div class="menu-group <%= is_active ? 'open' : '' %>">
+          <button class="nav-btn <%= is_active ? 'active' : '' %>" onclick="toggleSubmenu(this)">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+              <span><%= mod.name %></span>
+            </div>
+            <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          
+          <div class="submenu">
+            <div class="submenu-header"><%= mod.name %></div>
+            
+            <div class="sub-accordion <%= request.path.start_with?('/reports/progress') ? 'open' : '' %>">
+              <button class="sub-accordion-btn" type="button" onclick="toggleSubSubmenu(this)">
+                <span>Progresso</span>
+                <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+              <div class="sub-accordion-content">
+                <a href="/reports/progress/ead" class="submenu-link <%= request.path == '/reports/progress/ead' ? 'active' : '' %>">EaD</a>
+                <a href="/reports/progress/uni" class="submenu-link <%= request.path == '/reports/progress/uni' ? 'active' : '' %>">Online Uni</a>
+                <a href="/reports/progress/uniego" class="submenu-link <%= request.path == '/reports/progress/uniego' ? 'active' : '' %>">Online UNIEGO</a>
+                <a href="/reports/progress/raizes" class="submenu-link <%= request.path == '/reports/progress/raizes' ? 'active' : '' %>">Online Raízes</a>
+                <a href="/reports/progress/eefn" class="submenu-link <%= request.path == '/reports/progress/eefn' ? 'active' : '' %>">Online EEFN</a>
+              </div>
+            </div>
+
+            <div class="sub-accordion <%= request.path.start_with?('/reports/grades') ? 'open' : '' %>">
+              <button class="sub-accordion-btn" type="button" onclick="toggleSubSubmenu(this)">
+                <span>Notas</span>
+                <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+              <div class="sub-accordion-content">
+                <a href="/reports/grades/ead" class="submenu-link <%= request.path == '/reports/grades/ead' ? 'active' : '' %>">EaD</a>
+                <a href="/reports/grades/uni" class="submenu-link <%= request.path == '/reports/grades/uni' ? 'active' : '' %>">Online Uni</a>
+                <a href="/reports/grades/uniego" class="submenu-link <%= request.path == '/reports/grades/uniego' ? 'active' : '' %>">Online UNIEGO</a>
+                <a href="/reports/grades/raizes" class="submenu-link <%= request.path == '/reports/grades/raizes' ? 'active' : '' %>">Online Raízes</a>
+                <a href="/reports/grades/eefn" class="submenu-link <%= request.path == '/reports/grades/eefn' ? 'active' : '' %>">Online EEFN</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <a href="<%= mod.path_url %>" class="nav-link <%= is_active ? 'active' : '' %>" data-tooltip="<%= mod.name %>">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          <span><%= mod.name %></span>
+        </a>
+      <% end %>
+    <% end %>
+
+    <% if super_admin? %>
+      <div class="section-header" style="margin-top: 24px;">
+        <div class="section-divider"></div>
+        <span class="section-title">Administração</span>
+      </div>
+
+      <a href="<%= admin_users_path %>" class="nav-link <%= request.path.start_with?('/admin/users') ? 'active' : '' %>" data-tooltip="Usuários">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Usuários</span>
+      </a>
+      <a href="<%= admin_groups_path %>" class="nav-link <%= request.path.start_with?('/admin/groups') ? 'active' : '' %>" data-tooltip="Grupos">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+        <span>Grupos</span>
+      </a>
+    <% end %>
+  </nav>
+
+  <div class="user-box-footer" style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;">
+    <div class="logout-container">
+      <%= button_to logout_path, method: :delete, class: "nav-btn-logout", style: "background: transparent; border: none; padding: 10px 12px; width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; cursor: pointer;" do %>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-icon text-red" style="color: #f87171;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        <span style="color: rgba(255,255,255,0.6); font-weight: 600; font-size: 13px;">Sair do sistema</span>
+      <% end %>
+    </div>
+  </div>
+</aside>
+
+<script>
+  function toggleSubmenu(btn) {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar && sidebar.classList.contains("collapsed")) {
+      return;
+    }
+    const group = btn.closest('.menu-group');
+    if (group) {
+      group.classList.toggle('open');
+    }
+  }
+
+  function toggleSubSubmenu(btn) {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar && sidebar.classList.contains("collapsed")) {
+      return;
+    }
+    const acc = btn.closest('.sub-accordion');
+    if (acc) {
+      acc.classList.toggle('open');
+    }
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const isCollapsed = sidebar.classList.toggle("collapsed");
+    localStorage.setItem("sidebar-collapsed", isCollapsed ? "true" : "false");
+    
+    if (isCollapsed) {
+      // Close open submenus immediately to avoid ghost-hover state
+      document.querySelectorAll('.menu-group.open').forEach(group => {
+        group.classList.remove('open');
+      });
+      
+      // Temporary class to prevent ghost hover
+      sidebar.classList.add("just-collapsed");
+      setTimeout(() => {
+        sidebar.classList.remove("just-collapsed");
+      }, 400);
+    }
+    
+    const toggleBtn = document.getElementById("sidebar-toggle");
+    if (toggleBtn) {
+      toggleBtn.title = isCollapsed ? "Expandir menu" : "Recolher menu";
+    }
+  }
+
+  // Adjust toggle button tooltip on load
+  document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("sidebar-toggle");
+    if (sidebar && toggleBtn) {
+      const isCollapsed = sidebar.classList.contains("collapsed");
+      toggleBtn.title = isCollapsed ? "Expandir menu" : "Recolher menu";
+    }
+  });
+</script>

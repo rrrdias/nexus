@@ -1,0 +1,11 @@
+<div class="grid grid-4" style="margin-top: 20px;">
+  <% cards.each do |label, value, detail, css| %>
+    <div class="card metric" style="border-top-color: <%= css || "var(--green)" %>;">
+      <div class="card-body">
+        <div class="muted" style="font-weight: 800; text-transform: uppercase;"><%= label %></div>
+        <div class="metric-value"><%= value %></div>
+        <span class="badge"><%= detail %></span>
+      </div>
+    </div>
+  <% end %>
+</div>

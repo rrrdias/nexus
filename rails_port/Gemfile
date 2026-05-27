@@ -1,0 +1,23 @@
+source "https://rubygems.org"
+
+ruby "4.0.1"
+
+gem "rails", "~> 7.1.0"
+gem "pg", "~> 1.5"
+gem "puma", ">= 5.0"
+gem "bcrypt", "~> 3.1.7"
+gem "jwt", "~> 2.8"
+gem "rack-cors", "~> 2.0"
+gem "csv"
+gem "bootsnap", require: false
+gem "tzinfo-data", platforms: %i[ mingw mswin x64_mingw jruby ]
+gem "propshaft"
+
+group :development, :test do
+  gem "debug", platforms: %i[ mri mingw x64_mingw ]
+  gem "rspec-rails", "~> 6.1"
+end
+
+group :development do
+  gem "web-console"
+end

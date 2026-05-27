@@ -1,0 +1,38 @@
+<div class="login-page">
+  <section class="login-brand">
+    <div class="brand">
+      <div class="brand-mark">N</div>
+      <div>Nexus<span style="color: var(--green); font-weight: 500;">Hub</span></div>
+    </div>
+    <div>
+      <span class="badge">Plataforma Unificada</span>
+      <h1 style="font-size: 48px; line-height: 1.05;">Sistemas Academicos Integrados</h1>
+      <p style="color: rgba(255,255,255,.72); font-size: 18px; max-width: 520px;">
+        Centralize progresso, relatorios e permissoes corporativas em uma unica plataforma.
+      </p>
+    </div>
+    <small style="color: rgba(255,255,255,.35); font-weight: 800;">2026 NEXUS CORPORATE HUB</small>
+  </section>
+
+  <section class="login-form">
+    <div class="login-panel">
+      <h1>Bem-vindo</h1>
+      <p class="muted">Insira suas credenciais para acessar o portal.</p>
+      <% if params[:error].present? || alert.present? %>
+        <div class="flash alert">Usuario ou senha incorretos. Tente novamente.</div>
+      <% end %>
+
+      <%= form_with url: login_path, method: :post, local: true, class: "grid" do |form| %>
+        <div>
+          <%= form.label :login, "Usuario ou Email" %>
+          <%= form.text_field :login, required: true, placeholder: "ex: nome.sobrenome" %>
+        </div>
+        <div>
+          <%= form.label :password, "Senha" %>
+          <%= form.password_field :password, required: true, placeholder: "********" %>
+        </div>
+        <%= form.submit "Acessar Plataforma", class: "btn" %>
+      <% end %>
+    </div>
+  </section>
+</div>

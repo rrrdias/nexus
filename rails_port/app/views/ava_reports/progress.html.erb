@@ -1,0 +1,44 @@
+<h1 class="page-title"><%= @title %></h1>
+<p class="muted">Acompanhamento de progresso, acesso e fases.</p>
+
+<div class="actions" style="margin-top: 16px;">
+  <%= link_to "Exportar CSV", progress_report_export_path(@institution, request.query_parameters), class: "btn secondary" %>
+  <%= button_to "Sincronizar", reports_sync_path, method: :post, params: { institution: @institution, type: "progress" }, class: "btn" %>
+</div>
+
+<%= render "filters" %>
+
+<%= render "metric_cards", cards: [
+  ["Progresso medio", "#{@metrics[:average_progress]}%", "#{@metrics[:total_records]} matriculas", "var(--green)"],
+  ["Abaixo do esperado", @metrics[:below_expected], "#{@metrics[:average_below_expected]}%", "var(--red)"],
+  ["Disciplinas criticas", @metrics[:critical_disciplines], "de #{@metrics[:total_disciplines]}", "var(--amber)"],
+  ["Alunos sem acesso", @metrics[:count_alunos_sem_acesso], "#{@metrics[:percent_alunos_sem_acesso].round(1)}%", "var(--blue)"]
+] %>
+
+<div class="card" style="margin-top: 20px;">
+  <div class="card-header">Registros</div>
+  <div class="card-body">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Aluno</th><th>Matricula</th><th>Disciplina</th><th>Periodo</th><th>Ultimo acesso</th><th>Fases</th><th>Total</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @metrics[:data].each do |row| %>
+          <tr>
+            <td><strong><%= row["aluno"] %></strong><br><span class="muted"><%= row["usuario"] %></span></td>
+            <td><%= row["matricula"] %></td>
+            <td><%= row["curso"] %><br><span class="muted"><%= row["curso_perfil"] %></span></td>
+            <td><%= row["periodo_perfil"].presence || row["periodo"] %></td>
+            <td><%= row["lastaccess"].presence || "-" %><br><span class="badge"><%= row["diasSemAcesso"] %> dias</span></td>
+            <td>F1 <%= row["fase1"] %> | F2 <%= row["fase2"] %> | F3 <%= row["fase3"] %></td>
+            <td><strong><%= row["progresso_total"] %></strong></td>
+            <td><span class="badge"><%= row["enrolment_status"].presence || "-" %></span></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <%= render "pagination", metrics: @metrics %>
+  </div>
+</div>

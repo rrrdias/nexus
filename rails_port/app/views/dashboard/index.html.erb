@@ -1,0 +1,37 @@
+<h1 class="page-title">Bom dia, <%= current_user.name.to_s.split.first || "Usuario" %>!</h1>
+<p class="muted">Bem-vindo ao painel corporativo.</p>
+
+<div class="grid grid-4" style="margin-top: 24px;">
+  <% [
+    ["Colaboradores", User.count, "usuarios cadastrados"],
+    ["Modulos", SystemModule.count, "ativos: #{SystemModule.active.count}"],
+    ["Grupos", Group.count, "perfis de acesso"],
+    ["Relatorios AVA", AvaProgressReport.count + AvaGradesReport.count, "registros sincronizados"]
+  ].each do |label, value, trend| %>
+    <div class="card metric">
+      <div class="card-body">
+        <div class="muted" style="font-weight: 800; text-transform: uppercase;"><%= label %></div>
+        <div class="metric-value"><%= value %></div>
+        <span class="badge"><%= trend %></span>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div class="grid grid-2" style="margin-top: 24px;">
+  <div class="card">
+    <div class="card-header">Modulos Disponiveis</div>
+    <div class="card-body">
+      <% current_user.accessible_modules.each do |mod| %>
+        <p><strong><%= mod.name %></strong><br><span class="muted"><%= mod.description %></span></p>
+      <% end %>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">Status</div>
+    <div class="card-body">
+      <span class="badge">Sessao ativa</span>
+      <% if super_admin? %><span class="badge">Super Admin</span><% end %>
+    </div>
+  </div>
+</div>

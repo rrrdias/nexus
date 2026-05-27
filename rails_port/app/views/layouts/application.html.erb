@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <title>Nexus - Rails</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+  </head>
+  <body>
+    <% if logged_in? %>
+      <div class="app">
+        <%= render "shared/sidebar" %>
+        <div class="main">
+          <%= render "shared/topbar" %>
+          <main class="content">
+            <% if notice.present? %><div class="flash notice"><%= notice %></div><% end %>
+            <% if alert.present? %><div class="flash alert"><%= alert %></div><% end %>
+            <%= yield %>
+          </main>
+        </div>
+      </div>
+    <% else %>
+      <%= yield %>
+    <% end %>
+  </body>
+</html>
