@@ -55,7 +55,6 @@ services:
       NEXT_API_URL: http://backend:3001
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TRUST_HOST: "true"
-      AUTH_URL: ${AUTH_URL}
 
 volumes:
   nexus_core_db_prod:
