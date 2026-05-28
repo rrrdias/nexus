@@ -15,6 +15,7 @@ import { eq } from 'drizzle-orm';
 @Injectable()
 export class AcademicService implements OnModuleInit, OnModuleDestroy {
   private pool: sql.ConnectionPool | null = null;
+  private dbPrefix: string = '';
   
   // Track schema columns for dynamic search building
   private discenteColumns: string[] = [];
@@ -29,6 +30,12 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
+    // Load Prefix for Linked Server if configured
+    this.dbPrefix = process.env.LYCEUM_DB_PREFIX || '';
+    if (this.dbPrefix) {
+      console.log(`[Lyceum DB] Using database prefix (Linked Server): "${this.dbPrefix}"`);
+    }
+
     // 1. Connect to Lyceum SQL Server
     const config: sql.config = {
       user: process.env.LYCEUM_DB_USERNAME || 'PortAeeConsult',
@@ -56,8 +63,19 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       console.log('[Lyceum DB] Available AVA views in Lyceum:', this.avaViews);
 
       this.discenteColumns = await this.getViewColumns('VW_AVA_DISCENTE');
+      if (this.discenteColumns.length === 0) {
+        this.discenteColumns = ['ID', 'NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL', 'MATRICULA', 'CPF', 'USUARIO', 'EMAIL', 'TELEFONE', 'CURSO', 'UNIDADE_FISICA', 'SERIE'];
+      }
+
       this.docenteColumns = await this.getViewColumns('VW_AVA_DOCENTE');
+      if (this.docenteColumns.length === 0) {
+        this.docenteColumns = ['ID', 'NOME', 'SOBRENOME', 'CPF', 'EMAIL', 'TELEFONE'];
+      }
+
       this.turmaColumns = await this.getViewColumns('VW_AVA_TURMA');
+      if (this.turmaColumns.length === 0) {
+        this.turmaColumns = ['ID', 'TURMA', 'COD_TURMA', 'DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO', 'PERIODO', 'SERIE', 'MODELAGEM'];
+      }
 
       console.log('[Lyceum DB] VW_AVA_DISCENTE columns:', this.discenteColumns);
       console.log('[Lyceum DB] VW_AVA_DOCENTE columns:', this.docenteColumns);
@@ -85,8 +103,9 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   private async getAvaViews(): Promise<string[]> {
     if (!this.pool) return [];
     try {
+      const schemaPrefix = this.dbPrefix ? this.dbPrefix.replace('dbo.', '') : '';
       const res = await this.pool.request().query(
-        `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME LIKE '%AVA%'`
+        `SELECT TABLE_NAME FROM ${schemaPrefix}INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME LIKE '%AVA%'`
       );
       return res.recordset.map(row => row.TABLE_NAME);
     } catch (err) {
@@ -98,8 +117,9 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   private async getViewColumns(viewName: string): Promise<string[]> {
     if (!this.pool) return [];
     try {
+      const schemaPrefix = this.dbPrefix ? this.dbPrefix.replace('dbo.', '') : '';
       const res = await this.pool.request().query(
-        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '${viewName}'`
+        `SELECT COLUMN_NAME FROM ${schemaPrefix}INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '${viewName}'`
       );
       return res.recordset.map(row => row.COLUMN_NAME);
     } catch (err) {
@@ -224,7 +244,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
         const usersRes = await userReq.query(
           `SELECT TOP 200 ID 
-           FROM VW_AVA_USUARIOS 
+           FROM ${this.dbPrefix}VW_AVA_USUARIOS 
            ${userWhereClause}`
         );
 
@@ -249,8 +269,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     const countRes = await request.query(
       `SELECT COUNT(*) as total 
-       FROM VW_AVA_DISCENTE U 
-       LEFT JOIN VW_AVA_CURSO C ON U.CURSO = C.ID 
+       FROM ${this.dbPrefix}VW_AVA_DISCENTE U 
+       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON U.CURSO = C.ID 
        ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
@@ -260,8 +280,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
          U.*, 
          C.NOME AS CURSO_NOME, 
          C.UNIDADE_ENS AS CURSO_INSTITUICAO 
-       FROM VW_AVA_DISCENTE U 
-       LEFT JOIN VW_AVA_CURSO C ON U.CURSO = C.ID 
+       FROM ${this.dbPrefix}VW_AVA_DISCENTE U 
+       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON U.CURSO = C.ID 
        ${whereClause} 
        ORDER BY U.${orderColumn} 
        OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
@@ -334,7 +354,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
         const usersRes = await userReq.query(
           `SELECT TOP 200 ID 
-           FROM VW_AVA_USUARIOS 
+           FROM ${this.dbPrefix}VW_AVA_USUARIOS 
            ${userWhereClause}`
         );
 
@@ -358,12 +378,12 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     ) || this.docenteColumns[0] || '1';
 
     const countRes = await request.query(
-      `SELECT COUNT(*) as total FROM VW_AVA_DOCENTE ${whereClause}`
+      `SELECT COUNT(*) as total FROM ${this.dbPrefix}VW_AVA_DOCENTE ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
 
     const dataRes = await request.query(
-      `SELECT * FROM VW_AVA_DOCENTE ${whereClause} 
+      `SELECT * FROM ${this.dbPrefix}VW_AVA_DOCENTE ${whereClause} 
        ORDER BY ${orderColumn} 
        OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
     );
@@ -437,8 +457,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     const countRes = await request.query(
       `SELECT COUNT(*) as total 
-       FROM VW_AVA_TURMA T 
-       LEFT JOIN VW_AVA_CURSO C ON T.CURSO = C.ID 
+       FROM ${this.dbPrefix}VW_AVA_TURMA T 
+       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON T.CURSO = C.ID 
        ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
@@ -448,8 +468,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
          T.*, 
          C.NOME AS CURSO_NOME, 
          C.UNIDADE_ENS AS CURSO_INSTITUICAO 
-       FROM VW_AVA_TURMA T 
-       LEFT JOIN VW_AVA_CURSO C ON T.CURSO = C.ID 
+       FROM ${this.dbPrefix}VW_AVA_TURMA T 
+       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON T.CURSO = C.ID 
        ${whereClause} 
        ORDER BY T.${orderColumn} 
        OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
@@ -521,7 +541,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
         const usersRes = await userReq.query(
           `SELECT TOP 200 ID 
-           FROM VW_AVA_USUARIOS 
+           FROM ${this.dbPrefix}VW_AVA_USUARIOS 
            ${userWhereClause}`
         );
 
@@ -544,7 +564,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     // Executing lightweight count query
     const countRes = await request.query(
       `SELECT COUNT(*) as total 
-       FROM VW_AVA_MATRICULA M
+       FROM ${this.dbPrefix}VW_AVA_MATRICULA M
        ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
@@ -564,7 +584,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const dataRes = await request.query(
       `WITH PaginatedMatriculas AS (
          SELECT M.*
-         FROM VW_AVA_MATRICULA M
+         FROM ${this.dbPrefix}VW_AVA_MATRICULA M
          ${whereClause}
          ORDER BY M.USUARIO 
          OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY
@@ -574,8 +594,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
               COALESCE(U.SOBRENOME_SOCIAL, U.SOBRENOME) AS SOBRENOME,
               T.NOME_DISCIPLINA 
        FROM PaginatedMatriculas PM
-       LEFT JOIN VW_AVA_USUARIOS U ON PM.USUARIO = U.ID
-       LEFT JOIN VW_AVA_TURMA T ON PM.TURMA = T.ID`
+       LEFT JOIN ${this.dbPrefix}VW_AVA_USUARIOS U ON PM.USUARIO = U.ID
+       LEFT JOIN ${this.dbPrefix}VW_AVA_TURMA T ON PM.TURMA = T.ID`
     );
 
     return {
@@ -596,8 +616,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     const res = await request.query(
       `SELECT M.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, T.PERIODO, T.TURMA AS COD_TURMA
-       FROM VW_AVA_MATRICULA M
-       LEFT JOIN VW_AVA_TURMA T ON M.TURMA = T.ID
+       FROM ${this.dbPrefix}VW_AVA_MATRICULA M
+       LEFT JOIN ${this.dbPrefix}VW_AVA_TURMA T ON M.TURMA = T.ID
        WHERE M.USUARIO = @matricula AND M.NIVEL = '2'`
     );
     return res.recordset;
@@ -610,8 +630,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     const res = await request.query(
       `SELECT M.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, T.PERIODO, T.TURMA AS COD_TURMA
-       FROM VW_AVA_MATRICULA M
-       LEFT JOIN VW_AVA_TURMA T ON M.TURMA = T.ID
+       FROM ${this.dbPrefix}VW_AVA_MATRICULA M
+       LEFT JOIN ${this.dbPrefix}VW_AVA_TURMA T ON M.TURMA = T.ID
        WHERE M.USUARIO = @docenteId AND M.NIVEL = '1'`
     );
     return res.recordset;
