@@ -38,7 +38,7 @@ services:
       SEED_ADMIN_PASSWORD: admin
       CRON_SECRET: gerar-uma-chave-aleatoria-para-o-cron-job
     # Automatically push the schema on startup so the database is always in sync!
-    command: sh -c "cd apps/backend && npm run db:push --force && node dist/main.js"
+    command: sh -c "cd apps/backend && npm run db:push -- --force && node dist/main.js"
 
   frontend:
     build:
