@@ -104,8 +104,16 @@ export class AvaSyncService {
             updatedAt: new Date()
         }));
 
+        // Deduplicate locally to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+        const uniqueInsertsMap = new Map();
+        for (const insert of inserts) {
+          const key = `${insert.sourceInstitution}-${insert.userId}-${insert.courseId}`;
+          uniqueInsertsMap.set(key, insert);
+        }
+        const uniqueInserts = Array.from(uniqueInsertsMap.values());
+
         await this.db.insert(avaGradesReport)
-          .values(inserts)
+          .values(uniqueInserts)
           .onConflictDoUpdate({
             target: [avaGradesReport.sourceInstitution, avaGradesReport.userId, avaGradesReport.courseId],
             set: {
@@ -232,8 +240,16 @@ export class AvaSyncService {
             updatedAt: new Date()
         }));
 
+        // Deduplicate locally to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
+        const uniqueInsertsMap = new Map();
+        for (const insert of inserts) {
+          const key = `${insert.sourceInstitution}-${insert.alunoId}-${insert.curso}`;
+          uniqueInsertsMap.set(key, insert);
+        }
+        const uniqueInserts = Array.from(uniqueInsertsMap.values());
+
         await this.db.insert(avaProgressReport)
-          .values(inserts)
+          .values(uniqueInserts)
           .onConflictDoUpdate({
             target: [avaProgressReport.sourceInstitution, avaProgressReport.alunoId, avaProgressReport.curso],
             set: {
