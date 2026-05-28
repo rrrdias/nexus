@@ -172,14 +172,74 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const request = this.pool.request();
 
     if (search) {
-      const searchFields = this.discenteColumns.filter(col => 
-        ['NOME', 'MATRICULA', 'CPF', 'EMAIL', 'USUARIO', 'ALUNO', 'DISCENTE'].includes(col.toUpperCase())
-      );
-      if (searchFields.length > 0) {
-        whereClause = 'WHERE ' + searchFields.map((field, idx) => {
-          request.input(`search${idx}`, sql.VarChar, `%${search}%`);
-          return `U.${field} LIKE @search${idx}`;
-        }).join(' OR ');
+      const trimmedSearch = search.trim();
+      const isCodeSearch = /\d/.test(trimmedSearch);
+
+      if (isCodeSearch) {
+        // Code/Numeric search: query discente code columns directly using fast prefix match
+        const codeFields = this.discenteColumns.filter(col => 
+          ['MATRICULA', 'CPF', 'USUARIO', 'ID', 'ALUNO', 'DISCENTE'].includes(col.toUpperCase())
+        );
+        let conditions: string[] = [];
+        let paramIdx = 0;
+        codeFields.forEach(field => {
+          const paramName = `search${paramIdx++}`;
+          request.input(paramName, sql.VarChar, `${trimmedSearch}%`);
+          conditions.push(`U.${field} LIKE @${paramName}`);
+        });
+        if (conditions.length > 0) {
+          whereClause = 'WHERE ' + conditions.join(' OR ');
+        }
+      } else {
+        // Name Search: Step 1. Get matching users first from VW_AVA_USUARIOS to bypass buggy VW_AVA_DISCENTE.SOBRENOME view formula
+        const userReq = this.pool.request();
+        const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
+        let userWhereClause = '';
+
+        if (words.length > 1) {
+          // Multi-word name search
+          const conditions: string[] = [];
+          const textFields = ['NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL'];
+          words.forEach((word, wordIdx) => {
+            const wordCond: string[] = [];
+            textFields.forEach((field, fieldIdx) => {
+              const paramName = `w_${wordIdx}_${fieldIdx}`;
+              userReq.input(paramName, sql.VarChar, `%${word}%`);
+              wordCond.push(`${field} LIKE @${paramName}`);
+            });
+            conditions.push(`(${wordCond.join(' OR ')})`);
+          });
+          userWhereClause = 'WHERE ' + conditions.join(' AND ');
+        } else {
+          // Single-word name search
+          userReq.input('search0', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search1', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search2', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search3', sql.VarChar, `%${trimmedSearch}%`);
+          userWhereClause = `WHERE NOME LIKE @search0 
+              OR SOBRENOME LIKE @search1 
+              OR NOME_SOCIAL LIKE @search2 
+              OR SOBRENOME_SOCIAL LIKE @search3`;
+        }
+
+        const usersRes = await userReq.query(
+          `SELECT TOP 200 ID 
+           FROM VW_AVA_USUARIOS 
+           ${userWhereClause}`
+        );
+
+        const userIds = usersRes.recordset.map(row => row.ID);
+        if (userIds.length === 0) {
+          return { data: [], total: 0, page, size, totalPages: 0 };
+        }
+
+        const inParams: string[] = [];
+        userIds.forEach((id, idx) => {
+          const paramName = `uid${idx}`;
+          request.input(paramName, sql.VarChar, id);
+          inParams.push(`@${paramName}`);
+        });
+        whereClause = `WHERE U.ID IN (${inParams.join(', ')})`;
       }
     }
 
@@ -223,14 +283,73 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const request = this.pool.request();
 
     if (search) {
-      const searchFields = this.docenteColumns.filter(col => 
-        ['NOME', 'DOCENTE', 'CPF', 'EMAIL', 'USUARIO', 'PROFESSOR', 'COD_DOCENTE'].includes(col.toUpperCase())
-      );
-      if (searchFields.length > 0) {
-        whereClause = 'WHERE ' + searchFields.map((field, idx) => {
-          request.input(`search${idx}`, sql.VarChar, `%${search}%`);
-          return `${field} LIKE @search${idx}`;
-        }).join(' OR ');
+      const trimmedSearch = search.trim();
+      const isCodeSearch = /\d/.test(trimmedSearch);
+
+      if (isCodeSearch) {
+        const codeFields = this.docenteColumns.filter(col => 
+          ['CPF', 'USUARIO', 'PROFESSOR', 'COD_DOCENTE', 'ID'].includes(col.toUpperCase())
+        );
+        let conditions: string[] = [];
+        let paramIdx = 0;
+        codeFields.forEach(field => {
+          const paramName = `search${paramIdx++}`;
+          request.input(paramName, sql.VarChar, `${trimmedSearch}%`);
+          conditions.push(`${field} LIKE @${paramName}`);
+        });
+        if (conditions.length > 0) {
+          whereClause = 'WHERE ' + conditions.join(' OR ');
+        }
+      } else {
+        // Name Search: Step 1. Get matching users first from VW_AVA_USUARIOS to ensure clean, high-performance execution
+        const userReq = this.pool.request();
+        const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
+        let userWhereClause = '';
+
+        if (words.length > 1) {
+          // Multi-word name search
+          const conditions: string[] = [];
+          const textFields = ['NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL'];
+          words.forEach((word, wordIdx) => {
+            const wordCond: string[] = [];
+            textFields.forEach((field, fieldIdx) => {
+              const paramName = `w_${wordIdx}_${fieldIdx}`;
+              userReq.input(paramName, sql.VarChar, `%${word}%`);
+              wordCond.push(`${field} LIKE @${paramName}`);
+            });
+            conditions.push(`(${wordCond.join(' OR ')})`);
+          });
+          userWhereClause = 'WHERE ' + conditions.join(' AND ');
+        } else {
+          // Single-word name search
+          userReq.input('search0', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search1', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search2', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search3', sql.VarChar, `%${trimmedSearch}%`);
+          userWhereClause = `WHERE NOME LIKE @search0 
+              OR SOBRENOME LIKE @search1 
+              OR NOME_SOCIAL LIKE @search2 
+              OR SOBRENOME_SOCIAL LIKE @search3`;
+        }
+
+        const usersRes = await userReq.query(
+          `SELECT TOP 200 ID 
+           FROM VW_AVA_USUARIOS 
+           ${userWhereClause}`
+        );
+
+        const userIds = usersRes.recordset.map(row => row.ID);
+        if (userIds.length === 0) {
+          return { data: [], total: 0, page, size, totalPages: 0 };
+        }
+
+        const inParams: string[] = [];
+        userIds.forEach((id, idx) => {
+          const paramName = `uid${idx}`;
+          request.input(paramName, sql.VarChar, id);
+          inParams.push(`@${paramName}`);
+        });
+        whereClause = `WHERE ID IN (${inParams.join(', ')})`;
       }
     }
 
@@ -265,14 +384,50 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const request = this.pool.request();
 
     if (search) {
-      const searchFields = this.turmaColumns.filter(col => 
-        ['TURMA', 'DISCIPLINA', 'COD_TURMA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO'].includes(col.toUpperCase())
-      );
-      if (searchFields.length > 0) {
-        whereClause = 'WHERE ' + searchFields.map((field, idx) => {
-          request.input(`search${idx}`, sql.VarChar, `%${search}%`);
-          return `T.${field} LIKE @search${idx}`;
-        }).join(' OR ');
+      const trimmedSearch = search.trim();
+      const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
+
+      if (words.length > 1) {
+        const textFields = this.turmaColumns.filter(col => 
+          ['DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO'].includes(col.toUpperCase())
+        );
+        const conditions: string[] = [];
+        words.forEach((word, wordIdx) => {
+          const wordConditions: string[] = [];
+          textFields.forEach((field, fieldIdx) => {
+            const paramName = `w_${wordIdx}_${fieldIdx}`;
+            request.input(paramName, sql.VarChar, `%${word}%`);
+            wordConditions.push(`T.${field} LIKE @${paramName}`);
+          });
+          conditions.push(`(${wordConditions.join(' OR ')})`);
+        });
+        whereClause = 'WHERE ' + conditions.join(' AND ');
+      } else {
+        const codeFields = this.turmaColumns.filter(col => 
+          ['TURMA', 'COD_TURMA', 'ID'].includes(col.toUpperCase())
+        );
+        const textFields = this.turmaColumns.filter(col => 
+          ['DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO'].includes(col.toUpperCase())
+        );
+
+        let conditions: string[] = [];
+        let paramIdx = 0;
+
+        codeFields.forEach(field => {
+          const paramName = `search${paramIdx++}`;
+          request.input(paramName, sql.VarChar, `${trimmedSearch}%`);
+          conditions.push(`T.${field} LIKE @${paramName}`);
+        });
+
+        textFields.forEach(field => {
+          const paramName = `search${paramIdx++}`;
+          request.input(paramName, sql.VarChar, `%${trimmedSearch}%`);
+          conditions.push(`T.${field} LIKE @${paramName}`);
+        });
+
+        if (conditions.length > 0) {
+          whereClause = 'WHERE ' + conditions.join(' OR ');
+        }
       }
     }
 
@@ -316,22 +471,111 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const request = this.pool.request();
 
     if (search) {
-      const searchFields = ['USUARIO', 'TURMA', 'NIVEL', 'USUARIO_CPF'];
-      whereClause = 'WHERE ' + searchFields.map((field, idx) => {
-        request.input(`search${idx}`, sql.VarChar, `%${search}%`);
-        return `${field} LIKE @search${idx}`;
-      }).join(' OR ');
+      const trimmedSearch = search.trim();
+      const isCodeSearch = /\d/.test(trimmedSearch);
+
+      if (isCodeSearch) {
+        // Search strictly on VW_AVA_MATRICULA's indexed code columns (Usuario/Matrícula, Turma, CPF)
+        let conditions = [
+          'M.USUARIO LIKE @search0',
+          'M.TURMA LIKE @search1',
+          'M.USUARIO_CPF LIKE @search2'
+        ];
+        request.input('search0', sql.VarChar, `${trimmedSearch}%`);
+        request.input('search1', sql.VarChar, `${trimmedSearch}%`);
+        request.input('search2', sql.VarChar, `${trimmedSearch}%`);
+        whereClause = 'WHERE ' + conditions.join(' OR ');
+      } else {
+        // Name Search: Step 1. Get matching users first to avoid massive scanning joins
+        const userReq = this.pool.request();
+        const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
+        let userWhereClause = '';
+
+        if (words.length > 1) {
+          // Multi-word name search
+          const conditions: string[] = [];
+          const textFields = ['NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL'];
+          
+          words.forEach((word, wordIdx) => {
+            const wordConditions: string[] = [];
+            textFields.forEach((field, fieldIdx) => {
+              const paramName = `w_${wordIdx}_${fieldIdx}`;
+              userReq.input(paramName, sql.VarChar, `%${word}%`);
+              wordConditions.push(`${field} LIKE @${paramName}`);
+            });
+            conditions.push(`(${wordConditions.join(' OR ')})`);
+          });
+          userWhereClause = 'WHERE ' + conditions.join(' AND ');
+        } else {
+          // Single-word name search
+          userReq.input('search0', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search1', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search2', sql.VarChar, `%${trimmedSearch}%`);
+          userReq.input('search3', sql.VarChar, `%${trimmedSearch}%`);
+
+          userWhereClause = `WHERE NOME LIKE @search0 
+              OR SOBRENOME LIKE @search1 
+              OR NOME_SOCIAL LIKE @search2 
+              OR SOBRENOME_SOCIAL LIKE @search3`;
+        }
+
+        const usersRes = await userReq.query(
+          `SELECT TOP 200 ID 
+           FROM VW_AVA_USUARIOS 
+           ${userWhereClause}`
+        );
+
+        const userIds = usersRes.recordset.map(row => row.ID);
+        if (userIds.length === 0) {
+          return { data: [], total: 0, page, size, totalPages: 0 };
+        }
+
+        // Build IN clause for the main matriculas query
+        const inParams: string[] = [];
+        userIds.forEach((id, idx) => {
+          const paramName = `uid${idx}`;
+          request.input(paramName, sql.VarChar, id);
+          inParams.push(`@${paramName}`);
+        });
+        whereClause = `WHERE M.USUARIO IN (${inParams.join(', ')})`;
+      }
     }
 
+    // Executing lightweight count query
     const countRes = await request.query(
-      `SELECT COUNT(*) as total FROM VW_AVA_MATRICULA ${whereClause}`
+      `SELECT COUNT(*) as total 
+       FROM VW_AVA_MATRICULA M
+       ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
 
+    // Optimization: If total matches is 0, skip the paginated query entirely
+    if (total === 0) {
+      return {
+        data: [],
+        total: 0,
+        page,
+        size,
+        totalPages: 0
+      };
+    }
+
+    // Paginated query with highly optimized CTE (joins VW_AVA_USUARIOS and VW_AVA_TURMA only on final 15 rows)
     const dataRes = await request.query(
-      `SELECT * FROM VW_AVA_MATRICULA ${whereClause} 
-       ORDER BY USUARIO 
-       OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
+      `WITH PaginatedMatriculas AS (
+         SELECT M.*
+         FROM VW_AVA_MATRICULA M
+         ${whereClause}
+         ORDER BY M.USUARIO 
+         OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY
+       )
+       SELECT PM.*, 
+              COALESCE(U.NOME_SOCIAL, U.NOME) AS NOME, 
+              COALESCE(U.SOBRENOME_SOCIAL, U.SOBRENOME) AS SOBRENOME,
+              T.NOME_DISCIPLINA 
+       FROM PaginatedMatriculas PM
+       LEFT JOIN VW_AVA_USUARIOS U ON PM.USUARIO = U.ID
+       LEFT JOIN VW_AVA_TURMA T ON PM.TURMA = T.ID`
     );
 
     return {
@@ -350,44 +594,13 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const request = this.pool.request();
     request.input('matricula', sql.VarChar, matricula);
 
-    // 1. Identify which columns exist in VW_AVA_TURMA (e.g. MATRICULA/COD_ALUNO)
-    // In many setups, VW_AVA_TURMA acts as the enrollment view, OR there is a VW_AVA_MATRICULA.
-    // Let's dynamically check if "MATRICULA" or "ALUNO" exists in VW_AVA_TURMA or other AVA views
-    const matriculaCol = this.turmaColumns.find(c => 
-      ['MATRICULA', 'COD_ALUNO', 'ALUNO', 'DISCENTE', 'ALUNO_ID'].includes(c.toUpperCase())
+    const res = await request.query(
+      `SELECT M.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, T.PERIODO, T.TURMA AS COD_TURMA
+       FROM VW_AVA_MATRICULA M
+       LEFT JOIN VW_AVA_TURMA T ON M.TURMA = T.ID
+       WHERE M.USUARIO = @matricula AND M.NIVEL = '2'`
     );
-
-    if (matriculaCol) {
-      // VW_AVA_TURMA has the matricula linked! We can query directly
-      const res = await request.query(
-        `SELECT * FROM VW_AVA_TURMA WHERE ${matriculaCol} = @matricula`
-      );
-      return res.recordset;
-    }
-
-    // Fallback: If VW_AVA_TURMA doesn't contain matricula, maybe another view does (like VW_AVA_MATRICULA if exists)
-    const matriculaView = this.avaViews.find(v => v.toUpperCase().includes('MATRI') || v.toUpperCase().includes('DISCIPLINA'));
-    if (matriculaView) {
-      const cols = await this.getViewColumns(matriculaView);
-      const mCol = cols.find(c => ['MATRICULA', 'COD_ALUNO', 'ALUNO', 'ALUNO_ID'].includes(c.toUpperCase()));
-      if (mCol) {
-        const res = await request.query(
-          `SELECT * FROM ${matriculaView} WHERE ${mCol} = @matricula`
-        );
-        return res.recordset;
-      }
-    }
-
-    // Second Fallback: Query all rows in VW_AVA_TURMA to see if any row matches, or search column names
-    try {
-      const res = await request.query(
-        `SELECT * FROM VW_AVA_TURMA WHERE MATRICULA = @matricula`
-      );
-      return res.recordset;
-    } catch (e) {
-      // If all fails, return empty list cleanly
-      return [];
-    }
+    return res.recordset;
   }
 
   async getTeacherDisciplines(docenteId: string) {
@@ -395,25 +608,12 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const request = this.pool.request();
     request.input('docenteId', sql.VarChar, docenteId);
 
-    // Identify docente/professor column in VW_AVA_TURMA
-    const docenteCol = this.turmaColumns.find(c => 
-      ['DOCENTE', 'COD_DOCENTE', 'PROFESSOR', 'DOCENTE_ID', 'DOCENTEID'].includes(c.toUpperCase())
+    const res = await request.query(
+      `SELECT M.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, T.PERIODO, T.TURMA AS COD_TURMA
+       FROM VW_AVA_MATRICULA M
+       LEFT JOIN VW_AVA_TURMA T ON M.TURMA = T.ID
+       WHERE M.USUARIO = @docenteId AND M.NIVEL = '1'`
     );
-
-    if (docenteCol) {
-      const res = await request.query(
-        `SELECT * FROM VW_AVA_TURMA WHERE ${docenteCol} = @docenteId`
-      );
-      return res.recordset;
-    }
-
-    try {
-      const res = await request.query(
-        `SELECT * FROM VW_AVA_TURMA WHERE DOCENTE = @docenteId`
-      );
-      return res.recordset;
-    } catch (e) {
-      return [];
-    }
+    return res.recordset;
   }
 }
