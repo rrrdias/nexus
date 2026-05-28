@@ -20,6 +20,16 @@ import {
   createBooking,
   importBookings
 } from "@/app/actions/scheduling"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { 
   Calendar, 
   Clock, 
@@ -89,6 +99,22 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [importing, setImporting] = useState(false)
 
+  // Confirm dialog state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionType: "presence" | "absence" | "cancel" | null;
+    bookingId: string;
+    currentStatus?: string;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    actionType: null,
+    bookingId: "",
+  })
+
   // Auto trigger alerts
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type })
@@ -142,56 +168,83 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
   }
 
   // Attendance actions
-  const handleTogglePresence = async (id: string, currentStatus: string) => {
-    try {
-      if (currentStatus === "presente") {
-        showToast("Este agendamento já está concluído.", "error")
-        return
-      }
-      const confirm = window.confirm("Deseja confirmar a presença deste aluno?")
-      if (!confirm) return
-
-      const res = await concludeBooking(id)
-      if (res) {
-        showToast("Presença registrada com sucesso!", "success")
-        refreshData()
-      }
-    } catch (err: any) {
-      showToast(err.message || "Erro ao registrar presença.", "error")
+  const handleTogglePresence = (id: string, currentStatus: string) => {
+    if (currentStatus === "presente") {
+      showToast("Este agendamento já está concluído.", "error")
+      return
     }
+    setConfirmConfig({
+      isOpen: true,
+      title: "Confirmar Presença",
+      description: "Deseja confirmar a presença deste aluno? Esta ação registrará a presença do estudante e atualizará o status do agendamento.",
+      actionType: "presence",
+      bookingId: id,
+      currentStatus
+    })
   }
 
-  const handleToggleAbsence = async (id: string, currentStatus: string) => {
-    try {
-      if (currentStatus === "ausente") {
-        showToast("Este agendamento já está marcado como ausente.", "error")
-        return
-      }
-      const confirm = window.confirm("Deseja marcar falta para este aluno?")
-      if (!confirm) return
-
-      const res = await markAbsentBooking(id)
-      if (res) {
-        showToast("Falta registrada com sucesso!", "success")
-        refreshData()
-      }
-    } catch (err: any) {
-      showToast(err.message || "Erro ao registrar falta.", "error")
+  const handleToggleAbsence = (id: string, currentStatus: string) => {
+    if (currentStatus === "ausente") {
+      showToast("Este agendamento já está marcado como ausente.", "error")
+      return
     }
+    setConfirmConfig({
+      isOpen: true,
+      title: "Registrar Falta",
+      description: "Deseja marcar falta para este aluno? Esta ação registrará a ausência do estudante e atualizará o status do agendamento.",
+      actionType: "absence",
+      bookingId: id,
+      currentStatus
+    })
   }
 
-  const handleCancelBooking = async (id: string) => {
-    try {
-      const confirm = window.confirm("ATENÇÃO: Deseja realmente CANCELAR este agendamento? Esta ação irá liberar as vagas ocupadas de volta ao sistema.")
-      if (!confirm) return
+  const handleCancelBooking = (id: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "Cancelar Agendamento",
+      description: "ATENÇÃO: Deseja realmente CANCELAR este agendamento? Esta ação irá liberar as vagas ocupadas de volta ao sistema e é irreversível.",
+      actionType: "cancel",
+      bookingId: id
+    })
+  }
 
-      const res = await cancelBooking(id)
-      if (res) {
-        showToast("Agendamento cancelado e vagas liberadas com sucesso!", "success")
-        refreshData()
+  const handleConfirmAction = async () => {
+    const { actionType, bookingId } = confirmConfig
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }))
+    
+    if (!bookingId || !actionType) return
+
+    setLoading(true)
+    try {
+      if (actionType === "presence") {
+        const res = await concludeBooking(bookingId)
+        if (res.success) {
+          showToast("Presença registrada com sucesso!", "success")
+          refreshData()
+        } else {
+          showToast(res.error || "Erro ao registrar presença.", "error")
+        }
+      } else if (actionType === "absence") {
+        const res = await markAbsentBooking(bookingId)
+        if (res.success) {
+          showToast("Falta registrada com sucesso!", "success")
+          refreshData()
+        } else {
+          showToast(res.error || "Erro ao registrar falta.", "error")
+        }
+      } else if (actionType === "cancel") {
+        const res = await cancelBooking(bookingId)
+        if (res.success) {
+          showToast("Agendamento cancelado e vagas liberadas com sucesso!", "success")
+          refreshData()
+        } else {
+          showToast(res.error || "Erro ao cancelar agendamento.", "error")
+        }
       }
     } catch (err: any) {
-      showToast(err.message || "Erro ao cancelar agendamento.", "error")
+      showToast(err.message || "Ocorreu um erro ao processar a ação.", "error")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -241,21 +294,25 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
     }
     setSubmittingBooking(true)
     try {
-      await createBooking({
+      const res = await createBooking({
         opcaoId: selectedSlotId,
         matricula: studentProfile.matricula,
         periodo: modalPeriodo
       })
-      showToast("Agendamento criado com sucesso!", "success")
-      setIsModalOpen(false)
-      // Reset modal inputs
-      setModalMatricula("")
-      setStudentProfile(null)
-      setSelectedLocal("")
-      setSelectedDate("")
-      setAvailableSlots([])
-      setSelectedSlotId("")
-      refreshData()
+      if (res.success) {
+        showToast("Agendamento criado com sucesso!", "success")
+        setIsModalOpen(false)
+        // Reset modal inputs
+        setModalMatricula("")
+        setStudentProfile(null)
+        setSelectedLocal("")
+        setSelectedDate("")
+        setAvailableSlots([])
+        setSelectedSlotId("")
+        refreshData()
+      } else {
+        showToast(res.error || "Erro ao criar agendamento.", "error")
+      }
     } catch (err: any) {
       showToast(err.message || "Erro ao criar agendamento.", "error")
     } finally {
@@ -393,10 +450,12 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
         }
 
         const res = await importBookings(rows)
-        if (res.success) {
-          showToast(`Importação concluída! Registros processados: ${res.imported}. Falhas: ${res.errors}.`, "success")
+        if (res.success && res.data) {
+          showToast(`Importação concluída! Registros processados: ${res.data.imported}. Falhas: ${res.data.errors}.`, "success")
           setIsImportModalOpen(false)
           refreshData()
+        } else {
+          showToast(res.error || "Erro ao importar arquivo.", "error")
         }
       } catch (err: any) {
         showToast(err.message || "Erro ao importar arquivo.", "error")
@@ -979,6 +1038,39 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
           </div>
         )}
       </Card>
+
+      <AlertDialog 
+        open={confirmConfig.isOpen} 
+        onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, isOpen: open }))}
+      >
+        <AlertDialogContent className="rounded-2xl border-0 shadow-2xl p-6 bg-white max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-extrabold text-navy">
+              {confirmConfig.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-4 text-[14px]">
+              {confirmConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 border-t-0 bg-transparent p-0 m-0 sm:justify-end gap-3 flex-row justify-end">
+            <AlertDialogCancel className="border border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold rounded-lg h-11 px-6 mt-0 transition-colors">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmAction}
+              className={`font-semibold rounded-lg h-11 px-6 text-white transition-colors ${
+                confirmConfig.actionType === "cancel" 
+                  ? "bg-[#E53935] hover:bg-[#D32F2F]" 
+                  : confirmConfig.actionType === "absence" 
+                    ? "bg-[#D97706] hover:bg-[#B45309]" 
+                    : "bg-[#2563EB] hover:bg-[#1D4ED8]"
+              }`}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -80,43 +80,63 @@ export async function getBookings(filters: {
 }
 
 export async function createBooking(data: { opcaoId: string; matricula: string; periodo: string }) {
-  const res = await fetchFromApi('/api/scheduling/bookings', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi('/api/scheduling/bookings', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao criar agendamento." };
+  }
 }
 
 export async function concludeBooking(id: string) {
-  const res = await fetchFromApi(`/api/scheduling/bookings/${id}/conclude`, {
-    method: 'POST'
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi(`/api/scheduling/bookings/${id}/conclude`, {
+      method: 'POST'
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao registrar presença." };
+  }
 }
 
 export async function markAbsentBooking(id: string) {
-  const res = await fetchFromApi(`/api/scheduling/bookings/${id}/absent`, {
-    method: 'POST'
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi(`/api/scheduling/bookings/${id}/absent`, {
+      method: 'POST'
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao registrar falta." };
+  }
 }
 
 export async function cancelBooking(id: string) {
-  const res = await fetchFromApi(`/api/scheduling/bookings/${id}`, {
-    method: 'DELETE'
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi(`/api/scheduling/bookings/${id}`, {
+      method: 'DELETE'
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao cancelar agendamento." };
+  }
 }
 
 export async function importBookings(bookings: any[]) {
-  const res = await fetchFromApi('/api/scheduling/import', {
-    method: 'POST',
-    body: JSON.stringify({ bookings })
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi('/api/scheduling/import', {
+      method: 'POST',
+      body: JSON.stringify({ bookings })
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao importar agendamentos." };
+  }
 }
