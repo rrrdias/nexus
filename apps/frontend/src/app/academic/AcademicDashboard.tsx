@@ -30,6 +30,7 @@ export function AcademicDashboard() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | null }>({ message: "", type: null })
+  const [hasSearched, setHasSearched] = useState(false)
 
   // Data states
   const [listData, setListData] = useState<any[]>([])
@@ -81,13 +82,22 @@ export function AcademicDashboard() {
   }
 
   useEffect(() => {
-    fetchData()
+    if (hasSearched) {
+      fetchData()
+    } else {
+      setListData([])
+      setMeta({ total: 0, page: 1, size: 15, totalPages: 1 })
+    }
   }, [activeTab, page])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setPage(1)
-    fetchData()
+    setHasSearched(true)
+    if (page !== 1) {
+      setPage(1)
+    } else {
+      fetchData()
+    }
   }
 
   // Row resolvers to elegantly map dynamic view column names case-insensitively
@@ -207,7 +217,7 @@ export function AcademicDashboard() {
       {/* Interactive Tabs */}
       <div className="flex border-b border-gray-200 select-none overflow-x-auto">
         <button
-          onClick={() => { setActiveTab("discentes"); setSearch(""); setPage(1); }}
+          onClick={() => { setActiveTab("discentes"); setSearch(""); setPage(1); setHasSearched(false); setListData([]); }}
           className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
             activeTab === "discentes"
               ? "border-[#5E35B1] text-[#5E35B1]"
@@ -217,7 +227,7 @@ export function AcademicDashboard() {
           <User className="w-4 h-4" /> Discentes (Alunos)
         </button>
         <button
-          onClick={() => { setActiveTab("docentes"); setSearch(""); setPage(1); }}
+          onClick={() => { setActiveTab("docentes"); setSearch(""); setPage(1); setHasSearched(false); setListData([]); }}
           className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
             activeTab === "docentes"
               ? "border-[#5E35B1] text-[#5E35B1]"
@@ -227,7 +237,7 @@ export function AcademicDashboard() {
           <GraduationCap className="w-4 h-4" /> Docentes (Professores)
         </button>
         <button
-          onClick={() => { setActiveTab("turmas"); setSearch(""); setPage(1); }}
+          onClick={() => { setActiveTab("turmas"); setSearch(""); setPage(1); setHasSearched(false); setListData([]); }}
           className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
             activeTab === "turmas"
               ? "border-[#5E35B1] text-[#5E35B1]"
@@ -237,7 +247,7 @@ export function AcademicDashboard() {
           <Layers className="w-4 h-4" /> Turmas (Disciplinas)
         </button>
         <button
-          onClick={() => { setActiveTab("matriculas"); setSearch(""); setPage(1); }}
+          onClick={() => { setActiveTab("matriculas"); setSearch(""); setPage(1); setHasSearched(false); setListData([]); }}
           className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
             activeTab === "matriculas"
               ? "border-[#5E35B1] text-[#5E35B1]"
@@ -333,6 +343,22 @@ export function AcademicDashboard() {
                     </TableCell>
                   </TableRow>
                 ))
+              ) : !hasSearched ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-20 px-5">
+                    <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-4 select-none">
+                      <div className="w-16 h-16 rounded-full bg-[#5E35B1]/10 text-[#5E35B1] flex items-center justify-center shadow-inner">
+                        <Search className="w-8 h-8 animate-pulse" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-bold text-navy">Pesquisa no Lyceum</h3>
+                        <p className="text-xs text-[#5F6775] leading-relaxed">
+                          Digite um termo de pesquisa e clique em <strong className="text-[#5E35B1]">"Consultar"</strong> para pesquisar registros no Lyceum.
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ) : listData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-12 text-[#9AA0AC] italic">
