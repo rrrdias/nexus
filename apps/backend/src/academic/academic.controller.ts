@@ -1,7 +1,7 @@
 import { Controller, Get, Query, Param, BadRequestException } from '@nestjs/common';
 import { AcademicService } from './academic.service';
 
-@Controller('academic')
+@Controller('api/academic')
 export class AcademicController {
   constructor(private readonly academicService: AcademicService) {}
 
