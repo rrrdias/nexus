@@ -178,7 +178,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       if (searchFields.length > 0) {
         whereClause = 'WHERE ' + searchFields.map((field, idx) => {
           request.input(`search${idx}`, sql.VarChar, `%${search}%`);
-          return `${field} LIKE @search${idx}`;
+          return `U.${field} LIKE @search${idx}`;
         }).join(' OR ');
       }
     }
@@ -188,13 +188,22 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     ) || this.discenteColumns[0] || '1';
 
     const countRes = await request.query(
-      `SELECT COUNT(*) as total FROM VW_AVA_DISCENTE ${whereClause}`
+      `SELECT COUNT(*) as total 
+       FROM VW_AVA_DISCENTE U 
+       LEFT JOIN VW_AVA_CURSO C ON U.CURSO = C.ID 
+       ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
 
     const dataRes = await request.query(
-      `SELECT * FROM VW_AVA_DISCENTE ${whereClause} 
-       ORDER BY ${orderColumn} 
+      `SELECT 
+         U.*, 
+         C.NOME AS CURSO_NOME, 
+         C.UNIDADE_ENS AS CURSO_INSTITUICAO 
+       FROM VW_AVA_DISCENTE U 
+       LEFT JOIN VW_AVA_CURSO C ON U.CURSO = C.ID 
+       ${whereClause} 
+       ORDER BY U.${orderColumn} 
        OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
     );
 
@@ -262,7 +271,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       if (searchFields.length > 0) {
         whereClause = 'WHERE ' + searchFields.map((field, idx) => {
           request.input(`search${idx}`, sql.VarChar, `%${search}%`);
-          return `${field} LIKE @search${idx}`;
+          return `T.${field} LIKE @search${idx}`;
         }).join(' OR ');
       }
     }
@@ -272,13 +281,56 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     ) || this.turmaColumns[0] || '1';
 
     const countRes = await request.query(
-      `SELECT COUNT(*) as total FROM VW_AVA_TURMA ${whereClause}`
+      `SELECT COUNT(*) as total 
+       FROM VW_AVA_TURMA T 
+       LEFT JOIN VW_AVA_CURSO C ON T.CURSO = C.ID 
+       ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
 
     const dataRes = await request.query(
-      `SELECT * FROM VW_AVA_TURMA ${whereClause} 
-       ORDER BY ${orderColumn} 
+      `SELECT 
+         T.*, 
+         C.NOME AS CURSO_NOME, 
+         C.UNIDADE_ENS AS CURSO_INSTITUICAO 
+       FROM VW_AVA_TURMA T 
+       LEFT JOIN VW_AVA_CURSO C ON T.CURSO = C.ID 
+       ${whereClause} 
+       ORDER BY T.${orderColumn} 
+       OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
+    );
+
+    return {
+      data: dataRes.recordset,
+      total,
+      page,
+      size,
+      totalPages: Math.ceil(total / size)
+    };
+  }
+
+  async getMatriculas(search?: string, page = 1, size = 15) {
+    if (!this.pool) throw new Error('Lyceum database not connected.');
+    const offset = (page - 1) * size;
+    let whereClause = '';
+    const request = this.pool.request();
+
+    if (search) {
+      const searchFields = ['USUARIO', 'TURMA', 'NIVEL', 'USUARIO_CPF'];
+      whereClause = 'WHERE ' + searchFields.map((field, idx) => {
+        request.input(`search${idx}`, sql.VarChar, `%${search}%`);
+        return `${field} LIKE @search${idx}`;
+      }).join(' OR ');
+    }
+
+    const countRes = await request.query(
+      `SELECT COUNT(*) as total FROM VW_AVA_MATRICULA ${whereClause}`
+    );
+    const total = countRes.recordset[0]?.total || 0;
+
+    const dataRes = await request.query(
+      `SELECT * FROM VW_AVA_MATRICULA ${whereClause} 
+       ORDER BY USUARIO 
        OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
     );
 

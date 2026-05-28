@@ -61,3 +61,17 @@ export async function getClasses(filters: { search?: string; page?: number; size
     return { success: false, error: err.message || "Erro ao consultar turmas." }
   }
 }
+
+export async function getMatriculas(filters: { search?: string; page?: number; size?: number } = {}) {
+  try {
+    const params = new URLSearchParams()
+    if (filters.search) params.append('search', filters.search)
+    if (filters.page) params.append('page', String(filters.page))
+    if (filters.size) params.append('size', String(filters.size))
+
+    const res = await fetchFromApi(`/api/academic/matriculas?${params.toString()}`, { method: 'GET' })
+    return { success: true, data: res }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao consultar matrículas." }
+  }
+}

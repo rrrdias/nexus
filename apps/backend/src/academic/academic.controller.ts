@@ -63,4 +63,19 @@ export class AcademicController {
 
     return this.academicService.getClasses(search, pageNum, sizeNum);
   }
+
+  @Get('matriculas')
+  async getMatriculas(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('size') size?: string,
+  ) {
+    const pageNum = page ? parseInt(page) : 1;
+    const sizeNum = size ? parseInt(size) : 15;
+
+    if (isNaN(pageNum) || pageNum < 1) throw new BadRequestException('Página inválida.');
+    if (isNaN(sizeNum) || sizeNum < 1) throw new BadRequestException('Tamanho de página inválido.');
+
+    return this.academicService.getMatriculas(search, pageNum, sizeNum);
+  }
 }

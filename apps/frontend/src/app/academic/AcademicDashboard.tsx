@@ -20,9 +20,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { getStudents, getStudentDisciplines, getTeachers, getTeacherDisciplines, getClasses } from "@/app/actions/academic"
+import { getStudents, getStudentDisciplines, getTeachers, getTeacherDisciplines, getClasses, getMatriculas } from "@/app/actions/academic"
 
-type TabType = "discentes" | "docentes" | "turmas"
+type TabType = "discentes" | "docentes" | "turmas" | "matriculas"
 
 export function AcademicDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>("discentes")
@@ -56,8 +56,10 @@ export function AcademicDashboard() {
         res = await getStudents({ search, page, size: 15 })
       } else if (activeTab === "docentes") {
         res = await getTeachers({ search, page, size: 15 })
-      } else {
+      } else if (activeTab === "turmas") {
         res = await getClasses({ search, page, size: 15 })
+      } else {
+        res = await getMatriculas({ search, page, size: 15 })
       }
 
       if (res.success && res.data) {
@@ -90,28 +92,53 @@ export function AcademicDashboard() {
 
   // Row resolvers to elegantly map dynamic view column names case-insensitively
   const resolveStudentRow = (row: any) => {
-    const nome = row.NOME || row.Nome || row.nome || row.ALUNO || row.aluno || "Não Identificado"
+    const nomeBase = row.NOME_SOCIAL || row.NOME || row.Nome || row.nome || row.ALUNO || row.aluno || "Não Identificado"
+    const sobrenomeBase = row.SOBRENOME_SOCIAL || row.SOBRENOME || row.Sobrenome || row.sobrenome || ""
+    const nomeCompleto = `${nomeBase} ${sobrenomeBase}`.trim()
     const matricula = row.MATRICULA || row.Matricula || row.matricula || row.COD_ALUNO || row.cod_aluno || "---"
-    const email = row.EMAIL || row.Email || row.email || row.USUARIO || row.usuario || "---"
+    const email = row.EMAIL || row.Email || row.email || "---"
     const cpf = row.CPF || row.Cpf || row.cpf || "---"
-    return { nome, matricula, email, cpf }
+    const periodo = row.SERIE || row.Serie || row.serie || "---"
+    const unidadeFisica = row.UNIDADE_FISICA || row.UnidadeFisica || row.unidade_fisica || "---"
+    const curso = row.CURSO_NOME || row.CURSO || row.Curso || "---"
+    const cursoInstituicao = row.CURSO_INSTITUICAO || "---"
+    const telefone = row.TELEFONE || row.Telefone || row.telefone || "---"
+    const local = row.CIDADE && row.PAIS ? `${row.CIDADE} / ${row.PAIS}` : row.CIDADE || row.PAIS || "---"
+    return { nome: nomeCompleto, matricula, email, cpf, periodo, unidadeFisica, curso, cursoInstituicao, telefone, local }
   }
 
   const resolveTeacherRow = (row: any) => {
-    const nome = row.NOME || row.Nome || row.nome || row.DOCENTE_NOME || row.PROFESSOR || row.professor || "Não Identificado"
-    const docenteId = row.DOCENTE || row.Docente || row.docente || row.COD_DOCENTE || row.cod_docente || "---"
-    const email = row.EMAIL || row.Email || row.email || row.USUARIO || row.usuario || "---"
+    const nomeBase = row.NOME || row.Nome || "Não Identificado"
+    const sobrenomeBase = row.SOBRENOME || row.Sobrenome || ""
+    const nomeCompleto = `${nomeBase} ${sobrenomeBase}`.trim()
+    const docenteId = row.ID || row.Id || row.id || row.COD_DOCENTE || row.cod_docente || "---"
+    const email = row.EMAIL || row.Email || row.email || "---"
     const cpf = row.CPF || row.Cpf || row.cpf || "---"
-    return { nome, docenteId, email, cpf }
+    const telefone = row.TELEFONE || row.Telefone || row.telefone || "---"
+    const local = row.CIDADE && row.PAIS ? `${row.CIDADE} / ${row.PAIS}` : row.CIDADE || row.PAIS || "---"
+    return { nome: nomeCompleto, docenteId, email, cpf, telefone, local }
   }
 
   const resolveClassRow = (row: any) => {
     const codigo = row.TURMA || row.Turma || row.turma || row.COD_TURMA || row.cod_turma || "---"
-    const disciplina = row.DISCIPLINA || row.Disciplina || row.disciplina || row.NOME_DISCIPLINA || row.cod_disciplina || "---"
-    const curso = row.CURSO || row.Curso || row.curso || "Geral"
-    const periodo = row.PERIODO || row.Periodo || row.periodo || row.SEMESTRE || row.semestre || "---"
-    const ano = row.ANO || row.Ano || row.ano || "---"
-    return { codigo, disciplina, curso, periodo, ano }
+    const disciplina = row.NOME_DISCIPLINA || row.DISCIPLINA || row.disciplina || "---"
+    const disciplinaCod = row.DISCIPLINA || "---"
+    const curso = row.CURSO_NOME || row.CURSO || "---"
+    const instituicao = row.CURSO_INSTITUICAO || "---"
+    const periodo = row.PERIODO || row.Periodo || row.periodo || "---"
+    const serie = row.SERIE || row.Serie || row.serie || "---"
+    const modelagem = row.MODELAGEM || row.Modelagem || row.modelagem || "---"
+    return { codigo, disciplina, disciplinaCod, curso, instituicao, periodo, serie, modelagem }
+  }
+
+  const resolveMatriculaRow = (row: any) => {
+    const username = row.USUARIO || row.Usuario || row.usuario || "---"
+    const turma = row.TURMA || row.Turma || row.turma || "---"
+    const nivel = row.NIVEL || row.Nivel || row.nivel || "---"
+    const situacao = row.SITUACAO || row.Situacao || row.situacao || "---"
+    const ativo = row.ATIVO === 1 || row.ATIVO === '1' || row.ATIVO === true || row.ATIVO === 'S' ? 'Ativo' : 'Inativo'
+    const cpf = row.USUARIO_CPF || row.UsuarioCpf || "---"
+    return { username, turma, nivel, situacao, ativo, cpf }
   }
 
   // Load detailed disciplines in drawer
@@ -178,10 +205,10 @@ export function AcademicDashboard() {
       </div>
 
       {/* Interactive Tabs */}
-      <div className="flex border-b border-gray-200 select-none">
+      <div className="flex border-b border-gray-200 select-none overflow-x-auto">
         <button
           onClick={() => { setActiveTab("discentes"); setSearch(""); setPage(1); }}
-          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none ${
+          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
             activeTab === "discentes"
               ? "border-[#5E35B1] text-[#5E35B1]"
               : "border-transparent text-[#5F6775] hover:text-navy hover:border-gray-300"
@@ -191,7 +218,7 @@ export function AcademicDashboard() {
         </button>
         <button
           onClick={() => { setActiveTab("docentes"); setSearch(""); setPage(1); }}
-          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none ${
+          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
             activeTab === "docentes"
               ? "border-[#5E35B1] text-[#5E35B1]"
               : "border-transparent text-[#5F6775] hover:text-navy hover:border-gray-300"
@@ -201,13 +228,23 @@ export function AcademicDashboard() {
         </button>
         <button
           onClick={() => { setActiveTab("turmas"); setSearch(""); setPage(1); }}
-          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none ${
+          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
             activeTab === "turmas"
               ? "border-[#5E35B1] text-[#5E35B1]"
               : "border-transparent text-[#5F6775] hover:text-navy hover:border-gray-300"
           }`}
         >
-          <Layers className="w-4 h-4" /> Turmas e Matrículas
+          <Layers className="w-4 h-4" /> Turmas (Disciplinas)
+        </button>
+        <button
+          onClick={() => { setActiveTab("matriculas"); setSearch(""); setPage(1); }}
+          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
+            activeTab === "matriculas"
+              ? "border-[#5E35B1] text-[#5E35B1]"
+              : "border-transparent text-[#5F6775] hover:text-navy hover:border-gray-300"
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" /> Matrículas (Vínculos)
         </button>
       </div>
 
@@ -244,8 +281,10 @@ export function AcademicDashboard() {
                   <>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Aluno / Discente</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Matrícula</TableHead>
-                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">E-mail</TableHead>
-                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden lg:table-cell">CPF</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Curso / Instituição</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">Período</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden lg:table-cell">Unidade Física</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">Contato</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">Disciplinas</TableHead>
                   </>
                 )}
@@ -253,7 +292,8 @@ export function AcademicDashboard() {
                   <>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Docente / Professor</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Código Docente</TableHead>
-                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">E-mail</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">Contato</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden lg:table-cell">Localidade</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden lg:table-cell">CPF</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">Encargo</TableHead>
                   </>
@@ -262,9 +302,18 @@ export function AcademicDashboard() {
                   <>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Código Turma</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Disciplina Vinculada</TableHead>
-                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">Curso</TableHead>
-                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">Período</TableHead>
-                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">Ano</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">Curso / Unidade Ens.</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">Período / Série</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">Modelagem</TableHead>
+                  </>
+                )}
+                {activeTab === "matriculas" && (
+                  <>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Usuário / CPF</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Turma Vinculada</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Nível</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">Situação</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">Status</TableHead>
                   </>
                 )}
               </TableRow>
@@ -273,9 +322,9 @@ export function AcademicDashboard() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <TableRow key={idx} className="animate-pulse">
-                    <TableCell colSpan={5} className="py-5 px-5">
+                    <TableCell colSpan={7} className="py-5 px-5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
+                        <div className="w-8.5 h-8.5 rounded-full bg-gray-200 shrink-0" />
                         <div className="space-y-1.5 flex-1">
                           <div className="h-4 bg-gray-200 rounded w-1/4" />
                           <div className="h-3 bg-gray-200 rounded w-1/6" />
@@ -286,7 +335,7 @@ export function AcademicDashboard() {
                 ))
               ) : listData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-[#9AA0AC] italic">
+                  <TableCell colSpan={7} className="text-center py-12 text-[#9AA0AC] italic">
                     Nenhum registro encontrado no Lyceum. Ajuste a busca acima.
                   </TableCell>
                 </TableRow>
@@ -302,14 +351,22 @@ export function AcademicDashboard() {
                               {student.nome.slice(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-semibold text-navy text-xs">{student.nome}</p>
-                              <span className="text-[10px] text-[#9AA0AC] block md:hidden mt-0.5">{student.email}</span>
+                              <p className="font-semibold text-navy text-xs leading-none">{student.nome}</p>
+                              <span className="text-[10px] text-[#9AA0AC] mt-1 block font-mono">{student.cpf}</span>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs font-semibold font-mono text-navy">{student.matricula}</TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden md:table-cell">{student.email}</TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell">{student.cpf}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs font-bold font-mono text-navy">{student.matricula}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775]">
+                          <p className="font-semibold text-navy text-xs">{student.curso}</p>
+                          <span className="text-[10px] text-[#9AA0AC] block font-mono">{student.cursoInstituicao}</span>
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-navy font-bold text-center">{student.periodo}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell">{student.unidadeFisica}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden md:table-cell">
+                          <p className="font-semibold text-navy text-xs">{student.email}</p>
+                          <span className="text-[10px] text-[#9AA0AC] block font-mono">{student.telefone}</span>
+                        </TableCell>
                         <TableCell className="px-5 py-3.5 text-right">
                           <Button 
                             onClick={() => handleOpenDetail(row)}
@@ -332,14 +389,18 @@ export function AcademicDashboard() {
                               {teacher.nome.slice(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <p className="font-semibold text-navy text-xs">{teacher.nome}</p>
-                              <span className="text-[10px] text-[#9AA0AC] block md:hidden mt-0.5">{teacher.email}</span>
+                              <p className="font-semibold text-navy text-xs leading-none">{teacher.nome}</p>
+                              <span className="text-[10px] text-[#9AA0AC] mt-1 block font-mono">Prof. EA / Presencial</span>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs font-semibold font-mono text-navy">{teacher.docenteId}</TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden md:table-cell">{teacher.email}</TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell">{teacher.cpf}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs font-bold font-mono text-navy">{teacher.docenteId}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden md:table-cell">
+                          <p className="font-semibold text-navy text-xs">{teacher.email}</p>
+                          <span className="text-[10px] text-[#9AA0AC] block font-mono">{teacher.telefone}</span>
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell">{teacher.localidade || teacher.local}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell font-mono">{teacher.cpf}</TableCell>
                         <TableCell className="px-5 py-3.5 text-right">
                           <Button 
                             onClick={() => handleOpenDetail(row)}
@@ -352,17 +413,46 @@ export function AcademicDashboard() {
                         </TableCell>
                       </TableRow>
                     )
-                  } else {
+                  } else if (activeTab === "turmas") {
                     const cRow = resolveClassRow(row)
                     return (
                       <TableRow key={idx} className="hover:bg-gray-50/50 transition-colors">
                         <TableCell className="px-5 py-3.5 text-xs font-bold text-[#5E35B1] font-mono">{cRow.codigo}</TableCell>
                         <TableCell className="px-5 py-3.5">
-                          <p className="font-semibold text-navy text-xs">{cRow.disciplina}</p>
+                          <p className="font-bold text-navy text-xs">{cRow.disciplina}</p>
+                          <span className="text-[10px] text-[#9AA0AC] block font-mono mt-0.5">ID: {cRow.disciplinaCod}</span>
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden md:table-cell">{cRow.curso}</TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-navy font-semibold text-center">{cRow.periodo}</TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-right font-medium text-[#5F6775]">{cRow.ano}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden md:table-cell">
+                          <p className="font-semibold text-navy text-xs">{cRow.curso}</p>
+                          <span className="text-[10px] text-[#9AA0AC] block font-mono">{cRow.instituicao}</span>
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-navy font-semibold text-center">
+                          <p className="font-bold text-navy text-xs">{cRow.periodo}</p>
+                          <span className="text-[10px] text-[#9AA0AC] block font-mono">Série: {cRow.serie}</span>
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-right font-medium text-[#5F6775]">{cRow.modelagem}</TableCell>
+                      </TableRow>
+                    )
+                  } else {
+                    const mRow = resolveMatriculaRow(row)
+                    return (
+                      <TableRow key={idx} className="hover:bg-gray-50/50 transition-colors">
+                        <TableCell className="px-5 py-3.5">
+                          <p className="font-bold text-navy text-xs">{mRow.username}</p>
+                          <span className="text-[10px] text-[#9AA0AC] block font-mono mt-0.5">CPF: {mRow.cpf}</span>
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs font-bold text-[#5E35B1] font-mono">{mRow.turma}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-navy font-semibold">{mRow.nivel}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden md:table-cell">{mRow.situacao}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-right">
+                          <Badge className={
+                            mRow.ativo === 'Ativo'
+                              ? "bg-[#E8F5E9] text-[#2E7D32] hover:bg-[#C8E6C9] border border-[#A5D6A7]"
+                              : "bg-[#FFEBEE] text-[#C62828] hover:bg-[#FFCDD2] border border-[#EF9A9A]"
+                          }>
+                            {mRow.ativo}
+                          </Badge>
+                        </TableCell>
                       </TableRow>
                     )
                   }
