@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Box, LogOut, ShieldCheck, Users, ChevronLeft, ChevronRight, Calendar, MapPin, Clock } from "lucide-react"
+import { LayoutDashboard, Box, LogOut, ShieldCheck, Users, ChevronLeft, ChevronRight, Calendar, MapPin, Clock, GraduationCap } from "lucide-react"
 import { logoutAction } from "@/app/actions/auth"
 
 interface SidebarClientProps {
@@ -397,6 +397,8 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
           }
 
           // Módulos normais sem filhos
+          const Icon = sys.slug === 'academic' || sys.name === 'Módulo Acadêmico' ? GraduationCap : Box;
+
           return (
             <Link 
               key={sys.id} 
@@ -407,7 +409,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                   : 'text-white/50 hover:bg-navy-light hover:text-white border-transparent'
               }`}
             >
-              <Box className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+              <Icon className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
               <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
                 {sys.name}
               </span>

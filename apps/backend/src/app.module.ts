@@ -11,6 +11,7 @@ import { AvaSyncModule } from './ava-sync/ava-sync.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { SystemModule } from './system/system.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
+import { AcademicModule } from './academic/academic.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SchedulingModule } from './scheduling/scheduling.module';
     AvaSyncModule,
     SystemModule,
     SchedulingModule,
+    AcademicModule,
   ],
   controllers: [AppController],
   providers: [
