@@ -7,7 +7,8 @@ import {
   groups, 
   groupSystemAccess, 
   users, 
-  usersSystemAccess 
+  usersSystemAccess,
+  userGroups 
 } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -146,23 +147,17 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       });
 
       // 2. Grant direct access to all users belonging to Super Admin group
-      // Fetch users in this group
-      const adminUsers = await this.db.select({ userId: users.id })
-        .from(users)
-        .innerJoin(groups, eq(groups.name, 'Super Admin'))
-        .innerJoin(groups, eq(users.id, users.id)); // Simple check or lookup
+      const adminUsers = await this.db.select({ userId: userGroups.userId })
+        .from(userGroups)
+        .where(eq(userGroups.groupId, superAdminGroup.id));
 
-      // Let's do a direct select on users table or find admin user
-      const [adminUser] = await this.db.select()
-        .from(users)
-        .where(eq(users.userid, 'ricardo.dias'))
-        .limit(1);
-
-      if (adminUser) {
-        await this.db.insert(usersSystemAccess).values({
-          userId: adminUser.id,
-          systemModuleId: newModule.id,
-        });
+      if (adminUsers.length > 0) {
+        await this.db.insert(usersSystemAccess).values(
+          adminUsers.map(admin => ({
+            userId: admin.userId,
+            systemModuleId: newModule.id,
+          }))
+        );
       }
       console.log('[Postgres Seeder] Academic Module accesses granted successfully.');
     }
