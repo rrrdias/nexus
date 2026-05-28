@@ -63,6 +63,13 @@ services:
       # Moodle Sync - Pós Graduação
       MOODLE_POS_GRADES_GET_URL: ${MOODLE_POS_GRADES_GET_URL}
       MOODLE_POS_GRADES_ATT_URL: ${MOODLE_POS_GRADES_ATT_URL}
+      # Lyceum SQL Server Connection (Academic Module)
+      LYCEUM_DB_HOST: ${LYCEUM_DB_HOST}
+      LYCEUM_DB_PORT: ${LYCEUM_DB_PORT}
+      LYCEUM_DB_DATABASE: ${LYCEUM_DB_DATABASE}
+      LYCEUM_DB_USERNAME: ${LYCEUM_DB_USERNAME}
+      LYCEUM_DB_PASSWORD: ${LYCEUM_DB_PASSWORD}
+      LYCEUM_DB_PREFIX: ${LYCEUM_DB_PREFIX}
     command: sh -c "cd apps/backend && npm run db:push -- --force && node dist/main.js"
 
   frontend:
