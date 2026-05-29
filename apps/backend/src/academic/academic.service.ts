@@ -277,10 +277,29 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     const dataRes = await request.query(
       `SELECT 
-         U.*, 
+         U.ID,
+         U.NOME,
+         U.EMAIL,
+         U.CPF,
+         U.SERIE,
+         U.TURNO,
+         U.TELEFONE,
+         U.CIDADE,
+         U.PAIS,
+         U.CURSO,
+         U.UNIDADE_FISICA,
+         U.NOME_SOCIAL,
+         U.NOME_UNIDADE_FISICA,
+         U.SENHA,
+         U.DATA_CRIACAO,
+         U.DATA_ATUALIZACAO,
+         U.DATA_EXCLUSAO,
+         US.SOBRENOME,
+         US.SOBRENOME_SOCIAL,
          C.NOME AS CURSO_NOME, 
          C.UNIDADE_ENS AS CURSO_INSTITUICAO 
        FROM ${this.dbPrefix}VW_AVA_DISCENTE U 
+       LEFT JOIN ${this.dbPrefix}VW_AVA_USUARIOS US ON U.ID = US.ID
        LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON U.CURSO = C.ID 
        ${whereClause} 
        ORDER BY U.${orderColumn} 
@@ -315,7 +334,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
         codeFields.forEach(field => {
           const paramName = `search${paramIdx++}`;
           request.input(paramName, sql.VarChar, `${trimmedSearch}%`);
-          conditions.push(`${field} LIKE @${paramName}`);
+          conditions.push(`U.${field} LIKE @${paramName}`);
         });
         if (conditions.length > 0) {
           whereClause = 'WHERE ' + conditions.join(' OR ');
@@ -369,7 +388,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
           request.input(paramName, sql.VarChar, id);
           inParams.push(`@${paramName}`);
         });
-        whereClause = `WHERE ID IN (${inParams.join(', ')})`;
+        whereClause = `WHERE U.ID IN (${inParams.join(', ')})`;
       }
     }
 
@@ -378,13 +397,30 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     ) || this.docenteColumns[0] || '1';
 
     const countRes = await request.query(
-      `SELECT COUNT(*) as total FROM ${this.dbPrefix}VW_AVA_DOCENTE ${whereClause}`
+      `SELECT COUNT(*) as total FROM ${this.dbPrefix}VW_AVA_DOCENTE U ${whereClause}`
     );
     const total = countRes.recordset[0]?.total || 0;
 
     const dataRes = await request.query(
-      `SELECT * FROM ${this.dbPrefix}VW_AVA_DOCENTE ${whereClause} 
-       ORDER BY ${orderColumn} 
+      `SELECT 
+         U.ID,
+         U.NOME,
+         U.EMAIL,
+         U.CPF,
+         U.TELEFONE,
+         U.CIDADE,
+         U.PAIS,
+         U.SENHA,
+         U.DATA_CRIACAO,
+         U.DATA_ATUALIZACAO,
+         U.DATA_EXCLUSAO,
+         US.SOBRENOME,
+         US.NOME_SOCIAL,
+         US.SOBRENOME_SOCIAL
+       FROM ${this.dbPrefix}VW_AVA_DOCENTE U 
+       LEFT JOIN ${this.dbPrefix}VW_AVA_USUARIOS US ON U.ID = US.ID
+       ${whereClause} 
+       ORDER BY U.${orderColumn} 
        OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
     );
 
