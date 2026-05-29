@@ -244,7 +244,13 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
         const usersRes = await userReq.query(
           `SELECT TOP 200 ID 
-           FROM ${this.dbPrefix}VW_AVA_USUARIOS 
+           FROM (
+             SELECT ID, NOME, SOBRENOME, NOME_SOCIAL, SOBRENOME_SOCIAL 
+             FROM ${this.dbPrefix}VW_AVA_USUARIOS 
+             WHERE CHARINDEX(' ', NOME) > 0 
+             ORDER BY ID
+             OFFSET 0 ROWS
+           ) U
            ${userWhereClause}`
         );
 
@@ -373,7 +379,13 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
         const usersRes = await userReq.query(
           `SELECT TOP 200 ID 
-           FROM ${this.dbPrefix}VW_AVA_USUARIOS 
+           FROM (
+             SELECT ID, NOME, SOBRENOME, NOME_SOCIAL, SOBRENOME_SOCIAL 
+             FROM ${this.dbPrefix}VW_AVA_USUARIOS 
+             WHERE CHARINDEX(' ', NOME) > 0 
+             ORDER BY ID
+             OFFSET 0 ROWS
+           ) U
            ${userWhereClause}`
         );
 
@@ -577,7 +589,13 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
         const usersRes = await userReq.query(
           `SELECT TOP 200 ID 
-           FROM ${this.dbPrefix}VW_AVA_USUARIOS 
+           FROM (
+             SELECT ID, NOME, SOBRENOME, NOME_SOCIAL, SOBRENOME_SOCIAL 
+             FROM ${this.dbPrefix}VW_AVA_USUARIOS 
+             WHERE CHARINDEX(' ', NOME) > 0 
+             ORDER BY ID
+             OFFSET 0 ROWS
+           ) U
            ${userWhereClause}`
         );
 
