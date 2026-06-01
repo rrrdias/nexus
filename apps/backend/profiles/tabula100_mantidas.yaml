@@ -1,0 +1,48 @@
+name: 'Integração 2026-1'
+
+jobs:
+  faceg:
+    modo: 'prod'
+    name: 'Graduação UNIEGO'
+    sync:
+      turmas: true
+      matriculas:
+        aluno: true
+        professor: false
+    unidade: 'FAEGO'
+    curso-tipo: 'SUP'
+    periodo: '2026-1'
+
+    categoria:
+      - 'Graduação'
+      - '%CURSO_NOME'
+      - '%PERIODO'
+      - 'Disciplinas Online'
+
+    sala:
+      - '%DISCIPLINA_NOME'
+      - ' - '
+      - '%TURMA_ID'
+
+  raizes:
+    modo: 'prod'
+    name: 'Graduação Raízes'
+    sync:
+      turmas: true
+      matriculas:
+        aluno: true
+        professor: false
+    unidade: 'RAÍZES'
+    curso-tipo: 'SUP'
+    periodo: '2026-1'
+
+    categoria:
+      - 'Graduação'
+      - '%CURSO_NOME'
+      - '%PERIODO'
+      - 'Disciplinas Online'
+
+    sala:
+      - '%DISCIPLINA_NOME'
+      - ' - '
+      - '%TURMA_ID'

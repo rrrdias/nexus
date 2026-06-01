@@ -1,0 +1,24 @@
+name: 'Integração 2024-2'
+
+jobs:
+
+  unievangelica:
+    modo: 'prod'
+    name: 'Graduação'
+    sync:
+      turmas: false 
+      matriculas:
+        aluno: true
+        professor: true
+    unidade: 'UniEVANGÉLICA'
+    curso-tipo: 'SUP'
+    periodo: '2024-2'
+    cursos:
+    except-curso:
+    categoria:
+      - 'Graduação'
+      - '%CURSO_NOME'
+      - '%PERIODO'
+    sala:
+      - '%DISCIPLINA_NOME'
+    template: 'SM_GRAD100_20241'

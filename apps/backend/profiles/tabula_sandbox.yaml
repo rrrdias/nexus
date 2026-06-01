@@ -1,0 +1,24 @@
+name: 'Integração Teste Sandbox 2025-2'
+
+jobs:
+
+  unievangelica:
+    modo: 'sandbox'
+    name: 'Graduação'
+    sync:
+      turmas: true 
+      matriculas:
+        aluno: true
+        professor: true
+    unidade: 'UniEVANGÉLICA'
+    curso-tipo: 'SUP'
+    periodo: '2025-2'
+    cursos:
+    except-curso:
+    categoria:
+      - 'Graduação'
+      - '%CURSO_NOME'
+      - '%PERIODO'
+    sala:
+      - '%DISCIPLINA_NOME'
+    template: 'SM_PRESENCIAL_20252'

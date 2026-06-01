@@ -203,3 +203,56 @@ export const agendamentosMatricula = pgTable("agendamentos_matricula", {
   index("idx_agendamento_matricula").on(t.matricula),
 ])
 
+// ==========================================
+// Módulo: Nexus AVA Integration Tracker
+// ==========================================
+
+export const syncedTurmas = pgTable("synced_turma", {
+  unidadeEns: text("unidadeEns").notNull(),
+  turmaId: text("turmaId").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.unidadeEns, t.turmaId] }),
+  index("idx_synced_turmas_id").on(t.turmaId),
+])
+
+export const syncedUsuarios = pgTable("synced_usuario", {
+  unidadeEns: text("unidadeEns").notNull(),
+  username: text("username").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.unidadeEns, t.username] }),
+])
+
+export const syncedMatriculas = pgTable("synced_matricula", {
+  unidadeEns: text("unidadeEns").notNull(),
+  turma: text("turma").notNull(),
+  username: text("username").notNull(),
+  nivel: integer("nivel").notNull(), // 1=Professor / 2=Aluno
+}, (t) => [
+  primaryKey({ columns: [t.unidadeEns, t.turma, t.username, t.nivel] }),
+  index("idx_synced_mat_lookup").on(t.turma, t.username),
+])
+
+export const integrationJobs = pgTable("integration_job", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  profile: text("profile").notNull(), // ex: tabula.yaml
+  unidade: text("unidade").notNull(),
+  periodo: text("periodo").notNull(),
+  status: text("status").notNull(), // 'running', 'success', 'failed'
+  logs: text("logs"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  finishedAt: timestamp("finishedAt"),
+})
+
+export const avaOpenlms = pgTable("ava_openlms", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  unidadeEns: text("unidadeEns").unique().notNull(),
+  urlSandbox: text("urlSandbox").notNull(),
+  tokenSandbox: text("tokenSandbox").notNull(),
+  urlProd: text("urlProd").notNull(),
+  tokenProd: text("tokenProd").notNull(),
+  status: boolean("status").default(true).notNull(),
+})
+
+
+

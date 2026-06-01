@@ -1,0 +1,15 @@
+name: 'Integração NAI 2025-1'
+
+jobs:
+
+  unievangelica:
+    modo: 'prod'
+    name: 'NAI'
+    sync:
+      turmas: true 
+      matriculas:
+        aluno: true
+        professor: true
+    unidade: 'UniEVANGÉLICA'
+    curso-tipo: 'NAI'
+    periodo: '2026-1'

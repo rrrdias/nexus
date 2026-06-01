@@ -1,0 +1,1780 @@
+{
+  "id": "3005a924-8ac5-4320-8a1c-766181878935",
+  "prevId": "16118cfe-2ce7-4841-95fb-164e461066b1",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.agendamentos_matricula": {
+      "name": "agendamentos_matricula",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "opcaoId": {
+          "name": "opcaoId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "matricula": {
+          "name": "matricula",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ativo'"
+        },
+        "periodo": {
+          "name": "periodo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deletedAt": {
+          "name": "deletedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_agendamento_opcao": {
+          "name": "idx_agendamento_opcao",
+          "columns": [
+            {
+              "expression": "opcaoId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_agendamento_matricula": {
+          "name": "idx_agendamento_matricula",
+          "columns": [
+            {
+              "expression": "matricula",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agendamentos_matricula_opcaoId_opcao_id_fk": {
+          "name": "agendamentos_matricula_opcaoId_opcao_id_fk",
+          "tableFrom": "agendamentos_matricula",
+          "tableTo": "opcao",
+          "columnsFrom": [
+            "opcaoId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unq_agendamento_matricula_periodo": {
+          "name": "unq_agendamento_matricula_periodo",
+          "nullsNotDistinct": false,
+          "columns": [
+            "matricula",
+            "periodo"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.audit_log": {
+      "name": "audit_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ipAddress": {
+          "name": "ipAddress",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "userAgent": {
+          "name": "userAgent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_audit_log_user_timestamp": {
+          "name": "idx_audit_log_user_timestamp",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "timestamp",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_log_userId_user_id_fk": {
+          "name": "audit_log_userId_user_id_fk",
+          "tableFrom": "audit_log",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ava_grades_report": {
+      "name": "ava_grades_report",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sourceInstitution": {
+          "name": "sourceInstitution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "course_id": {
+          "name": "course_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "course_fullname": {
+          "name": "course_fullname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "course_shortname": {
+          "name": "course_shortname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_identification": {
+          "name": "user_identification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_username": {
+          "name": "user_username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "student_name": {
+          "name": "student_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_email": {
+          "name": "user_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_phone1": {
+          "name": "user_phone1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_phone2": {
+          "name": "user_phone2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enrolment_status": {
+          "name": "enrolment_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "curso_perfil": {
+          "name": "curso_perfil",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "periodo_perfil": {
+          "name": "periodo_perfil",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unidade_fisica": {
+          "name": "unidade_fisica",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "periodo": {
+          "name": "periodo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fase1": {
+          "name": "fase1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fase2": {
+          "name": "fase2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fase3": {
+          "name": "fase3",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "media": {
+          "name": "media",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "custom_course": {
+          "name": "custom_course",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lastaccess": {
+          "name": "lastaccess",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_ava_grades_institution_period": {
+          "name": "idx_ava_grades_institution_period",
+          "columns": [
+            {
+              "expression": "sourceInstitution",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_grades_profile_filters": {
+          "name": "idx_ava_grades_profile_filters",
+          "columns": [
+            {
+              "expression": "sourceInstitution",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "curso_perfil",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodo_perfil",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "unidade_fisica",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_grades_status": {
+          "name": "idx_ava_grades_status",
+          "columns": [
+            {
+              "expression": "sourceInstitution",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "enrolment_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_grades_updated_at": {
+          "name": "idx_ava_grades_updated_at",
+          "columns": [
+            {
+              "expression": "updatedAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_grades_student_trgm": {
+          "name": "idx_ava_grades_student_trgm",
+          "columns": [
+            {
+              "expression": "student_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "idx_ava_grades_course_trgm": {
+          "name": "idx_ava_grades_course_trgm",
+          "columns": [
+            {
+              "expression": "course_fullname",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "idx_ava_grades_username_trgm": {
+          "name": "idx_ava_grades_username_trgm",
+          "columns": [
+            {
+              "expression": "user_username",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "idx_ava_grades_identification_trgm": {
+          "name": "idx_ava_grades_identification_trgm",
+          "columns": [
+            {
+              "expression": "user_identification",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unq_ava_grades": {
+          "name": "unq_ava_grades",
+          "nullsNotDistinct": false,
+          "columns": [
+            "sourceInstitution",
+            "user_id",
+            "course_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ava_openlms": {
+      "name": "ava_openlms",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "unidadeEns": {
+          "name": "unidadeEns",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "urlSandbox": {
+          "name": "urlSandbox",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tokenSandbox": {
+          "name": "tokenSandbox",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "urlProd": {
+          "name": "urlProd",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tokenProd": {
+          "name": "tokenProd",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "ava_openlms_unidadeEns_unique": {
+          "name": "ava_openlms_unidadeEns_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "unidadeEns"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ava_progress_report": {
+      "name": "ava_progress_report",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sourceInstitution": {
+          "name": "sourceInstitution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "aluno_id": {
+          "name": "aluno_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usuario": {
+          "name": "usuario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aluno": {
+          "name": "aluno",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matricula": {
+          "name": "matricula",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_phone1": {
+          "name": "user_phone1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "periodo": {
+          "name": "periodo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enrolment_status": {
+          "name": "enrolment_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lastaccess": {
+          "name": "lastaccess",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "curso": {
+          "name": "curso",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fase1": {
+          "name": "fase1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fase2": {
+          "name": "fase2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fase3": {
+          "name": "fase3",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "curso_perfil": {
+          "name": "curso_perfil",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "periodo_perfil": {
+          "name": "periodo_perfil",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unidade_fisica": {
+          "name": "unidade_fisica",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "progresso_total": {
+          "name": "progresso_total",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lista_fase1": {
+          "name": "lista_fase1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lista_fase2": {
+          "name": "lista_fase2",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lista_fase3": {
+          "name": "lista_fase3",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dias_sem_acesso": {
+          "name": "dias_sem_acesso",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_ava_progress_institution_period": {
+          "name": "idx_ava_progress_institution_period",
+          "columns": [
+            {
+              "expression": "sourceInstitution",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_progress_profile_filters": {
+          "name": "idx_ava_progress_profile_filters",
+          "columns": [
+            {
+              "expression": "sourceInstitution",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "curso_perfil",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "periodo_perfil",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "unidade_fisica",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_progress_status": {
+          "name": "idx_ava_progress_status",
+          "columns": [
+            {
+              "expression": "sourceInstitution",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "enrolment_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_progress_updated_at": {
+          "name": "idx_ava_progress_updated_at",
+          "columns": [
+            {
+              "expression": "updatedAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ava_progress_aluno_trgm": {
+          "name": "idx_ava_progress_aluno_trgm",
+          "columns": [
+            {
+              "expression": "aluno",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "idx_ava_progress_curso_trgm": {
+          "name": "idx_ava_progress_curso_trgm",
+          "columns": [
+            {
+              "expression": "curso",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "idx_ava_progress_usuario_trgm": {
+          "name": "idx_ava_progress_usuario_trgm",
+          "columns": [
+            {
+              "expression": "usuario",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "idx_ava_progress_matricula_trgm": {
+          "name": "idx_ava_progress_matricula_trgm",
+          "columns": [
+            {
+              "expression": "matricula",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unq_ava_progress": {
+          "name": "unq_ava_progress",
+          "nullsNotDistinct": false,
+          "columns": [
+            "sourceInstitution",
+            "aluno_id",
+            "curso"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.group_system_access": {
+      "name": "group_system_access",
+      "schema": "",
+      "columns": {
+        "groupId": {
+          "name": "groupId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "systemModuleId": {
+          "name": "systemModuleId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_group_system_access_module": {
+          "name": "idx_group_system_access_module",
+          "columns": [
+            {
+              "expression": "systemModuleId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "group_system_access_groupId_group_id_fk": {
+          "name": "group_system_access_groupId_group_id_fk",
+          "tableFrom": "group_system_access",
+          "tableTo": "group",
+          "columnsFrom": [
+            "groupId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "group_system_access_systemModuleId_system_module_id_fk": {
+          "name": "group_system_access_systemModuleId_system_module_id_fk",
+          "tableFrom": "group_system_access",
+          "tableTo": "system_module",
+          "columnsFrom": [
+            "systemModuleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "group_system_access_groupId_systemModuleId_pk": {
+          "name": "group_system_access_groupId_systemModuleId_pk",
+          "columns": [
+            "groupId",
+            "systemModuleId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.group": {
+      "name": "group",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "group_name_unique": {
+          "name": "group_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.integration_job": {
+      "name": "integration_job",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profile": {
+          "name": "profile",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unidade": {
+          "name": "unidade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "periodo": {
+          "name": "periodo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "logs": {
+          "name": "logs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "startedAt": {
+          "name": "startedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "finishedAt": {
+          "name": "finishedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.local": {
+      "name": "local",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endereco": {
+          "name": "endereco",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "link_local": {
+          "name": "link_local",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telefone": {
+          "name": "telefone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.opcao": {
+      "name": "opcao",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "localId": {
+          "name": "localId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hora": {
+          "name": "hora",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vagas": {
+          "name": "vagas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_opcao_local": {
+          "name": "idx_opcao_local",
+          "columns": [
+            {
+              "expression": "localId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_opcao_data": {
+          "name": "idx_opcao_data",
+          "columns": [
+            {
+              "expression": "data",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "opcao_localId_local_id_fk": {
+          "name": "opcao_localId_local_id_fk",
+          "tableFrom": "opcao",
+          "tableTo": "local",
+          "columnsFrom": [
+            "localId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.synced_matricula": {
+      "name": "synced_matricula",
+      "schema": "",
+      "columns": {
+        "unidadeEns": {
+          "name": "unidadeEns",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "turma": {
+          "name": "turma",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nivel": {
+          "name": "nivel",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_synced_mat_lookup": {
+          "name": "idx_synced_mat_lookup",
+          "columns": [
+            {
+              "expression": "turma",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "username",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "synced_matricula_unidadeEns_turma_username_nivel_pk": {
+          "name": "synced_matricula_unidadeEns_turma_username_nivel_pk",
+          "columns": [
+            "unidadeEns",
+            "turma",
+            "username",
+            "nivel"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.synced_turma": {
+      "name": "synced_turma",
+      "schema": "",
+      "columns": {
+        "unidadeEns": {
+          "name": "unidadeEns",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "turmaId": {
+          "name": "turmaId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_synced_turmas_id": {
+          "name": "idx_synced_turmas_id",
+          "columns": [
+            {
+              "expression": "turmaId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "synced_turma_unidadeEns_turmaId_pk": {
+          "name": "synced_turma_unidadeEns_turmaId_pk",
+          "columns": [
+            "unidadeEns",
+            "turmaId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.synced_usuario": {
+      "name": "synced_usuario",
+      "schema": "",
+      "columns": {
+        "unidadeEns": {
+          "name": "unidadeEns",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "synced_usuario_unidadeEns_username_pk": {
+          "name": "synced_usuario_unidadeEns_username_pk",
+          "columns": [
+            "unidadeEns",
+            "username"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.system_module": {
+      "name": "system_module",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "colorCode": {
+          "name": "colorCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#27AE60'"
+        },
+        "iconClass": {
+          "name": "iconClass",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ti-apps'"
+        },
+        "pathUrl": {
+          "name": "pathUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isActive": {
+          "name": "isActive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "system_module_name_unique": {
+          "name": "system_module_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        },
+        "system_module_slug_unique": {
+          "name": "system_module_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_group": {
+      "name": "user_group",
+      "schema": "",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "groupId": {
+          "name": "groupId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_user_group_group": {
+          "name": "idx_user_group_group",
+          "columns": [
+            {
+              "expression": "groupId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_group_userId_user_id_fk": {
+          "name": "user_group_userId_user_id_fk",
+          "tableFrom": "user_group",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_group_groupId_group_id_fk": {
+          "name": "user_group_groupId_group_id_fk",
+          "tableFrom": "user_group",
+          "tableTo": "group",
+          "columnsFrom": [
+            "groupId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_group_userId_groupId_pk": {
+          "name": "user_group_userId_groupId_pk",
+          "columns": [
+            "userId",
+            "groupId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user": {
+      "name": "user",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "emailVerified": {
+          "name": "emailVerified",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isActive": {
+          "name": "isActive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "userid": {
+          "name": "userid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_email_unique": {
+          "name": "user_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "user_userid_unique": {
+          "name": "user_userid_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "userid"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users_system_access": {
+      "name": "users_system_access",
+      "schema": "",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "systemModuleId": {
+          "name": "systemModuleId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grantedAt": {
+          "name": "grantedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_users_system_access_module": {
+          "name": "idx_users_system_access_module",
+          "columns": [
+            {
+              "expression": "systemModuleId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "users_system_access_userId_user_id_fk": {
+          "name": "users_system_access_userId_user_id_fk",
+          "tableFrom": "users_system_access",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "users_system_access_systemModuleId_system_module_id_fk": {
+          "name": "users_system_access_systemModuleId_system_module_id_fk",
+          "tableFrom": "users_system_access",
+          "tableTo": "system_module",
+          "columnsFrom": [
+            "systemModuleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "users_system_access_userId_systemModuleId_pk": {
+          "name": "users_system_access_userId_systemModuleId_pk",
+          "columns": [
+            "userId",
+            "systemModuleId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

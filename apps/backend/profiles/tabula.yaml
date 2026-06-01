@@ -1,0 +1,51 @@
+name: 'Integração 2026-1'
+
+jobs:
+
+  unievangelica:
+    modo: 'prod'
+    name: 'Graduação'
+    sync:
+      turmas: true 
+      matriculas:
+        aluno: true
+        professor: true
+    unidade: 'UniEVANGÉLICA'
+    curso-tipo: 'SUP'
+    periodo: '2026-1'
+
+    categoria:
+      - '%UNIDADE_FISICA'
+      - '%CURSO_NOME'
+      - '%PERIODO'
+      - 'Disciplinas Presenciais'
+
+    sala:
+      - '%DISCIPLINA_NOME'
+      - ' - '
+      - '%TURMA_ID'
+
+    coursetemplate: 'SM_PRESENCIAL_20261'
+
+
+  # stricto:
+  #   modo: 'prod'
+  #   name: 'Pós-Graduação'
+  #   sync:
+  #     turmas: true 
+  #     matriculas:
+  #       aluno: true
+  #       professor: false
+  #   unidade: 'UniEVANGÉLICA'
+  #   curso-tipo: 'POS'
+  #   periodo: '2026-1'
+  #   # cursos:
+  #   # except-curso:
+  #   # categoria:
+  #   #   - 'Graduação'
+  #   #   - '%CURSO_NOME'
+  #   #   - '%PERIODO'
+  #   # sala:
+  #   #   - '%DISCIPLINA_NOME'
+  #   # template: 'SM_GRAD100_20241'
+    

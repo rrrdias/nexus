@@ -1,0 +1,16 @@
+name: 'Integração Projeto Integrador ENG. SOFTWARE 2026-1'
+
+jobs:
+
+  unievangelica:
+    modo: 'prod'
+    name: 'Graduação'
+    sync:
+      turmas: true 
+      matriculas:
+        aluno: true
+        professor: false
+    unidade: 'UniEVANGÉLICA'
+    curso-tipo: 'SUP'
+    periodo: '2026-1'
+    

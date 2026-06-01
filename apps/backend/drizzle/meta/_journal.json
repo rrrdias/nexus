@@ -8,6 +8,20 @@
       "when": 1779798557900,
       "tag": "0000_perfect_human_torch",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780087401518,
+      "tag": "0001_clever_living_mummy",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780087490789,
+      "tag": "0002_cloudy_ulik",
+      "breakpoints": true
     }
   ]
 }

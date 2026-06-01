@@ -1,0 +1,26 @@
+name: 'Integração 2026-1'
+
+jobs:
+
+  unievangelica:
+    modo: 'prod'
+    name: 'Graduação EAD'
+    sync:
+      turmas: true 
+      matriculas:
+        aluno: true
+        professor: true
+    unidade: 'Ead_Unievangelica'
+    curso-tipo: 'EAD'
+    periodo: '2026-1'
+    
+    # categoria:
+    #   - 'Graduação EaD'
+    #   - '%PERIODO'
+
+    # sala:
+    #   - '%DISCIPLINA_NOME'
+    #   - ' - '
+    #   - '%TURMA_ID'
+
+    # coursetemplate:

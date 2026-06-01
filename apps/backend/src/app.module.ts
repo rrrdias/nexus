@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { SystemModule } from './system/system.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
 import { AcademicModule } from './academic/academic.module';
+import { IntegrationsModule } from './academic/integrations/integrations.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AcademicModule } from './academic/academic.module';
     SystemModule,
     SchedulingModule,
     AcademicModule,
+    IntegrationsModule,
   ],
   controllers: [AppController],
   providers: [

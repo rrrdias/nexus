@@ -1,0 +1,13 @@
+name: 'Integração 2026-1'
+
+jobs:
+  uni:
+    modo: 'prod'
+    name: 'Pos Uni'
+    sync:
+      turmas: true
+      matriculas:
+        aluno: true
+        professor: false
+    unidade: 'UniEVANGÉLICA'
+    curso-tipo: 'POS'

@@ -690,4 +690,13 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     );
     return res.recordset;
   }
+
+  getSqlPool() {
+    if (!this.pool) throw new Error('Lyceum database not connected.');
+    return this.pool;
+  }
+
+  getDbPrefix() {
+    return this.dbPrefix;
+  }
 }

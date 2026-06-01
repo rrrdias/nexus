@@ -40,19 +40,19 @@ export default async function LoginPage({
         {/* Texto Central */}
         <div className="relative z-10 max-w-lg mt-[-10%]">
           <div className="inline-block px-3 py-1 mb-6 rounded-full bg-white/5 border border-white/10 text-green-brand text-xs font-bold tracking-wider uppercase">
-            Plataforma Unificada
+            Plataforma Integrada
           </div>
           <h1 className="text-4xl lg:text-5xl font-extrabold text-white leading-tight tracking-tight mb-6">
-            Sistemas Acadêmicos <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-brand to-teal">Integrados</span>
+             Sistemas Integrados<br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-brand to-teal">Tecnologias Educacionais</span>
           </h1>
           <p className="text-white/70 text-lg leading-relaxed">
-            Centralize a gestão de progresso, relatórios e permissões corporativas em uma única plataforma de alta performance e segurança.
+            Plataforma de Sistemas Integrados de Tecnologias Educacionais.
           </p>
         </div>
 
         {/* Rodapé Esquerdo */}
         <div className="relative z-10 text-[11px] text-white/30 font-semibold tracking-widest">
-          © 2026 NEXUS CORPORATE HUB. TODOS OS DIREITOS RESERVADOS.
+          © 2026 NEXUS HUB - TED.
         </div>
       </div>
 

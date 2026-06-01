@@ -1,0 +1,13 @@
+jobs:
+
+  faceg:
+    modo: 'prod'
+    name: 'PÓS-Graduação RAIZES'
+    sync:
+      turmas: true 
+      matriculas:
+        aluno: true
+        professor: false
+    unidade: 'RAIZES'
+    curso-tipo: 'POS'
+    periodo: '2025-2'

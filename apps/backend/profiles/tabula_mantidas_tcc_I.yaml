@@ -1,0 +1,54 @@
+name: 'Integração TCC I Mantidas 2026-1'
+
+jobs:
+  faceg:
+    modo: 'prod'
+    name: 'Graduação FACEG'
+    sync:
+      turmas: true
+      matriculas:
+        aluno: true
+        professor: false
+    unidade: 'FAEGO'
+    curso-tipo: 'SUP'
+    periodo: '2026-1'
+    cursos:
+    except-curso:
+    categoria:
+      - 'Graduação'
+      - '%CURSO_NOME'
+      - '%PERIODO'
+      - 'Disciplinas Presenciais'
+
+    sala:
+      - '%DISCIPLINA_NOME'
+      - ' - '
+      - '%TURMA_ID'
+
+    template: 'SM_TCCI_20252'
+
+  raizes:
+    modo: 'prod'
+    name: 'Graduação Raízes'
+    sync:
+      turmas: true
+      matriculas:
+        aluno: true
+        professor: true
+    unidade: 'RAÍZES'
+    curso-tipo: 'SUP'
+    periodo: '2026-1'
+    cursos:
+    except-curso:
+    categoria:
+      - 'Graduação'
+      - '%CURSO_NOME'
+      - '%PERIODO'
+      - 'Disciplinas Presenciais'
+
+    sala:
+      - '%DISCIPLINA_NOME'
+      - ' - '
+      - '%TURMA_ID'
+
+    template: 'SM_TCCI_20252'

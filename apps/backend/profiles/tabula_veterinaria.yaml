@@ -1,0 +1,16 @@
+name: 'Integração 2026-1'
+
+jobs:
+
+  unievangelica:
+    modo: 'prod'
+    name: 'Medicina Veterinária em Foco'
+    sync:
+      turmas: true 
+      matriculas:
+        aluno: true
+        professor: false
+    unidade: 'UniEVANGÉLICA'
+    curso-tipo: 'SUP'
+    periodo: '2026-1'
+    

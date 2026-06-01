@@ -21,6 +21,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
   const [isProgressOpen, setIsProgressOpen] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [isSchedulingOpen, setIsSchedulingOpen] = useState(false)
+  const [isAcademicOpen, setIsAcademicOpen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [justCollapsed, setJustCollapsed] = useState(false)
   // collapsedUIState atrasa a troca de accordion → floating até após a animação terminar,
@@ -46,6 +47,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
     if (pathname.startsWith('/admin/scheduling')) {
       setIsSchedulingOpen(true)
     }
+    if (pathname.startsWith('/academic')) {
+      setIsAcademicOpen(true)
+    }
   }, [pathname])
 
   const toggleSidebar = () => {
@@ -58,6 +62,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
       // Recolhendo: fecha submenu imediatamente para evitar ghost hover
       setIsReportsOpen(false)
       setIsSchedulingOpen(false)
+      setIsAcademicOpen(false)
       setJustCollapsed(true)
       // collapsedUIState só ativa DEPOIS da animação (400ms)
       // para evitar que o floating seja montado com o cursor ainda sobre a sidebar
@@ -389,6 +394,72 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                     </Link>
                     <Link href="/admin/scheduling/slots" className={`flex items-center gap-2 text-[11px] hover:text-white py-2 px-2.5 rounded-md transition-colors ${pathname === '/admin/scheduling/slots' ? 'text-green-brand font-medium bg-white/5' : 'text-white/50 hover:bg-white/5'}`}>
                       <Clock className="w-3.5 h-3.5 text-green-dark" /> Datas e Vagas
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          if (sys.slug === 'academic' || sys.name === 'Módulo Acadêmico') {
+            const isSubActive = pathname.startsWith('/academic')
+            return (
+              <div key={sys.id} className="group relative w-full text-left">
+                <button 
+                  onClick={() => {
+                    if (!collapsedState) {
+                      setIsAcademicOpen(!isAcademicOpen)
+                    }
+                  }}
+                  className={`flex items-center justify-between rounded-lg transition-all duration-300 ease-in-out cursor-pointer w-full h-10 px-2.5 focus:outline-none border-l-2 ${
+                    isSubActive
+                      ? 'bg-[rgba(45,206,108,0.12)] text-white font-medium border-green-brand'
+                      : 'text-white/50 hover:bg-navy-light hover:text-white border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <GraduationCap className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                    <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
+                      {sys.name}
+                    </span>
+                  </div>
+                  <ChevronRight 
+                    className={`w-4 h-4 transition-all duration-300 opacity-50 shrink-0 ${
+                      collapsedState ? "w-0 opacity-0 pointer-events-none" : "w-4 opacity-50"
+                     } ${isAcademicOpen && !collapsedState ? "rotate-90" : ""}`} 
+                  />
+                </button>
+                
+                {/* Submenu Area */}
+                {collapsedUIState ? (
+                  /* Collapsed floating menu */
+                  <div className={`absolute left-full top-0 ml-3 w-52 bg-navy border border-white/10 shadow-2xl rounded-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto before:content-[''] before:absolute before:-left-16 before:-top-8 before:-bottom-8 before:w-16 ${
+                    isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
+                  }`}>
+                    <div className="px-4 py-1.5 border-b border-white/5 text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2 select-none">
+                      {sys.name}
+                    </div>
+                    <div className="px-2 py-1 space-y-1">
+                      <Link href="/academic" className={`flex items-center gap-2 text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/academic' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                        Consultar Registros
+                      </Link>
+                      <Link href="/academic/integrations" className={`flex items-center gap-2 text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/academic/integrations' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                        Integração AVA (Moodle)
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  /* Expanded list menu */
+                  <div 
+                    className={`pl-11 pr-3 space-y-1 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10 overflow-hidden transition-all duration-300 ease-in-out ${
+                      isAcademicOpen && !isTransitioning ? "max-h-[300px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
+                    }`}
+                  >
+                    <Link href="/academic" className={`flex items-center gap-2 text-[11px] hover:text-white py-2 px-2.5 rounded-md transition-colors ${pathname === '/academic' ? 'text-green-brand font-medium bg-white/5' : 'text-white/50 hover:bg-white/5'}`}>
+                      Consultar Registros
+                    </Link>
+                    <Link href="/academic/integrations" className={`flex items-center gap-2 text-[11px] hover:text-white py-2 px-2.5 rounded-md transition-colors ${pathname === '/academic/integrations' ? 'text-green-brand font-medium bg-white/5' : 'text-white/50 hover:bg-white/5'}`}>
+                      Integração AVA (Moodle)
                     </Link>
                   </div>
                 )}

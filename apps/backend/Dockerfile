@@ -43,6 +43,7 @@ COPY --from=builder /app/apps/backend/package.json ./apps/backend/
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/apps/backend/drizzle ./apps/backend/drizzle
 COPY --from=builder /app/apps/backend/drizzle.config.ts ./apps/backend/
+COPY --from=builder /app/apps/backend/profiles ./apps/backend/profiles
 COPY --from=runner-deps /app/node_modules ./node_modules
 
 # Ensure we have drizzle migrations folder copied in the right path for scripts
