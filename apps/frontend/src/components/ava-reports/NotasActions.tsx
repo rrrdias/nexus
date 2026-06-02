@@ -269,7 +269,7 @@ export function NotasActions({ filters, institution }: { filters: any, instituti
           className="text-navy border-navy/20 hover:bg-navy/5 font-semibold"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
-          {isSyncing ? "Sincronizando..." : "Sincronizar Moodle"}
+          {isSyncing ? "Sincronizando..." : "Sincronizar AVA"}
         </Button>
         
         <Button 
