@@ -18,17 +18,20 @@ const fontMono = DM_Mono({
   variable: "--font-mono"
 })
 
-export const metadata: Metadata = {
-  title: "Nexus Hub",
-  description: "Portal Hub de Sistemas",
-  icons: {
-    icon: [
-      {
-        url: "/favicon.svg",
-        type: "image/svg+xml",
-      }
-    ],
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const basePath = process.env.NEXT_BASE_PATH || ""
+  return {
+    title: "Nexus Hub",
+    description: "Portal Hub de Sistemas",
+    icons: {
+      icon: [
+        {
+          url: `${basePath}/favicon.svg`,
+          type: "image/svg+xml",
+        }
+      ],
+    },
+  }
 }
 
 export default async function RootLayout({
