@@ -22,7 +22,12 @@ export const metadata: Metadata = {
   title: "Nexus Hub",
   description: "Portal Hub de Sistemas",
   icons: {
-    icon: "/favicon.svg", // O Next.js resolverá isso como /nexus/favicon.svg automaticamente
+    icon: [
+      {
+        url: "/favicon.svg",
+        type: "image/svg+xml",
+      }
+    ],
   },
 }
 

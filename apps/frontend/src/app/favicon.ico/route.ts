@@ -1,0 +1,23 @@
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="8" fill="#2DCE6C"/>
+  <circle cx="16" cy="16" r="5" fill="#1C2B4A" opacity="0.92"/>
+  <circle cx="5.5" cy="5.5" r="2.5" fill="#1C2B4A" opacity="0.58"/>
+  <circle cx="26.5" cy="5.5" r="2.5" fill="#1C2B4A" opacity="0.58"/>
+  <circle cx="5.5" cy="26.5" r="2.5" fill="#1C2B4A" opacity="0.58"/>
+  <circle cx="26.5" cy="26.5" r="2.5" fill="#1C2B4A" opacity="0.58"/>
+  <line x1="11.5" y1="11.5" x2="5.5" y2="5.5"   stroke="#1C2B4A" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+  <line x1="20.5" y1="11.5" x2="26.5" y2="5.5"  stroke="#1C2B4A" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+  <line x1="11.5" y1="20.5" x2="5.5" y2="26.5"  stroke="#1C2B4A" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+  <line x1="20.5" y1="20.5" x2="26.5" y2="26.5" stroke="#1C2B4A" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+</svg>`;
+
+  return new NextResponse(svgContent, {
+    headers: {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'public, max-age=86400, must-revalidate',
+    },
+  });
+}
