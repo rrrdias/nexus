@@ -7,20 +7,23 @@ import { auth } from "@/auth"
 import { IdleTimeoutProvider } from "@/components/IdleTimeoutProvider"
 import { SessionProvider } from "next-auth/react"
 
-const fontSans = Plus_Jakarta_Sans({ 
-  subsets: ["latin"], 
-  variable: "--font-sans" 
+const fontSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans"
 })
 
-const fontMono = DM_Mono({ 
-  subsets: ["latin"], 
-  weight: ["400", "500"], 
-  variable: "--font-mono" 
+const fontMono = DM_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono"
 })
 
 export const metadata: Metadata = {
   title: "Nexus Hub",
   description: "Portal Hub de Sistemas",
+  icons: {
+    icon: "/favicon.svg", // O Next.js resolverá isso como /nexus/favicon.svg automaticamente
+  },
 }
 
 export default async function RootLayout({
