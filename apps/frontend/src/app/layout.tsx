@@ -19,7 +19,7 @@ const fontMono = DM_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Nexus - Painel Corporativo",
+  title: "Nexus Hub",
   description: "Portal Hub de Sistemas",
 }
 
