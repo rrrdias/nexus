@@ -127,7 +127,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
         </div>
         <div className={`transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${collapsedState ? "w-0 h-0 opacity-0 pointer-events-none absolute" : "w-auto opacity-100 relative"}`}>
           <h1 className="text-white font-extrabold text-[15px] tracking-tight whitespace-nowrap">Nexus<span className="text-green-brand font-normal">Hub</span></h1>
-          <p className="text-[8px] font-semibold text-white/35 uppercase tracking-widest font-mono whitespace-nowrap">NEXUS APPLICATION</p>
+          <p className="text-[8px] font-semibold text-white/35 uppercase tracking-widest font-mono whitespace-nowrap">Tecnologias Educacionais</p>
         </div>
       </div>
 

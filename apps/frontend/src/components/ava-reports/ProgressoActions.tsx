@@ -299,7 +299,7 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
                   Iniciar Sincronização
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-gray-4 text-[14px]">
-                  Deseja iniciar a sincronização de dados {institution ? `de ${institution.toUpperCase()}` : 'GLOBAL'} com o Moodle? 
+                  Deseja iniciar a sincronização de dados {institution ? `de ${institution.toUpperCase()}` : 'GLOBAL'} com o AVA? 
                   <br/><br/>
                   Este processo trará os <strong>percentuais de progresso e conclusão das fases</strong> em tempo real, mas pode levar alguns minutos dependendo do volume de dados.
                 </AlertDialogDescription>
@@ -330,7 +330,7 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
                 Sincronizando Dados...
               </AlertDialogTitle>
               <AlertDialogDescription className="text-gray-4 text-[14px] leading-relaxed max-w-sm">
-                Buscando os dados em tempo real no Moodle. Este processo pode levar alguns minutos.
+                Buscando os dados em tempo real no AVA. Este processo pode levar alguns minutos.
                 <br />
                 <strong className="text-navy font-bold mt-2 block">Por favor, não feche ou atualize esta página.</strong>
               </AlertDialogDescription>
@@ -375,7 +375,7 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
                 Falha na Sincronização
               </AlertDialogTitle>
               <AlertDialogDescription className="text-gray-4 text-[14px] leading-relaxed max-w-sm mb-6">
-                Ocorreu um problema ao sincronizar os dados com o Moodle.
+                Ocorreu um problema ao sincronizar os dados com o AVA.
                 {syncError && (
                   <div className="mt-3 p-3 bg-red/5 rounded-lg border border-red/10 text-left font-mono text-[12px] text-red/80 break-words max-h-32 overflow-y-auto">
                     {syncError}
