@@ -78,8 +78,9 @@ export function IntegrationsDashboard() {
       if (historyRes.success) {
         setHistory(historyRes.data)
       }
-    } catch (e) {
-      showToast("Falha ao se conectar com as APIs do backend.", "error")
+    } catch (e: any) {
+      console.error("[Integrations] Error fetching initial data:", e)
+      showToast(`Falha ao se conectar com as APIs do backend: ${e?.message || e}`, "error")
     } finally {
       setLoading(false)
     }
