@@ -61,9 +61,14 @@ export function IntegrationsDashboard() {
         getIntegrationHistory()
       ])
 
+      let errorMsg = ""
+
       if (statsRes.success) {
         setSyncStats(statsRes.data)
+      } else {
+        errorMsg = statsRes.error || "Falha ao carregar status da integração."
       }
+
       if (profilesRes.success) {
         setProfiles(profilesRes.data)
         if (profilesRes.data.length > 0) {
@@ -74,9 +79,22 @@ export function IntegrationsDashboard() {
             setSelectedJob(defaultProf.jobs[0])
           }
         }
+      } else {
+        errorMsg = errorMsg 
+          ? `${errorMsg} | ${profilesRes.error || "Falha ao carregar perfis."}` 
+          : (profilesRes.error || "Falha ao carregar perfis.")
       }
+
       if (historyRes.success) {
         setHistory(historyRes.data)
+      } else {
+        errorMsg = errorMsg 
+          ? `${errorMsg} | ${historyRes.error || "Falha ao carregar histórico."}` 
+          : (historyRes.error || "Falha ao carregar histórico.")
+      }
+
+      if (errorMsg) {
+        showToast(errorMsg, "error")
       }
     } catch (e: any) {
       console.error("[Integrations] Error fetching initial data:", e)
