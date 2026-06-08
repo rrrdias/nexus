@@ -524,7 +524,33 @@ Este módulo centraliza o monitoramento, sincronização de dados e gerenciament
 ### 4. Práticas de Desenvolvimento Relevantes
 - **⚠️ Preservação de Codificação (UTF-8 Obrigatório)**: O compilador Next.js 16/Turbopack é altamente estrito com caracteres especiais e formatos inválidos de codificação de arquivos. **NUNCA** salve códigos TSX através de scripts ou redirecionamentos de terminal (como `Set-Content` do PowerShell) sem especificar explicitamente a codificação UTF-8 (`-Encoding UTF8` ou de preferência usando a API nativa de escrita de arquivos do agente), evitando assim falhas de build por UTF-8 corrompido.
 - **⚠️ Estrutura de Compilação do Backend (TypeScript & Drizzle)**: Quando adicionar arquivos de configuração (como `drizzle.config.ts`) na raiz de uma aplicação NestJS, certifique-se de que eles estão incluídos no `exclude` do `tsconfig.build.json`. Caso contrário, a compilação do TypeScript preservará a árvore de diretórios aninhando os arquivos compilados em `dist/src/main.js` em vez de `dist/main.js`, o que quebra a execução do container de produção.
-- **⚠️ Execução de Migrações do Drizzle no Docker**: Para rodar sincronizações de banco ou migrações via Docker (`drizzle-kit push`), mude sempre o diretório de trabalho (`cd apps/backend`) antes de executar o comando e utilize a flag `--force` para evitar falhas por falta de terminal interativo (TTY) ao atualizar esquemas em tabelas com registros.
+- **⚠️ Execução de Migrações do Drizzle no Docker**: Para rodar sincronizações de banco ou migrações via Docker (`drizzle-kit push`), mude sempre o diretório de trabalho (`cd apps/backend`) antes de executar o comando (ou utilize a flag `--workspace=@nexus-core/backend` a partir do diretório raiz) e utilize a flag `--force` para evitar falhas por falta de terminal interativo (TTY) ao atualizar esquemas em tabelas com registros.
+
+---
+
+## Módulo de Sincronização AVA Moodle (Ex-PonteM)
+
+Este módulo é responsável por sincronizar turmas (salas), usuários (contas) e inscrições (matrículas) extraídas do banco de dados do Lyceum diretamente com as APIs de Webservice do Moodle OpenLMS. O motor de sincronização foi totalmente reescrito de PHP/Laravel para TypeScript (NestJS / PostgreSQL / Drizzle ORM).
+
+### 1. Modelagem de Tabelas no Drizzle
+- **`synced_turma`**: Registra as salas virtuais criadas com sucesso no Moodle. Evita duplicações em novas varreduras.
+- **`synced_usuario`**: Rastreia quais usuários (alunos e professores) já possuem conta no Moodle.
+- **`synced_matricula`**: Gerencia o vínculo ativo de alunos e professores às suas respectivas turmas no Moodle.
+- **`ava_openlms`**: Centraliza os URLs e tokens (Sandbox e Produção) para a autenticação com o Moodle de cada unidade educacional.
+- **`integration_job`**: Guarda o log linha a linha de cada job, o status de sucesso/falha, unidade, período e tempo de duração para auditorias.
+
+### 2. Convenções e Tratamento de Erros (Next.js & Server Actions)
+- **⚠️ Redação de Erros em Produção**: As Server Actions (`"use server"`) do Next.js em produção ocultam a mensagem de exceções cruas (`throw new Error`). Para exibir mensagens detalhadas de conexão ou erros de banco ao usuário, as Server Actions **devem** interceptar os erros internamente com blocos `try-catch` e retornar a estrutura `{ success: false, error: string }`.
+- **Tratamento no Frontend**: O dashboard de integrações consome as Server Actions de maneira estruturada, verificando o campo `success` e agregando possíveis mensagens de erro em Toasts dinâmicos sem estourar o renderizador ou a navegação do Next.js.
+
+### 3. Conflitos de Collation no SQL Server (Lyceum)
+- **⚠️ COLLATE database_default**: Ao realizar operações de concatenação (ex: `CONCAT`) no SQL Server envolvendo campos de tabelas de visualização (`VW_*`) do Lyceum (como `DISCIPLINA` e `TURMA`), pode ocorrer erro de conflito devido a collations diferentes das colunas (como `Latin1_General_CI_AI` e `Latin1_General_CI_AS`). Para solucionar, aplique explicitamente `COLLATE database_default` em todos os parâmetros de texto que entram no `CONCAT`.
+
+### 4. Execução de Sementes (Seeds) Sem Destruição de Dados
+- **⚠️ Seeding Seguro**: O arquivo de seed principal (`seed.ts`) limpa e recria todas as tabelas (o que é destrutivo). Para semear ou atualizar credenciais de unidades na tabela `ava_openlms` em produção sem afetar as tabelas existentes de agendamentos ou usuários, utilize o script isolado e seguro `seed-openlms.ts` através do comando:
+  ```bash
+  docker compose -f docker-compose.prod.yml exec backend npx tsx apps/backend/src/db/seed-openlms.ts
+  ```
 
 ---
 

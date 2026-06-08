@@ -256,11 +256,11 @@ export class IntegrationsService {
               T.PERIODO,
               T.ID AS TURMA_ID,
               CONCAT(
-                  T.DISCIPLINA, 
+                  T.DISCIPLINA COLLATE database_default, 
                   '|', 
-                  T.TURMA, 
+                  T.TURMA COLLATE database_default, 
                   '|', 
-                  REPLACE(T.PERIODO, '-', '|')
+                  REPLACE(T.PERIODO COLLATE database_default, '-', '|')
               ) AS ID_NUMBER,
               T.NOME_DISCIPLINA AS DISCIPLINA_NOME,
               T.MODELAGEM,
