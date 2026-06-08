@@ -48,6 +48,9 @@ COPY --from=runner-deps /app/node_modules ./node_modules
 
 # Ensure we have drizzle migrations folder copied in the right path for scripts
 COPY --from=builder /app/apps/backend/src/db/schema.ts ./apps/backend/src/db/schema.ts
+COPY --from=builder /app/apps/backend/src/db/index.ts ./apps/backend/src/db/index.ts
+COPY --from=builder /app/apps/backend/src/db/seed-openlms.ts ./apps/backend/src/db/seed-openlms.ts
+COPY --from=builder /app/apps/backend/src/db/seed.ts ./apps/backend/src/db/seed.ts
 
 USER nestjs
 
