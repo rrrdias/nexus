@@ -19,11 +19,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Set environment variables for Next.js build (e.g. public API URL)
+# Set environment variables for Next.js build
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 ARG NEXT_BASE_PATH=""
 ENV NEXT_BASE_PATH=$NEXT_BASE_PATH
+
 ENV NODE_ENV=production
 
 # Build the Next.js app
@@ -34,14 +36,18 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV NEXT_BASE_PATH=/nexus
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy the standalone build (which includes its own traced production node_modules)
+# Copy the standalone build
 COPY --from=builder /app/apps/frontend/.next/standalone ./
-# Copy public and static assets since they are not copied by Next.js standalone automatically
+
+# Garante a cópia dos estáticos tanto na raiz quanto no caminho do workspace
+COPY --from=builder /app/apps/frontend/public ./public
 COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
+COPY --from=builder /app/apps/frontend/.next/static ./.next/static
 COPY --from=builder /app/apps/frontend/.next/static ./apps/frontend/.next/static
 
 USER nextjs
