@@ -10,7 +10,8 @@ import {
   usersSystemAccess,
   userGroups 
 } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, ilike, or, and, sql as drizzleSql, desc, asc } from 'drizzle-orm';
+import { academicDiscente, academicDocente, academicTurma, academicMatricula } from '../db/schema';
 
 @Injectable()
 export class AcademicService implements OnModuleInit, OnModuleDestroy {
@@ -38,9 +39,9 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     // 1. Connect to Lyceum SQL Server
     const config: sql.config = {
-      user: process.env.LYCEUM_DB_USERNAME || 'PortAeeConsult',
-      password: process.env.LYCEUM_DB_PASSWORD || 'Port4eeC0nsult@Tudo.',
-      server: process.env.LYCEUM_DB_HOST || '172.29.44.90',
+      user: process.env.LYCEUM_DB_USERNAME || '',
+      password: process.env.LYCEUM_DB_PASSWORD || '',
+      server: process.env.LYCEUM_DB_HOST || '',
       port: parseInt(process.env.LYCEUM_DB_PORT || '1433'),
       database: process.env.LYCEUM_DB_DATABASE || 'Lyceum',
       options: {
@@ -185,135 +186,48 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
   // --- Academic Consultations (Lyceum Views) ---
 
+  
   async getStudents(search?: string, page = 1, size = 15) {
-    if (!this.pool) throw new Error('Lyceum database not connected.');
     const offset = (page - 1) * size;
-    let whereClause = '';
-    const request = this.pool.request();
+    let whereClause: any = undefined;
 
     if (search) {
       const trimmedSearch = search.trim();
       const isCodeSearch = /\d/.test(trimmedSearch);
 
       if (isCodeSearch) {
-        // Code/Numeric search: query discente code columns directly using fast prefix match
-        const codeFields = this.discenteColumns.filter(col => 
-          ['MATRICULA', 'CPF', 'USUARIO', 'ID', 'ALUNO', 'DISCENTE'].includes(col.toUpperCase())
+        whereClause = or(
+          ilike(academicDiscente.matricula, `%${trimmedSearch}%`),
+          ilike(academicDiscente.cpf, `%${trimmedSearch}%`),
+          ilike(academicDiscente.usuario, `%${trimmedSearch}%`),
+          ilike(academicDiscente.id, `%${trimmedSearch}%`)
         );
-        let conditions: string[] = [];
-        let paramIdx = 0;
-        codeFields.forEach(field => {
-          const paramName = `search${paramIdx++}`;
-          request.input(paramName, sql.VarChar, `${trimmedSearch}%`);
-          conditions.push(`U.${field} LIKE @${paramName}`);
-        });
-        if (conditions.length > 0) {
-          whereClause = 'WHERE ' + conditions.join(' OR ');
-        }
       } else {
-        // Name Search: Step 1. Get matching users first from VW_AVA_USUARIOS to bypass buggy VW_AVA_DISCENTE.SOBRENOME view formula
-        const userReq = this.pool.request();
         const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-        let userWhereClause = '';
-
-        if (words.length > 1) {
-          // Multi-word name search
-          const conditions: string[] = [];
-          const textFields = ['NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL'];
-          words.forEach((word, wordIdx) => {
-            const wordCond: string[] = [];
-            textFields.forEach((field, fieldIdx) => {
-              const paramName = `w_${wordIdx}_${fieldIdx}`;
-              userReq.input(paramName, sql.VarChar, `%${word}%`);
-              wordCond.push(`${field} LIKE @${paramName}`);
-            });
-            conditions.push(`(${wordCond.join(' OR ')})`);
-          });
-          userWhereClause = 'WHERE ' + conditions.join(' AND ');
-        } else {
-          // Single-word name search
-          userReq.input('search0', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search1', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search2', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search3', sql.VarChar, `%${trimmedSearch}%`);
-          userWhereClause = `WHERE NOME LIKE @search0 
-              OR SOBRENOME LIKE @search1 
-              OR NOME_SOCIAL LIKE @search2 
-              OR SOBRENOME_SOCIAL LIKE @search3`;
-        }
-
-        const usersRes = await userReq.query(
-          `SELECT TOP 200 ID 
-           FROM (
-             SELECT ID, NOME, SOBRENOME, NOME_SOCIAL, SOBRENOME_SOCIAL 
-             FROM ${this.dbPrefix}VW_AVA_USUARIOS 
-             WHERE CHARINDEX(' ', NOME) > 0 
-             ORDER BY ID
-             OFFSET 0 ROWS
-           ) U
-           ${userWhereClause}`
-        );
-
-        const userIds = usersRes.recordset.map(row => row.ID);
-        if (userIds.length === 0) {
-          return { data: [], total: 0, page, size, totalPages: 0 };
-        }
-
-        const inParams: string[] = [];
-        userIds.forEach((id, idx) => {
-          const paramName = `uid${idx}`;
-          request.input(paramName, sql.VarChar, id);
-          inParams.push(`@${paramName}`);
-        });
-        whereClause = `WHERE U.ID IN (${inParams.join(', ')})`;
+        const textConditions = words.map(word => or(
+          ilike(academicDiscente.nome, `%${word}%`),
+          ilike(academicDiscente.sobrenome, `%${word}%`),
+          ilike(academicDiscente.nomeSocial, `%${word}%`),
+          ilike(academicDiscente.sobrenomeSocial, `%${word}%`)
+        ));
+        whereClause = and(...textConditions);
       }
     }
 
-    const orderColumn = this.discenteColumns.find(col => 
-      ['NOME', 'ALUNO', 'MATRICULA'].includes(col.toUpperCase())
-    ) || this.discenteColumns[0] || '1';
+    const countRes = await this.db.select({ count: drizzleSql<number>`count(*)` })
+      .from(academicDiscente)
+      .where(whereClause);
+    const total = Number(countRes[0]?.count || 0);
 
-    const countRes = await request.query(
-      `SELECT COUNT(*) as total 
-       FROM ${this.dbPrefix}VW_AVA_DISCENTE U 
-       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON U.CURSO = C.ID 
-       ${whereClause}`
-    );
-    const total = countRes.recordset[0]?.total || 0;
-
-    const dataRes = await request.query(
-      `SELECT 
-         U.ID,
-         U.NOME,
-         U.EMAIL,
-         U.CPF,
-         U.SERIE,
-         U.TURNO,
-         U.TELEFONE,
-         U.CIDADE,
-         U.PAIS,
-         U.CURSO,
-         U.UNIDADE_FISICA,
-         U.NOME_SOCIAL,
-         U.NOME_UNIDADE_FISICA,
-         U.SENHA,
-         U.DATA_CRIACAO,
-         U.DATA_ATUALIZACAO,
-         U.DATA_EXCLUSAO,
-         US.SOBRENOME,
-         US.SOBRENOME_SOCIAL,
-         C.NOME AS CURSO_NOME, 
-         C.UNIDADE_ENS AS CURSO_INSTITUICAO 
-       FROM ${this.dbPrefix}VW_AVA_DISCENTE U 
-       LEFT JOIN ${this.dbPrefix}VW_AVA_USUARIOS US ON U.ID = US.ID
-       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON U.CURSO = C.ID 
-       ${whereClause} 
-       ORDER BY U.${orderColumn} 
-       OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
-    );
+    const data = await this.db.select()
+      .from(academicDiscente)
+      .where(whereClause)
+      .orderBy(asc(academicDiscente.nome))
+      .limit(size)
+      .offset(offset);
 
     return {
-      data: dataRes.recordset,
+      data,
       total,
       page,
       size,
@@ -322,122 +236,44 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getTeachers(search?: string, page = 1, size = 15) {
-    if (!this.pool) throw new Error('Lyceum database not connected.');
     const offset = (page - 1) * size;
-    let whereClause = '';
-    const request = this.pool.request();
+    let whereClause: any = undefined;
 
     if (search) {
       const trimmedSearch = search.trim();
       const isCodeSearch = /\d/.test(trimmedSearch);
 
       if (isCodeSearch) {
-        const codeFields = this.docenteColumns.filter(col => 
-          ['CPF', 'USUARIO', 'PROFESSOR', 'COD_DOCENTE', 'ID'].includes(col.toUpperCase())
+        whereClause = or(
+          ilike(academicDocente.cpf, `%${trimmedSearch}%`),
+          ilike(academicDocente.id, `%${trimmedSearch}%`)
         );
-        let conditions: string[] = [];
-        let paramIdx = 0;
-        codeFields.forEach(field => {
-          const paramName = `search${paramIdx++}`;
-          request.input(paramName, sql.VarChar, `${trimmedSearch}%`);
-          conditions.push(`U.${field} LIKE @${paramName}`);
-        });
-        if (conditions.length > 0) {
-          whereClause = 'WHERE ' + conditions.join(' OR ');
-        }
       } else {
-        // Name Search: Step 1. Get matching users first from VW_AVA_USUARIOS to ensure clean, high-performance execution
-        const userReq = this.pool.request();
         const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-        let userWhereClause = '';
-
-        if (words.length > 1) {
-          // Multi-word name search
-          const conditions: string[] = [];
-          const textFields = ['NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL'];
-          words.forEach((word, wordIdx) => {
-            const wordCond: string[] = [];
-            textFields.forEach((field, fieldIdx) => {
-              const paramName = `w_${wordIdx}_${fieldIdx}`;
-              userReq.input(paramName, sql.VarChar, `%${word}%`);
-              wordCond.push(`${field} LIKE @${paramName}`);
-            });
-            conditions.push(`(${wordCond.join(' OR ')})`);
-          });
-          userWhereClause = 'WHERE ' + conditions.join(' AND ');
-        } else {
-          // Single-word name search
-          userReq.input('search0', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search1', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search2', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search3', sql.VarChar, `%${trimmedSearch}%`);
-          userWhereClause = `WHERE NOME LIKE @search0 
-              OR SOBRENOME LIKE @search1 
-              OR NOME_SOCIAL LIKE @search2 
-              OR SOBRENOME_SOCIAL LIKE @search3`;
-        }
-
-        const usersRes = await userReq.query(
-          `SELECT TOP 200 ID 
-           FROM (
-             SELECT ID, NOME, SOBRENOME, NOME_SOCIAL, SOBRENOME_SOCIAL 
-             FROM ${this.dbPrefix}VW_AVA_USUARIOS 
-             WHERE CHARINDEX(' ', NOME) > 0 
-             ORDER BY ID
-             OFFSET 0 ROWS
-           ) U
-           ${userWhereClause}`
-        );
-
-        const userIds = usersRes.recordset.map(row => row.ID);
-        if (userIds.length === 0) {
-          return { data: [], total: 0, page, size, totalPages: 0 };
-        }
-
-        const inParams: string[] = [];
-        userIds.forEach((id, idx) => {
-          const paramName = `uid${idx}`;
-          request.input(paramName, sql.VarChar, id);
-          inParams.push(`@${paramName}`);
-        });
-        whereClause = `WHERE U.ID IN (${inParams.join(', ')})`;
+        const textConditions = words.map(word => or(
+          ilike(academicDocente.nome, `%${word}%`),
+          ilike(academicDocente.sobrenome, `%${word}%`),
+          ilike(academicDocente.nomeSocial, `%${word}%`),
+          ilike(academicDocente.sobrenomeSocial, `%${word}%`)
+        ));
+        whereClause = and(...textConditions);
       }
     }
 
-    const orderColumn = this.docenteColumns.find(col => 
-      ['NOME', 'PROFESSOR', 'DOCENTE'].includes(col.toUpperCase())
-    ) || this.docenteColumns[0] || '1';
+    const countRes = await this.db.select({ count: drizzleSql<number>`count(*)` })
+      .from(academicDocente)
+      .where(whereClause);
+    const total = Number(countRes[0]?.count || 0);
 
-    const countRes = await request.query(
-      `SELECT COUNT(*) as total FROM ${this.dbPrefix}VW_AVA_DOCENTE U ${whereClause}`
-    );
-    const total = countRes.recordset[0]?.total || 0;
-
-    const dataRes = await request.query(
-      `SELECT 
-         U.ID,
-         U.NOME,
-         U.EMAIL,
-         U.CPF,
-         U.TELEFONE,
-         U.CIDADE,
-         U.PAIS,
-         U.SENHA,
-         U.DATA_CRIACAO,
-         U.DATA_ATUALIZACAO,
-         U.DATA_EXCLUSAO,
-         US.SOBRENOME,
-         US.NOME_SOCIAL,
-         US.SOBRENOME_SOCIAL
-       FROM ${this.dbPrefix}VW_AVA_DOCENTE U 
-       LEFT JOIN ${this.dbPrefix}VW_AVA_USUARIOS US ON U.ID = US.ID
-       ${whereClause} 
-       ORDER BY U.${orderColumn} 
-       OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
-    );
+    const data = await this.db.select()
+      .from(academicDocente)
+      .where(whereClause)
+      .orderBy(asc(academicDocente.nome))
+      .limit(size)
+      .offset(offset);
 
     return {
-      data: dataRes.recordset,
+      data,
       total,
       page,
       size,
@@ -446,85 +282,37 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getClasses(search?: string, page = 1, size = 15) {
-    if (!this.pool) throw new Error('Lyceum database not connected.');
     const offset = (page - 1) * size;
-    let whereClause = '';
-    const request = this.pool.request();
+    let whereClause: any = undefined;
 
     if (search) {
       const trimmedSearch = search.trim();
       const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-
-      if (words.length > 1) {
-        const textFields = this.turmaColumns.filter(col => 
-          ['DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO'].includes(col.toUpperCase())
-        );
-        const conditions: string[] = [];
-        words.forEach((word, wordIdx) => {
-          const wordConditions: string[] = [];
-          textFields.forEach((field, fieldIdx) => {
-            const paramName = `w_${wordIdx}_${fieldIdx}`;
-            request.input(paramName, sql.VarChar, `%${word}%`);
-            wordConditions.push(`T.${field} LIKE @${paramName}`);
-          });
-          conditions.push(`(${wordConditions.join(' OR ')})`);
-        });
-        whereClause = 'WHERE ' + conditions.join(' AND ');
-      } else {
-        const codeFields = this.turmaColumns.filter(col => 
-          ['TURMA', 'COD_TURMA', 'ID'].includes(col.toUpperCase())
-        );
-        const textFields = this.turmaColumns.filter(col => 
-          ['DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO'].includes(col.toUpperCase())
-        );
-
-        let conditions: string[] = [];
-        let paramIdx = 0;
-
-        codeFields.forEach(field => {
-          const paramName = `search${paramIdx++}`;
-          request.input(paramName, sql.VarChar, `${trimmedSearch}%`);
-          conditions.push(`T.${field} LIKE @${paramName}`);
-        });
-
-        textFields.forEach(field => {
-          const paramName = `search${paramIdx++}`;
-          request.input(paramName, sql.VarChar, `%${trimmedSearch}%`);
-          conditions.push(`T.${field} LIKE @${paramName}`);
-        });
-
-        if (conditions.length > 0) {
-          whereClause = 'WHERE ' + conditions.join(' OR ');
-        }
-      }
+      
+      const textConditions = words.map(word => or(
+        ilike(academicTurma.turma, `%${word}%`),
+        ilike(academicTurma.codTurma, `%${word}%`),
+        ilike(academicTurma.disciplina, `%${word}%`),
+        ilike(academicTurma.nomeDisciplina, `%${word}%`),
+        ilike(academicTurma.codDisciplina, `%${word}%`)
+      ));
+      whereClause = and(...textConditions);
     }
 
-    const orderColumn = this.turmaColumns.find(col => 
-      ['TURMA', 'COD_TURMA', 'DISCIPLINA'].includes(col.toUpperCase())
-    ) || this.turmaColumns[0] || '1';
+    const countRes = await this.db.select({ count: drizzleSql<number>`count(*)` })
+      .from(academicTurma)
+      .where(whereClause);
+    const total = Number(countRes[0]?.count || 0);
 
-    const countRes = await request.query(
-      `SELECT COUNT(*) as total 
-       FROM ${this.dbPrefix}VW_AVA_TURMA T 
-       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON T.CURSO = C.ID 
-       ${whereClause}`
-    );
-    const total = countRes.recordset[0]?.total || 0;
-
-    const dataRes = await request.query(
-      `SELECT 
-         T.*, 
-         C.NOME AS CURSO_NOME, 
-         C.UNIDADE_ENS AS CURSO_INSTITUICAO 
-       FROM ${this.dbPrefix}VW_AVA_TURMA T 
-       LEFT JOIN ${this.dbPrefix}VW_AVA_CURSO C ON T.CURSO = C.ID 
-       ${whereClause} 
-       ORDER BY T.${orderColumn} 
-       OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY`
-    );
+    const data = await this.db.select()
+      .from(academicTurma)
+      .where(whereClause)
+      .orderBy(asc(academicTurma.turma))
+      .limit(size)
+      .offset(offset);
 
     return {
-      data: dataRes.recordset,
+      data,
       total,
       page,
       size,
@@ -533,127 +321,76 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getMatriculas(search?: string, page = 1, size = 15) {
-    if (!this.pool) throw new Error('Lyceum database not connected.');
     const offset = (page - 1) * size;
-    let whereClause = '';
-    const request = this.pool.request();
+    let whereClause: any = undefined;
 
     if (search) {
       const trimmedSearch = search.trim();
-      const isCodeSearch = /\d/.test(trimmedSearch);
-
-      if (isCodeSearch) {
-        // Search strictly on VW_AVA_MATRICULA's indexed code columns (Usuario/Matrícula, Turma, CPF)
-        let conditions = [
-          'M.USUARIO LIKE @search0',
-          'M.TURMA LIKE @search1',
-          'M.USUARIO_CPF LIKE @search2'
-        ];
-        request.input('search0', sql.VarChar, `${trimmedSearch}%`);
-        request.input('search1', sql.VarChar, `${trimmedSearch}%`);
-        request.input('search2', sql.VarChar, `${trimmedSearch}%`);
-        whereClause = 'WHERE ' + conditions.join(' OR ');
-      } else {
-        // Name Search: Step 1. Get matching users first to avoid massive scanning joins
-        const userReq = this.pool.request();
-        const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-        let userWhereClause = '';
-
-        if (words.length > 1) {
-          // Multi-word name search
-          const conditions: string[] = [];
-          const textFields = ['NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL'];
-          
-          words.forEach((word, wordIdx) => {
-            const wordConditions: string[] = [];
-            textFields.forEach((field, fieldIdx) => {
-              const paramName = `w_${wordIdx}_${fieldIdx}`;
-              userReq.input(paramName, sql.VarChar, `%${word}%`);
-              wordConditions.push(`${field} LIKE @${paramName}`);
-            });
-            conditions.push(`(${wordConditions.join(' OR ')})`);
-          });
-          userWhereClause = 'WHERE ' + conditions.join(' AND ');
-        } else {
-          // Single-word name search
-          userReq.input('search0', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search1', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search2', sql.VarChar, `%${trimmedSearch}%`);
-          userReq.input('search3', sql.VarChar, `%${trimmedSearch}%`);
-
-          userWhereClause = `WHERE NOME LIKE @search0 
-              OR SOBRENOME LIKE @search1 
-              OR NOME_SOCIAL LIKE @search2 
-              OR SOBRENOME_SOCIAL LIKE @search3`;
-        }
-
-        const usersRes = await userReq.query(
-          `SELECT TOP 200 ID 
-           FROM (
-             SELECT ID, NOME, SOBRENOME, NOME_SOCIAL, SOBRENOME_SOCIAL 
-             FROM ${this.dbPrefix}VW_AVA_USUARIOS 
-             WHERE CHARINDEX(' ', NOME) > 0 
-             ORDER BY ID
-             OFFSET 0 ROWS
-           ) U
-           ${userWhereClause}`
-        );
-
-        const userIds = usersRes.recordset.map(row => row.ID);
-        if (userIds.length === 0) {
-          return { data: [], total: 0, page, size, totalPages: 0 };
-        }
-
-        // Build IN clause for the main matriculas query
-        const inParams: string[] = [];
-        userIds.forEach((id, idx) => {
-          const paramName = `uid${idx}`;
-          request.input(paramName, sql.VarChar, id);
-          inParams.push(`@${paramName}`);
-        });
-        whereClause = `WHERE M.USUARIO IN (${inParams.join(', ')})`;
-      }
+      const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
+      
+      const textConditions = words.map(word => or(
+        ilike(academicDiscente.nome, `%${word}%`),
+        ilike(academicDiscente.sobrenome, `%${word}%`),
+        ilike(academicDiscente.nomeSocial, `%${word}%`),
+        ilike(academicTurma.turma, `%${word}%`),
+        ilike(academicTurma.nomeDisciplina, `%${word}%`),
+        ilike(academicMatricula.usuarioId, `%${word}%`)
+      ));
+      whereClause = and(...textConditions);
     }
 
-    // Executing lightweight count query
-    const countRes = await request.query(
-      `SELECT COUNT(*) as total 
-       FROM ${this.dbPrefix}VW_AVA_MATRICULA M
-       ${whereClause}`
-    );
-    const total = countRes.recordset[0]?.total || 0;
+    const baseQuery = this.db.select({
+      id: academicMatricula.id,
+      usuario: academicMatricula.usuarioId,
+      turma: academicMatricula.turmaId,
+      nivel: academicMatricula.nivel,
+      ativo: academicMatricula.ativo,
+      situacao: academicMatricula.situacao,
+      nome: academicDiscente.nome,
+      sobrenome: academicDiscente.sobrenome,
+      nomeSocial: academicDiscente.nomeSocial,
+      sobrenomeSocial: academicDiscente.sobrenomeSocial,
+      nomeDisciplina: academicTurma.nomeDisciplina,
+      turmaNome: academicTurma.turma
+    })
+    .from(academicMatricula)
+    .leftJoin(academicDiscente, eq(academicMatricula.usuarioId, academicDiscente.id))
+    .leftJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id));
 
-    // Optimization: If total matches is 0, skip the paginated query entirely
-    if (total === 0) {
-      return {
-        data: [],
-        total: 0,
-        page,
-        size,
-        totalPages: 0
-      };
+    if (whereClause && search) {
+      baseQuery.where(whereClause);
     }
 
-    // Paginated query with highly optimized CTE (joins VW_AVA_USUARIOS and VW_AVA_TURMA only on final 15 rows)
-    const dataRes = await request.query(
-      `WITH PaginatedMatriculas AS (
-         SELECT M.*
-         FROM ${this.dbPrefix}VW_AVA_MATRICULA M
-         ${whereClause}
-         ORDER BY M.USUARIO 
-         OFFSET ${offset} ROWS FETCH NEXT ${size} ROWS ONLY
-       )
-       SELECT PM.*, 
-              COALESCE(U.NOME_SOCIAL, U.NOME) AS NOME, 
-              COALESCE(U.SOBRENOME_SOCIAL, U.SOBRENOME) AS SOBRENOME,
-              T.NOME_DISCIPLINA 
-       FROM PaginatedMatriculas PM
-       LEFT JOIN ${this.dbPrefix}VW_AVA_USUARIOS U ON PM.USUARIO = U.ID
-       LEFT JOIN ${this.dbPrefix}VW_AVA_TURMA T ON PM.TURMA = T.ID`
-    );
+    // Workaround for counting with joins in Drizzle
+    const countQuery = this.db.select({ count: drizzleSql<number>`count(*)` })
+      .from(academicMatricula)
+      .leftJoin(academicDiscente, eq(academicMatricula.usuarioId, academicDiscente.id))
+      .leftJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id));
+      
+    if (whereClause && search) countQuery.where(whereClause);
+    
+    const countRes = await countQuery;
+    const total = Number(countRes[0]?.count || 0);
+
+    const data = await baseQuery
+      .limit(size)
+      .offset(offset);
+
+    // Format output to match old Lyceum response
+    const formattedData = data.map(m => ({
+      ID: m.id,
+      USUARIO: m.usuario,
+      TURMA: m.turma,
+      NIVEL: m.nivel,
+      ATIVO: m.ativo,
+      SITUACAO: m.situacao,
+      NOME: m.nomeSocial || m.nome,
+      SOBRENOME: m.sobrenomeSocial || m.sobrenome,
+      NOME_DISCIPLINA: m.nomeDisciplina || m.turmaNome
+    }));
 
     return {
-      data: dataRes.recordset,
+      data: formattedData,
       total,
       page,
       size,
@@ -661,34 +398,42 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  // --- Linked Disciplines Consultations (Student & Teacher) ---
-
   async getStudentDisciplines(matricula: string) {
-    if (!this.pool) throw new Error('Lyceum database not connected.');
-    const request = this.pool.request();
-    request.input('matricula', sql.VarChar, matricula);
-
-    const res = await request.query(
-      `SELECT M.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, T.PERIODO, T.TURMA AS COD_TURMA
-       FROM ${this.dbPrefix}VW_AVA_MATRICULA M
-       LEFT JOIN ${this.dbPrefix}VW_AVA_TURMA T ON M.TURMA = T.ID
-       WHERE M.USUARIO = @matricula AND M.NIVEL = '2'`
+    const data = await this.db.select({
+      TURMA: academicTurma.id,
+      DISCIPLINA: academicTurma.disciplina,
+      NOME_DISCIPLINA: academicTurma.nomeDisciplina,
+      PERIODO: academicTurma.periodo,
+      COD_TURMA: academicTurma.turma
+    })
+    .from(academicMatricula)
+    .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
+    .where(
+      and(
+        eq(academicMatricula.usuarioId, matricula),
+        eq(academicMatricula.nivel, '2')
+      )
     );
-    return res.recordset;
+    return data;
   }
 
   async getTeacherDisciplines(docenteId: string) {
-    if (!this.pool) throw new Error('Lyceum database not connected.');
-    const request = this.pool.request();
-    request.input('docenteId', sql.VarChar, docenteId);
-
-    const res = await request.query(
-      `SELECT M.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, T.PERIODO, T.TURMA AS COD_TURMA
-       FROM ${this.dbPrefix}VW_AVA_MATRICULA M
-       LEFT JOIN ${this.dbPrefix}VW_AVA_TURMA T ON M.TURMA = T.ID
-       WHERE M.USUARIO = @docenteId AND M.NIVEL = '1'`
+    const data = await this.db.select({
+      TURMA: academicTurma.id,
+      DISCIPLINA: academicTurma.disciplina,
+      NOME_DISCIPLINA: academicTurma.nomeDisciplina,
+      PERIODO: academicTurma.periodo,
+      COD_TURMA: academicTurma.turma
+    })
+    .from(academicMatricula)
+    .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
+    .where(
+      and(
+        eq(academicMatricula.usuarioId, docenteId),
+        eq(academicMatricula.nivel, '1')
+      )
     );
-    return res.recordset;
+    return data;
   }
 
   getSqlPool() {

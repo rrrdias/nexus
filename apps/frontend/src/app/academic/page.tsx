@@ -4,7 +4,6 @@ import { AcademicDashboard } from "./AcademicDashboard"
 
 export default async function AcademicPage() {
   const session = await auth()
-  // @ts-ignore
   if (!session?.user) redirect("/login")
 
   return (

@@ -20,7 +20,6 @@ export default auth((req) => {
   }
 
   // Se o usuário foi desativado após o login, força logout imediato
-  // @ts-ignore
   if (isLoggedIn && req.auth?.user?.isDisabled) {
     return NextResponse.redirect(new URL(`${bp}/api/auth/signout`, req.url))
   }

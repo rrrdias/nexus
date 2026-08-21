@@ -5,7 +5,6 @@ import { SlotsManagement } from "./SlotsManagement"
 
 export default async function AdminSlotsPage() {
   const session = await auth()
-  // @ts-ignore
   if (!session?.user) redirect("/login")
 
   // Fetch only active locals to allow creating slots for active campus centers

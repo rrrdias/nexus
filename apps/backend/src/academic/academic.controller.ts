@@ -1,9 +1,21 @@
-import { Controller, Get, Query, Param, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, BadRequestException, Req, ForbiddenException } from '@nestjs/common';
 import { AcademicService } from './academic.service';
+import { AcademicSyncService } from './academic-sync.service';
 
 @Controller('api/academic')
 export class AcademicController {
-  constructor(private readonly academicService: AcademicService) {}
+  constructor(
+    private readonly academicService: AcademicService,
+    private readonly syncService: AcademicSyncService
+  ) {}
+
+  @Post('sync')
+  async triggerSync(@Req() req: any) {
+    if (!req.user?.isSuperAdmin) {
+      throw new ForbiddenException('Apenas administradores podem iniciar a sincronização acadêmica.');
+    }
+    return this.syncService.syncActivePeriods();
+  }
 
   @Get('discentes')
   async getStudents(

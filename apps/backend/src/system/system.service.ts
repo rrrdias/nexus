@@ -142,8 +142,7 @@ export class SystemService {
         console.warn("Could not retrieve real audit logs (table may be empty or unpopulated):", err.message);
       }
 
-      // Fallback dummy audit logs for stunning presentation
-      const logs = rawLogs.length > 0 ? rawLogs.map(l => {
+      const logs = rawLogs.map(l => {
         const logDate = l.timestamp ? new Date(l.timestamp) : new Date();
         return {
           id: l.id,
@@ -151,12 +150,7 @@ export class SystemService {
           timestamp: !isNaN(logDate.getTime()) ? logDate.toISOString() : new Date().toISOString(),
           userName: l.userName || 'Sistema',
         };
-      }) : [
-        { id: '1', action: 'Sincronização global concluída sem erros.', timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(), userName: 'Sistema (Scheduler)' },
-        { id: '2', action: 'Conexão com Drizzle ORM e Postgres estabelecida.', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), userName: 'Database Engine' },
-        { id: '3', action: 'Módulo de Notas e Painel Administrativo iniciados.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), userName: 'System Core' },
-        { id: '4', action: 'Políticas de acesso super_admin carregadas.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), userName: 'Auth Gateway' },
-      ];
+      });
 
       // 5. Active and Inactive Users Count (Real)
       let activeUsers = totalUsers;
@@ -206,29 +200,24 @@ export class SystemService {
       };
     } catch (error) {
       console.error("Fatal error in getSystemAdminDashboardStats:", error);
-      // Absolute graceful fallback to ensure the UI ALWAYS renders and does NOT throw 500
       return {
         uptime: Math.floor(process.uptime()),
-        dbLatency: 12,
-        totalUsers: 248,
-        totalGroups: 4,
-        totalSyncRecords: 1204,
-        activeUsers: 248,
-        inactiveUsers: 12,
-        onlineUsers: 1,
+        dbLatency: -1,
+        totalUsers: 0,
+        totalGroups: 0,
+        totalSyncRecords: 0,
+        activeUsers: 0,
+        inactiveUsers: 0,
+        onlineUsers: 0,
         integrations: [
-          { id: 'ead', name: 'EAD', status: 'success', latency: 42, lastSync: new Date().toISOString() },
-          { id: 'eefn', name: 'EEFN', status: 'success', latency: 31, lastSync: new Date().toISOString() },
-          { id: 'raizes', name: 'RAÍZES', status: 'success', latency: 28, lastSync: new Date().toISOString() },
-          { id: 'uni', name: 'UNI', status: 'success', latency: 48, lastSync: new Date().toISOString() },
-          { id: 'uniego', name: 'UNIEGO', status: 'success', latency: 37, lastSync: new Date().toISOString() },
+          { id: 'ead', name: 'EAD', status: 'offline', latency: 0, lastSync: null },
+          { id: 'eefn', name: 'EEFN', status: 'offline', latency: 0, lastSync: null },
+          { id: 'raizes', name: 'RAÍZES', status: 'offline', latency: 0, lastSync: null },
+          { id: 'uni', name: 'UNI', status: 'offline', latency: 0, lastSync: null },
+          { id: 'uniego', name: 'UNIEGO', status: 'offline', latency: 0, lastSync: null },
         ],
-        logs: [
-          { id: '1', action: 'Sincronização global concluída sem erros.', timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(), userName: 'Sistema (Scheduler)' },
-          { id: '2', action: 'Conexão com Drizzle ORM e Postgres estabelecida.', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), userName: 'Database Engine' },
-          { id: '3', action: 'Módulo de Notas e Painel Administrativo iniciados.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), userName: 'System Core' },
-          { id: '4', action: 'Políticas de acesso super_admin carregadas.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), userName: 'Auth Gateway' },
-        ]
+        logs: [],
+        error: 'Falha ao consultar estatísticas do sistema. Verifique os logs do servidor.',
       };
     }
   }

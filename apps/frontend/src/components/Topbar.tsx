@@ -28,8 +28,7 @@ export async function Topbar() {
                 {session.user.name}
               </p>
               <p className="text-[10px] text-green-dark font-bold uppercase tracking-tighter mt-1">
-                {/* @ts-ignore */}
-                {session.user.groups?.length > 0 ? session.user.groups[0] : 'Colaborador'}
+                {(session.user.groups ?? []).length > 0 ? session.user.groups![0] : 'Colaborador'}
               </p>
             </div>
             <div className="w-7 h-7 rounded-full bg-navy text-white flex items-center justify-center font-bold text-[10px] shadow-inner">

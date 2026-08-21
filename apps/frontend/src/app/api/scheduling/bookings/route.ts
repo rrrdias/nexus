@@ -3,7 +3,6 @@ import { auth } from "@/auth"
 
 export async function GET(req: NextRequest) {
   const session = await auth()
-  // @ts-ignore
   const token = session?.user?.accessToken
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

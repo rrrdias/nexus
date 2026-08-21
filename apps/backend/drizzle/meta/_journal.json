@@ -22,6 +22,13 @@
       "when": 1780087490789,
       "tag": "0002_cloudy_ulik",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781111568662,
+      "tag": "0003_quick_goblin_queen",
+      "breakpoints": true
     }
   ]
 }

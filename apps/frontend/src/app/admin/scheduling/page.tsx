@@ -5,7 +5,6 @@ import { SchedulingDashboard } from "./SchedulingDashboard"
 
 export default async function AdminSchedulingPage({ searchParams }: { searchParams: Promise<any> }) {
   const session = await auth()
-  // @ts-ignore
   if (!session?.user) redirect("/login")
 
   const filters = await searchParams

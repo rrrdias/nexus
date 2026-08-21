@@ -54,24 +54,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id
-        // @ts-ignore
         token.isSuperAdmin = user.isSuperAdmin
-        // @ts-ignore
         token.groups = user.groups
-        // @ts-ignore
         token.accessToken = user.accessToken
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        // @ts-ignore
         session.user.isSuperAdmin = !!token.isSuperAdmin
-        // @ts-ignore
-        session.user.groups = token.groups || []
-        // @ts-ignore
+        session.user.groups = (token.groups as string[]) || []
         session.user.id = token.sub as string
-        // @ts-ignore
         session.user.accessToken = token.accessToken as string
       }
       return session

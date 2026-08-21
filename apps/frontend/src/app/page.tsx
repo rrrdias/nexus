@@ -10,7 +10,6 @@ import {
   Database, 
   RefreshCw, 
   Shield, 
-  Cpu, 
   Clock, 
   Terminal, 
   Lock, 
@@ -226,13 +225,6 @@ export default async function DashboardPage() {
     activeUsers: 2,
     inactiveUsers: 0,
     onlineUsers: 1,
-    integrations: [
-      { id: 'ead', name: 'EAD', status: 'success', latency: 42, lastSync: new Date().toISOString() },
-      { id: 'eefn', name: 'EEFN', status: 'success', latency: 31, lastSync: new Date().toISOString() },
-      { id: 'raizes', name: 'RAÍZES', status: 'success', latency: 28, lastSync: new Date().toISOString() },
-      { id: 'uni', name: 'UNI', status: 'success', latency: 48, lastSync: new Date().toISOString() },
-      { id: 'uniego', name: 'UNIEGO', status: 'success', latency: 37, lastSync: new Date().toISOString() },
-    ],
     logs: [
       { id: '1', action: 'Sincronização global concluída sem erros.', timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(), userName: 'Sistema (Scheduler)' },
       { id: '2', action: 'Conexão com Drizzle ORM e Postgres estabelecida.', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), userName: 'Database Engine' },
@@ -255,9 +247,7 @@ export default async function DashboardPage() {
     greeting = 'Boa noite'
   }
 
-  // Calculate offline integrations status
-  const offlineCount = data.integrations.filter((i: any) => i.status !== 'success').length
-  const hasOffline = offlineCount > 0
+  // Offline integrations calculations removed since AVA integrations are discontinued
 
   const stats = [
     { 
@@ -309,27 +299,11 @@ export default async function DashboardPage() {
           </h1>
           <p className="text-[#5F6775] text-sm mt-1 flex items-center gap-2 select-none">
             <span className="relative flex h-2.5 w-2.5">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                hasOffline ? 'bg-red-500' : 'bg-[#27AE60]'
-              }`}></span>
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                hasOffline ? 'bg-red-500' : 'bg-[#27AE60]'
-              }`}></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-[#27AE60]"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#27AE60]"></span>
             </span>
-            {hasOffline ? (
-              <>
-                <span className="text-red-600 font-bold">
-                  {offlineCount} {offlineCount === 1 ? 'integração AVA offline' : 'integrações AVA offline'}
-                </span>
-                <span> · Uptime do servidor: </span>
-                <span className="font-bold text-navy font-mono">{uptimeString}</span>
-              </>
-            ) : (
-              <>
-                <span>Todos os sistemas do ecossistema operacionais · Uptime do servidor: </span>
-                <span className="font-bold text-navy font-mono">{uptimeString}</span>
-              </>
-            )}
+            <span>Todos os sistemas do ecossistema operacionais · Uptime do servidor: </span>
+            <span className="font-bold text-navy font-mono">{uptimeString}</span>
           </p>
         </div>
       </div>
@@ -406,58 +380,8 @@ export default async function DashboardPage() {
       {/* Layout de Duas Colunas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Coluna 1: Status de Integrações (UNI, EEFN, EaD, etc) */}
-        <Card className="lg:col-span-7 shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="bg-[#F4F5F7] border-b flex flex-row items-center justify-between py-4">
-            <CardTitle className="text-base font-extrabold text-navy flex items-center gap-2 select-none">
-              <Cpu className="w-5 h-5 text-green-dark" /> Integrações com AVA (Moodle)
-            </CardTitle>
-            <Badge variant="outline" className="border-green-dark text-green-dark font-bold bg-green-50 select-none">
-              5 Conectadas
-            </Badge>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
-            <div className="divide-y divide-gray-100">
-              {data.integrations.map((integration: any) => (
-                <div key={integration.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 first:pt-0 last:pb-0">
-                  <div className="flex items-center gap-2.5">
-                    <div className="relative flex h-3 w-3 shrink-0">
-                      {integration.status === 'success' ? (
-                        <>
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#27AE60] opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-[#27AE60]"></span>
-                        </>
-                      ) : (
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                      )}
-                    </div>
-                    <div>
-                      <span className="text-sm font-extrabold text-navy">{integration.name}</span>
-                      <p className="text-[10px] text-[#9AA0AC] font-medium font-mono mt-0.5">
-                        {formatSyncTime(integration.lastSync)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-right">
-                    {integration.status === 'success' && (
-                      <span className="text-[10px] bg-slate-100 text-[#5F6775] px-2 py-0.5 rounded font-bold font-mono">
-                        Ping: {integration.latency}ms
-                      </span>
-                    )}
-                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
-                      integration.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {integration.status === 'success' ? 'Conectado' : 'Offline'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Coluna 2: Audit Logs & Governance */}
-        <Card className="lg:col-span-5 shadow-sm hover:shadow-md transition-shadow">
+        {/* Coluna Unificada: Audit Logs & Governance */}
+        <Card className="lg:col-span-12 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="bg-[#F4F5F7] border-b flex flex-row items-center justify-between py-4">
             <CardTitle className="text-base font-extrabold text-navy flex items-center gap-2 select-none">
               <Terminal className="w-5 h-5 text-[#1976D2]" /> Logs de Auditoria

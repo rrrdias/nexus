@@ -4,7 +4,6 @@ import { auth, signOut } from "@/auth"
 
 export async function fetchFromApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const session = await auth()
-  // @ts-ignore
   const token = session?.user?.accessToken
 
   if (!token) {

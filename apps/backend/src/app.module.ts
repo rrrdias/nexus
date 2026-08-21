@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DbModule } from './db/db.module';
@@ -12,10 +13,10 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { SystemModule } from './system/system.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
 import { AcademicModule } from './academic/academic.module';
-import { IntegrationsModule } from './academic/integrations/integrations.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     DbModule,
     AuthModule,
     UsersModule,
@@ -25,7 +26,6 @@ import { IntegrationsModule } from './academic/integrations/integrations.module'
     SystemModule,
     SchedulingModule,
     AcademicModule,
-    IntegrationsModule,
   ],
   controllers: [AppController],
   providers: [

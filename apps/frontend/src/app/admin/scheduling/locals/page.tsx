@@ -5,7 +5,6 @@ import { LocalsManagement } from "./LocalsManagement"
 
 export default async function AdminLocalsPage() {
   const session = await auth()
-  // @ts-ignore
   if (!session?.user) redirect("/login")
 
   const locals = await getLocals({ todos: true })

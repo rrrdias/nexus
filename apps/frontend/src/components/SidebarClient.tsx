@@ -146,7 +146,6 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
           }`}>
             <span className="text-white text-sm font-medium tracking-tight truncate whitespace-nowrap">{session.user.name}</span>
             <span className="text-green-dark text-[10px] font-bold uppercase tracking-wider mt-0.5 truncate whitespace-nowrap">
-              {/* @ts-ignore */}
               {session.user.groups?.length > 0 ? session.user.groups.join(', ') : 'Sem Grupo'}
             </span>
           </div>
@@ -443,9 +442,6 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                       <Link href="/academic" className={`flex items-center gap-2 text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/academic' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Consultar Registros
                       </Link>
-                      <Link href="/academic/integrations" className={`flex items-center gap-2 text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/academic/integrations' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
-                        Integração AVA (Moodle)
-                      </Link>
                     </div>
                   </div>
                 ) : (
@@ -457,9 +453,6 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                   >
                     <Link href="/academic" className={`flex items-center gap-2 text-[11px] hover:text-white py-2 px-2.5 rounded-md transition-colors ${pathname === '/academic' ? 'text-green-brand font-medium bg-white/5' : 'text-white/50 hover:bg-white/5'}`}>
                       Consultar Registros
-                    </Link>
-                    <Link href="/academic/integrations" className={`flex items-center gap-2 text-[11px] hover:text-white py-2 px-2.5 rounded-md transition-colors ${pathname === '/academic/integrations' ? 'text-green-brand font-medium bg-white/5' : 'text-white/50 hover:bg-white/5'}`}>
-                      Integração AVA (Moodle)
                     </Link>
                   </div>
                 )}
@@ -498,7 +491,6 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
         })}
 
         {/* Administração do SuperAdmin */}
-        {/* @ts-ignore */}
         {session?.user?.isSuperAdmin && (
           <>
             {/* Separador/Título da Seção Administração */}

@@ -208,6 +208,7 @@ export class SchedulingService {
           inArray(opcaos.hora, requiredTimes),
           eq(opcaos.status, true)
         ))
+        .orderBy(opcaos.hora)
         .for('update');
 
       if (slots.length < requiredTimes.length) {
@@ -281,6 +282,7 @@ export class SchedulingService {
             eq(opcaos.data, opcao.data),
             inArray(opcaos.hora, requiredTimes)
           ))
+          .orderBy(opcaos.hora)
           .for('update');
 
         // Restore vacancy capacity (+1)
@@ -389,6 +391,16 @@ export class SchedulingService {
 
     const whereClause = and(...conditions);
 
+    const studentSubquery = this.db.select({
+      matricula: avaProgressReport.matricula,
+      periodo: avaProgressReport.periodo,
+      aluno: sql<string>`max(${avaProgressReport.aluno})`.as('aluno'),
+      usuario: sql<string>`max(${avaProgressReport.usuario})`.as('usuario'),
+    })
+      .from(avaProgressReport)
+      .groupBy(avaProgressReport.matricula, avaProgressReport.periodo)
+      .as('student_subquery');
+
     // Get paginated bookings details
     const rawData = await this.db.select({
       id: agendamentosMatricula.id,
@@ -401,10 +413,19 @@ export class SchedulingService {
       hora: opcaos.hora,
       localId: opcaos.localId,
       localNome: locals.nome,
+      studentName: studentSubquery.aluno,
+      studentEmail: studentSubquery.usuario,
     })
       .from(agendamentosMatricula)
       .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
       .innerJoin(locals, eq(opcaos.localId, locals.id))
+      .leftJoin(
+        studentSubquery,
+        and(
+          eq(studentSubquery.matricula, agendamentosMatricula.matricula),
+          eq(studentSubquery.periodo, agendamentosMatricula.periodo)
+        )
+      )
       .where(whereClause)
       .orderBy(desc(agendamentosMatricula.createdAt))
       .limit(size)
@@ -421,18 +442,13 @@ export class SchedulingService {
     const totalPages = Math.ceil(totalRecords / size);
 
     // Hydrate names & emails from synced progress reports
-    const bookings = await Promise.all(rawData.map(async (row) => {
-      const [syncRecord] = await this.db.select({ aluno: avaProgressReport.aluno, usuario: avaProgressReport.usuario })
-        .from(avaProgressReport)
-        .where(and(eq(avaProgressReport.matricula, row.matricula), eq(avaProgressReport.periodo, row.periodo)))
-        .limit(1);
-
+    const bookings = rawData.map((row) => {
       return {
         ...row,
-        studentName: syncRecord?.aluno || 'Estudante Não Identificado',
-        studentEmail: syncRecord?.usuario || ''
+        studentName: row.studentName || 'Estudante Não Identificado',
+        studentEmail: row.studentEmail || ''
       };
-    }));
+    });
 
     return {
       page,

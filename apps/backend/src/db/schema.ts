@@ -256,3 +256,91 @@ export const avaOpenlms = pgTable("ava_openlms", {
 
 
 
+
+
+// ==========================================
+// Módulo: Academic (Cache Lyceum)
+// ==========================================
+
+export const academicTurma = pgTable("academic_turma", {
+  id: text("id").primaryKey(), // ID real do Lyceum
+  turma: text("turma"),
+  codTurma: text("cod_turma"),
+  disciplina: text("disciplina"),
+  nomeDisciplina: text("nome_disciplina"),
+  codDisciplina: text("cod_disciplina"),
+  curso: text("curso"),
+  periodo: text("periodo"),
+  serie: text("serie"),
+  modelagem: text("modelagem"),
+  cursoNome: text("curso_nome"),
+  cursoInstituicao: text("curso_instituicao"),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_ac_turma_periodo").on(t.periodo),
+  index("idx_ac_turma_trgm").using("gin", t.turma.op("gin_trgm_ops")),
+  index("idx_ac_turma_cod_trgm").using("gin", t.codTurma.op("gin_trgm_ops")),
+  index("idx_ac_turma_disc_trgm").using("gin", t.disciplina.op("gin_trgm_ops")),
+  index("idx_ac_turma_nome_disc_trgm").using("gin", t.nomeDisciplina.op("gin_trgm_ops")),
+])
+
+export const academicDiscente = pgTable("academic_discente", {
+  id: text("id").primaryKey(),
+  nome: text("nome"),
+  email: text("email"),
+  cpf: text("cpf"),
+  serie: text("serie"),
+  turno: text("turno"),
+  telefone: text("telefone"),
+  cidade: text("cidade"),
+  pais: text("pais"),
+  curso: text("curso"),
+  unidadeFisica: text("unidade_fisica"),
+  nomeSocial: text("nome_social"),
+  nomeUnidadeFisica: text("nome_unidade_fisica"),
+  sobrenome: text("sobrenome"),
+  sobrenomeSocial: text("sobrenome_social"),
+  cursoNome: text("curso_nome"),
+  cursoInstituicao: text("curso_instituicao"),
+  matricula: text("matricula"),
+  usuario: text("usuario"),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_ac_discente_nome_trgm").using("gin", t.nome.op("gin_trgm_ops")),
+  index("idx_ac_discente_sobrenome_trgm").using("gin", t.sobrenome.op("gin_trgm_ops")),
+  index("idx_ac_discente_cpf_trgm").using("gin", t.cpf.op("gin_trgm_ops")),
+  index("idx_ac_discente_mat_trgm").using("gin", t.matricula.op("gin_trgm_ops")),
+  index("idx_ac_discente_usu_trgm").using("gin", t.usuario.op("gin_trgm_ops")),
+])
+
+export const academicDocente = pgTable("academic_docente", {
+  id: text("id").primaryKey(),
+  nome: text("nome"),
+  email: text("email"),
+  cpf: text("cpf"),
+  telefone: text("telefone"),
+  cidade: text("cidade"),
+  pais: text("pais"),
+  sobrenome: text("sobrenome"),
+  nomeSocial: text("nome_social"),
+  sobrenomeSocial: text("sobrenome_social"),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+}, (t) => [
+  index("idx_ac_docente_nome_trgm").using("gin", t.nome.op("gin_trgm_ops")),
+  index("idx_ac_docente_sobrenome_trgm").using("gin", t.sobrenome.op("gin_trgm_ops")),
+  index("idx_ac_docente_cpf_trgm").using("gin", t.cpf.op("gin_trgm_ops")),
+])
+
+export const academicMatricula = pgTable("academic_matricula", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  usuarioId: text("usuario_id").notNull(),
+  turmaId: text("turma_id").notNull(),
+  nivel: text("nivel").notNull(), // '1' docente, '2' discente
+  ativo: text("ativo"),
+  situacao: text("situacao"),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+}, (t) => [
+  unique("unq_ac_matricula").on(t.usuarioId, t.turmaId, t.nivel),
+  index("idx_ac_matricula_usuario").on(t.usuarioId),
+  index("idx_ac_matricula_turma").on(t.turmaId),
+])

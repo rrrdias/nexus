@@ -13,14 +13,15 @@ import {
   X,
   FileSpreadsheet,
   CheckCircle2,
-  Bookmark
+  Bookmark,
+  RefreshCw
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { getStudents, getStudentDisciplines, getTeachers, getTeacherDisciplines, getClasses, getMatriculas } from "@/app/actions/academic"
+import { getStudents, getStudentDisciplines, getTeachers, getTeacherDisciplines, getClasses, getMatriculas, syncAcademicData } from "@/app/actions/academic"
 
 type TabType = "discentes" | "docentes" | "turmas" | "matriculas"
 
@@ -31,6 +32,7 @@ export function AcademicDashboard() {
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | null }>({ message: "", type: null })
   const [hasSearched, setHasSearched] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   // Data states
   const [listData, setListData] = useState<any[]>([])
@@ -100,44 +102,63 @@ export function AcademicDashboard() {
     }
   }
 
+  const handleSync = async () => {
+    setSyncing(true)
+    showToast("Sincronização iniciada. Isso pode levar alguns minutos...", "success")
+    try {
+      const res = await syncAcademicData()
+      if (res.success) {
+        showToast(`Sincronização concluída! ${res.data.usersSync || 0} usuários e ${res.data.turmas || 0} turmas.`, "success")
+        if (hasSearched) fetchData()
+      } else {
+        showToast(res.error || "Erro ao sincronizar base.", "error")
+      }
+    } catch (err) {
+      showToast("Falha ao comunicar com servidor de sincronização.", "error")
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   // Row resolvers to elegantly map dynamic view column names case-insensitively
   const resolveStudentRow = (row: any) => {
-    const nomeBase = row.NOME_SOCIAL || row.NOME || row.Nome || row.nome || row.ALUNO || row.aluno || "Não Identificado"
-    const sobrenomeBase = row.SOBRENOME_SOCIAL || row.SOBRENOME || row.Sobrenome || row.sobrenome || ""
+    const nomeBase = row.NOME_SOCIAL || row.nomeSocial || row.NOME || row.Nome || row.nome || row.ALUNO || row.aluno || "Não Identificado"
+    const sobrenomeBase = row.SOBRENOME_SOCIAL || row.sobrenomeSocial || row.SOBRENOME || row.Sobrenome || row.sobrenome || ""
     const nomeCompleto = `${nomeBase} ${sobrenomeBase}`.trim()
-    const matricula = row.ID || row.MATRICULA || row.Matricula || row.matricula || row.COD_ALUNO || row.cod_aluno || "---"
+    // O ID do banco agora é o matricula oficial, caso a coluna matricula real esteja vazia (nula)
+    const matricula = row.id || row.ID || row.MATRICULA || row.Matricula || row.matricula || row.COD_ALUNO || row.cod_aluno || "---"
     const email = row.EMAIL || row.Email || row.email || "---"
     const cpf = row.CPF || row.Cpf || row.cpf || "---"
     const periodo = row.SERIE || row.Serie || row.serie || "---"
-    const unidadeFisica = row.UNIDADE_FISICA || row.UnidadeFisica || row.unidade_fisica || "---"
-    const curso = row.CURSO_NOME || row.CURSO || row.Curso || "---"
-    const cursoInstituicao = row.CURSO_INSTITUICAO || "---"
+    const unidadeFisica = row.UNIDADE_FISICA || row.unidadeFisica || row.UnidadeFisica || row.unidade_fisica || "---"
+    const curso = row.CURSO_NOME || row.cursoNome || row.CURSO || row.Curso || row.curso || "---"
+    const cursoInstituicao = row.CURSO_INSTITUICAO || row.cursoInstituicao || "---"
     const telefone = row.TELEFONE || row.Telefone || row.telefone || "---"
-    const local = row.CIDADE && row.PAIS ? `${row.CIDADE} / ${row.PAIS}` : row.CIDADE || row.PAIS || "---"
+    const local = row.CIDADE && row.PAIS ? `${row.CIDADE} / ${row.PAIS}` : row.CIDADE || row.PAIS || (row.cidade && row.pais ? `${row.cidade} / ${row.pais}` : row.cidade || row.pais || "---")
     return { nome: nomeCompleto, matricula, email, cpf, periodo, unidadeFisica, curso, cursoInstituicao, telefone, local }
   }
 
   const resolveTeacherRow = (row: any) => {
-    const nomeBase = row.NOME || row.Nome || "Não Identificado"
-    const sobrenomeBase = row.SOBRENOME || row.Sobrenome || ""
+    const nomeBase = row.NOME || row.Nome || row.nome || "Não Identificado"
+    const sobrenomeBase = row.SOBRENOME || row.Sobrenome || row.sobrenome || ""
     const nomeCompleto = `${nomeBase} ${sobrenomeBase}`.trim()
-    const docenteId = row.ID || row.Id || row.id || row.COD_DOCENTE || row.cod_docente || "---"
+    const docenteId = row.id || row.ID || row.Id || row.COD_DOCENTE || row.cod_docente || "---"
     const email = row.EMAIL || row.Email || row.email || "---"
     const cpf = row.CPF || row.Cpf || row.cpf || "---"
     const telefone = row.TELEFONE || row.Telefone || row.telefone || "---"
-    const local = row.CIDADE && row.PAIS ? `${row.CIDADE} / ${row.PAIS}` : row.CIDADE || row.PAIS || "---"
+    const local = row.CIDADE && row.PAIS ? `${row.CIDADE} / ${row.PAIS}` : row.CIDADE || row.PAIS || (row.cidade && row.pais ? `${row.cidade} / ${row.pais}` : row.cidade || row.pais || "---")
     return { nome: nomeCompleto, docenteId, email, cpf, telefone, local }
   }
 
   const resolveClassRow = (row: any) => {
-    const codigo = row.TURMA || row.Turma || row.turma || row.COD_TURMA || row.cod_turma || "---"
-    const disciplina = row.NOME_DISCIPLINA || row.DISCIPLINA || row.disciplina || "---"
-    const disciplinaCod = row.DISCIPLINA || "---"
-    const curso = row.CURSO_NOME || row.CURSO || "---"
-    const instituicao = row.CURSO_INSTITUICAO || "---"
-    const periodo = row.PERIODO || row.Periodo || row.periodo || "---"
-    const serie = row.SERIE || row.Serie || row.serie || "---"
-    const modelagem = row.MODELAGEM || row.Modelagem || row.modelagem || "---"
+    const codigo = row.turma || row.TURMA || row.Turma || row.codTurma || row.COD_TURMA || row.cod_turma || "---"
+    const disciplina = row.nomeDisciplina || row.NOME_DISCIPLINA || row.DISCIPLINA || row.disciplina || "---"
+    const disciplinaCod = row.codDisciplina || row.DISCIPLINA || "---"
+    const curso = row.cursoNome || row.CURSO_NOME || row.CURSO || "---"
+    const instituicao = row.cursoInstituicao || row.CURSO_INSTITUICAO || "---"
+    const periodo = row.periodo || row.PERIODO || row.Periodo || "---"
+    const serie = row.serie || row.SERIE || row.Serie || "---"
+    const modelagem = row.modelagem || row.MODELAGEM || row.Modelagem || "---"
     return { codigo, disciplina, disciplinaCod, curso, instituicao, periodo, serie, modelagem }
   }
 
@@ -157,7 +178,8 @@ export function AcademicDashboard() {
     }
 
     const situacao = row.SITUACAO || row.Situacao || row.situacao || "---"
-    const ativo = row.ATIVO === 1 || row.ATIVO === '1' || row.ATIVO === true || row.ATIVO === 'S' ? 'Ativo' : 'Inativo'
+    const valAtivo = row.ativo !== undefined ? row.ativo : row.ATIVO
+    const ativo = valAtivo === 1 || valAtivo === '1' || valAtivo === true || valAtivo === 'S' ? 'Ativo' : 'Inativo'
     const cpf = row.USUARIO_CPF || row.UsuarioCpf || "---"
     const nomeDisciplina = row.NOME_DISCIPLINA || row.NomeDisciplina || row.nome_disciplina || "---"
     
@@ -227,9 +249,21 @@ export function AcademicDashboard() {
         </div>
         
         {/* Connection status indicator */}
-        <Badge className="bg-[#E8F5E9] text-[#2E7D32] border border-[#A5D6A7] hover:bg-[#C8E6C9] py-1 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 self-start md:self-auto shadow-sm">
-          <CheckCircle2 className="w-3.5 h-3.5" /> Lyceum Online
-        </Badge>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleSync} 
+            disabled={syncing}
+            className="h-7 text-[11px] font-bold rounded-lg text-[#5E35B1] border-[#5E35B1]/20 hover:bg-[#5E35B1]/10 gap-1.5 shadow-sm"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Sincronizando...' : 'Forçar Sincronização'}
+          </Button>
+          <Badge className="bg-[#E8F5E9] text-[#2E7D32] border border-[#A5D6A7] hover:bg-[#C8E6C9] py-1 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Lyceum Online
+          </Badge>
+        </div>
       </div>
 
       {/* Interactive Tabs */}

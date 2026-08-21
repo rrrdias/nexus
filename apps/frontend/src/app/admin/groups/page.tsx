@@ -9,7 +9,6 @@ import { Pencil, Trash2, Plus, ShieldCheck } from "lucide-react"
 
 export default async function AdminGroupsPage() {
   const session = await auth()
-  // @ts-ignore
   if (!session?.user?.isSuperAdmin) redirect("/")
 
   const groupsWithModules = await getGroups()

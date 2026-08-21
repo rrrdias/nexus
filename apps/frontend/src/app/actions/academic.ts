@@ -75,3 +75,12 @@ export async function getMatriculas(filters: { search?: string; page?: number; s
     return { success: false, error: err.message || "Erro ao consultar matrículas." }
   }
 }
+
+export async function syncAcademicData() {
+  try {
+    const res = await fetchFromApi(`/api/academic/sync`, { method: 'POST' })
+    return { success: true, data: res }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erro ao sincronizar base do Lyceum." }
+  }
+}

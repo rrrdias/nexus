@@ -11,7 +11,6 @@ import { Pencil, Trash2, Plus } from "lucide-react"
 
 export default async function AdminUsersPage() {
   const session = await auth()
-  // @ts-ignore
   if (!session?.user?.isSuperAdmin) redirect("/")
 
   const usersWithDetails = await getUsers()
