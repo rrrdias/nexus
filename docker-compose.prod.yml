@@ -27,11 +27,11 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "3001:3001"
+      - "3003:3001"
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://admin:${DB_PASSWORD}@db:5432/core_db
-      PORT: 3001
+      PORT: 3003
       JWT_SECRET: ${JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
