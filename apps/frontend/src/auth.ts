@@ -2,6 +2,8 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  basePath: process.env.NEXT_BASE_PATH ? `${process.env.NEXT_BASE_PATH}/api/auth` : "/nexus/api/auth",
+  trustHost: true,
   session: { 
     strategy: "jwt", 
     maxAge: 30 * 60, // 30 minutos de sessão

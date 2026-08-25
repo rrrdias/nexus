@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url)
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+  const baseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://backend:3001"
   const url = `${baseUrl}/api/scheduling/bookings?${searchParams.toString()}`
 
   try {
