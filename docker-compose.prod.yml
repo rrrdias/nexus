@@ -84,6 +84,7 @@ services:
       dockerfile: apps/frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_BASE_PATH: "/nexus"
     container_name: nexus_core_frontend_prod
     restart: always
     depends_on:
@@ -94,6 +95,7 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_API_URL: http://backend:3004
+      NEXT_BASE_PATH: "/nexus"
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TRUST_HOST: "true"
       AUTH_URL: ${AUTH_URL}
