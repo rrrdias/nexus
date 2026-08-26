@@ -11,16 +11,22 @@ export default auth((req) => {
   if (isOnApiAuth) return
 
   if (!isLoggedIn && !isOnLogin) {
-    return NextResponse.redirect(new URL('/login', req.nextUrl))
+    const url = req.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
   if (isLoggedIn && isOnLogin) {
-    return NextResponse.redirect(new URL('/', req.nextUrl))
+    const url = req.nextUrl.clone()
+    url.pathname = '/'
+    return NextResponse.redirect(url)
   }
 
   // Se o usuário foi desativado após o login, força logout imediato
   if (isLoggedIn && req.auth?.user?.isDisabled) {
-    return NextResponse.redirect(new URL('/api/auth/signout', req.nextUrl))
+    const url = req.nextUrl.clone()
+    url.pathname = '/api/auth/signout'
+    return NextResponse.redirect(url)
   }
 })
 
