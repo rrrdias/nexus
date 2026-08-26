@@ -54,8 +54,8 @@ COPY --from=builder /app/apps/backend/src/db/seed.ts ./apps/backend/src/db/seed.
 
 USER nestjs
 
-EXPOSE 3001
+EXPOSE 3004
 
-ENV PORT=3001
+ENV PORT=3004
 
 CMD ["node", "apps/backend/dist/main.js"]
