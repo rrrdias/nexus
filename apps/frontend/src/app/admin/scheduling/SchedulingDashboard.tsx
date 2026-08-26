@@ -18,7 +18,8 @@ import {
   getStudentProfile, 
   getOptions, 
   createBooking,
-  importBookings
+  importBookings,
+  getBookings
 } from "@/app/actions/scheduling"
 import {
   AlertDialog,
@@ -132,12 +133,8 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
       if (dataFiltro) filters.data = dataFiltro
       if (status !== "all") filters.status = status
 
-      const params = new URLSearchParams()
-      Object.entries(filters).forEach(([k, v]) => params.append(k, String(v)))
-      
-      const res = await fetch(`/api/scheduling/bookings?${params.toString()}`)
-      if (res.ok) {
-        const result = await res.json()
+      const result = await getBookings(filters)
+      if (result) {
         setBookingsData(result.data)
         setMeta({
           total_records: result.total_records,
@@ -337,7 +334,7 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
     const params = new URLSearchParams()
     Object.entries(filters).forEach(([k, v]) => params.append(k, String(v)))
     
-    window.open(`/api/scheduling/export?${params.toString()}`)
+    window.open(`/nexus/api/scheduling/export?${params.toString()}`)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

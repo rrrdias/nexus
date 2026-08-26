@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { createLocal, updateLocal } from "@/app/actions/scheduling"
+import { createLocal, updateLocal, getLocals } from "@/app/actions/scheduling"
 import { 
   Building2, 
   MapPin, 
@@ -48,11 +48,8 @@ export function LocalsManagement({ initialLocals }: { initialLocals: any[] }) {
   const refreshData = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/scheduling/locals?todos=true")
-      if (res.ok) {
-        const data = await res.json()
-        setLocalsList(data)
-      }
+      const data = await getLocals({ todos: true })
+      setLocalsList(data)
     } catch (err) {
       showToast("Erro ao recarregar a lista de polos.", "error")
     } finally {

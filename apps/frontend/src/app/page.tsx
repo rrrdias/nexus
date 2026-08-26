@@ -130,8 +130,7 @@ export default async function DashboardPage() {
   const session = await auth()
   
   if (!session) {
-    const basePath = process.env.NEXT_BASE_PATH || ""
-    redirect(`${basePath}/login`)
+    redirect("/login")
   }
 
   const isSuperAdmin = !!(session?.user as any)?.isSuperAdmin
