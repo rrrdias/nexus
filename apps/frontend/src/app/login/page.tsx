@@ -96,10 +96,9 @@ export default async function LoginPage({
             "use server"
             try {
               const formDataObj = Object.fromEntries(formData)
-              const basePath = process.env.NEXT_BASE_PATH || ""
               await signIn("credentials", {
                 ...formDataObj,
-                redirectTo: `${basePath}/`
+                redirectTo: "/"
               })
             } catch (error) {
               if (error instanceof AuthError) {

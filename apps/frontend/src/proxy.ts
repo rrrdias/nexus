@@ -4,24 +4,23 @@ import { NextResponse } from "next/server"
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
-  const bp = process.env.NEXT_BASE_PATH || ""
 
-  const isOnApiAuth = req.nextUrl.pathname.startsWith(`${bp}/api/auth`)
-  const isOnLogin = req.nextUrl.pathname.startsWith(`${bp}/login`)
+  const isOnApiAuth = req.nextUrl.pathname.startsWith('/api/auth')
+  const isOnLogin = req.nextUrl.pathname.startsWith('/login')
 
   if (isOnApiAuth) return
 
   if (!isLoggedIn && !isOnLogin) {
-    return NextResponse.redirect(new URL(`${bp}/login`, req.url))
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
   }
 
   if (isLoggedIn && isOnLogin) {
-    return NextResponse.redirect(new URL(`${bp}/`, req.url))
+    return NextResponse.redirect(new URL('/', req.nextUrl))
   }
 
   // Se o usuário foi desativado após o login, força logout imediato
   if (isLoggedIn && req.auth?.user?.isDisabled) {
-    return NextResponse.redirect(new URL(`${bp}/api/auth/signout`, req.url))
+    return NextResponse.redirect(new URL('/api/auth/signout', req.nextUrl))
   }
 })
 

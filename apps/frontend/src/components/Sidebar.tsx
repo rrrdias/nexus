@@ -18,8 +18,7 @@ export async function Sidebar() {
         throw e
       }
       if (e instanceof Error && (e.message === "Unauthorized" || e.message === "Acesso negado.")) {
-        const bp = process.env.NEXT_BASE_PATH || ""
-        await signOut({ redirectTo: `${bp}/login` })
+        await signOut({ redirectTo: "/login" })
       }
       console.error(e)
     }
