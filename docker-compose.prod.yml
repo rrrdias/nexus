@@ -30,11 +30,11 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "${BACKEND_PORT:-3001}:3001"
+      - "${BACKEND_PORT:-3004}:3004"
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://admin:${DB_PASSWORD}@db:5432/core_db
-      PORT: 3001
+      PORT: 3004
       JWT_SECRET: ${JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
@@ -93,7 +93,7 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      NEXT_API_URL: http://backend:3001
+      NEXT_API_URL: http://backend:3004
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TRUST_HOST: "true"
       AUTH_URL: ${AUTH_URL}
