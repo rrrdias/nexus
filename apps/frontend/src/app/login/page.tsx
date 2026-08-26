@@ -98,7 +98,7 @@ export default async function LoginPage({
               const formDataObj = Object.fromEntries(formData)
               await signIn("credentials", {
                 ...formDataObj,
-                redirectTo: "/"
+                redirectTo: "/nexus"
               })
             } catch (error) {
               if (error instanceof AuthError) {

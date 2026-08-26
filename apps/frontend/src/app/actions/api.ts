@@ -7,7 +7,7 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
   const token = session?.user?.accessToken
 
   if (!token) {
-    await signOut({ redirectTo: "/login" })
+    await signOut({ redirectTo: "/nexus/login" })
   }
 
   const baseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -24,7 +24,7 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
     })
 
     if (response.status === 401) {
-      await signOut({ redirectTo: "/login" })
+      await signOut({ redirectTo: "/nexus/login" })
     }
 
     if (!response.ok) {

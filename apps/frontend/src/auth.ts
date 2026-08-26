@@ -4,6 +4,10 @@ import Credentials from "next-auth/providers/credentials"
 export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: process.env.NEXT_BASE_PATH ? `${process.env.NEXT_BASE_PATH}/api/auth` : "/nexus/api/auth",
   trustHost: true,
+  pages: {
+    signIn: "/nexus/login",
+    error: "/nexus/login",
+  },
   session: { 
     strategy: "jwt", 
     maxAge: 30 * 60, // 30 minutos de sessão

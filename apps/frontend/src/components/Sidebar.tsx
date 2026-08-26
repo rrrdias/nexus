@@ -18,7 +18,7 @@ export async function Sidebar() {
         throw e
       }
       if (e instanceof Error && (e.message === "Unauthorized" || e.message === "Acesso negado.")) {
-        await signOut({ redirectTo: "/login" })
+        await signOut({ redirectTo: "/nexus/login" })
       }
       console.error(e)
     }
