@@ -23,7 +23,7 @@ export class AvaSyncService {
     console.log(`[SYNC] Iniciando Notas ${institution}...`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     try {
       let res;
@@ -31,12 +31,13 @@ export class AvaSyncService {
         res = await fetch(getUrl, { cache: 'no-store', signal: controller.signal });
       } catch (fetchError: any) {
         if (fetchError.name === 'AbortError') {
-          return { source: `${institution}_grades`, status: 'skipped', reason: 'Timeout na resposta do Moodle (15s)' };
+          return { source: `${institution}_grades`, status: 'skipped', reason: 'Timeout na resposta do Moodle (120s)' };
         }
         return { source: `${institution}_grades`, status: 'skipped', reason: `Erro de conexão: ${fetchError.message}` };
       } finally {
         clearTimeout(timeoutId);
       }
+
 
       if (!res.ok) {
         return { source: `${institution}_grades`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` };
@@ -160,7 +161,7 @@ export class AvaSyncService {
     console.log(`[SYNC] Iniciando Progresso ${institution}...`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     try {
       let res;
@@ -168,12 +169,13 @@ export class AvaSyncService {
         res = await fetch(getUrl, { cache: 'no-store', signal: controller.signal });
       } catch (fetchError: any) {
         if (fetchError.name === 'AbortError') {
-          return { source: `${institution}_progress`, status: 'skipped', reason: 'Timeout na resposta do Moodle (15s)' };
+          return { source: `${institution}_progress`, status: 'skipped', reason: 'Timeout na resposta do Moodle (120s)' };
         }
         return { source: `${institution}_progress`, status: 'skipped', reason: `Erro de conexão: ${fetchError.message}` };
       } finally {
         clearTimeout(timeoutId);
       }
+
 
       if (!res.ok) {
         return { source: `${institution}_progress`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` };

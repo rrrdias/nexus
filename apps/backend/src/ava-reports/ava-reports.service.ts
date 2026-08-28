@@ -350,12 +350,19 @@ export class AvaReportsService {
         results.push(res);
       }
 
+      const skippedOrErrors = results.filter(r => r.status === 'skipped' || r.status === 'error');
+      if (skippedOrErrors.length === results.length && results.length > 0) {
+        const reasons = results.map(r => `${r.source}: ${r.reason || r.status}`).join('; ');
+        throw new Error(`Sincronização não executada: ${reasons}`);
+      }
 
       return { success: true, results };
+
     } catch (error: any) {
       console.error("Erro na action de sync:", error);
       throw new Error(error.message || "Erro interno na sincronização");
     }
+
   }
 
 
