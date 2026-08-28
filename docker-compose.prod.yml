@@ -31,8 +31,11 @@ services:
         condition: service_healthy
     ports:
       - "${BACKEND_PORT:-3004}:3004"
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
+
       DATABASE_URL: postgresql://admin:${DB_PASSWORD}@db:5432/core_db
       PORT: 3004
       JWT_SECRET: ${JWT_SECRET}
