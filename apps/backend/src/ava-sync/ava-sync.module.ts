@@ -4,6 +4,7 @@ import { AvaSyncService } from './ava-sync.service';
 
 @Module({
   controllers: [AvaSyncController],
-  providers: [AvaSyncService]
+  providers: [AvaSyncService],
+  exports: [AvaSyncService]
 })
 export class AvaSyncModule {}

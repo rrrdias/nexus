@@ -4,6 +4,8 @@ import { eq, ilike, and, inArray, or, isNull, isNotNull, not, sql } from 'drizzl
 import { avaProgressReport, avaGradesReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
+import { AvaSyncService } from '../ava-sync/ava-sync.service';
+
 type SessionUser = {
   id?: string;
   isSuperAdmin?: boolean;
@@ -16,7 +18,9 @@ export class AvaReportsService {
 
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
+    private readonly avaSyncService: AvaSyncService,
   ) {}
+
 
   async assertAvaAccess(user?: SessionUser) {
     if (!user?.id || user.isDisabled) {
@@ -315,36 +319,45 @@ export class AvaReportsService {
     await this.assertAvaAccess(user);
 
     try {
-      if (!process.env.CRON_SECRET) {
-        throw new Error("CRON_SECRET não configurado.");
+      const inst = institution?.toLowerCase() || 'ead';
+      const allTasks = [
+        { name: 'ead', type: 'grades', get: process.env.MOODLE_EAD_GRADES_GET_URL, att: process.env.MOODLE_EAD_GRADES_ATT_URL },
+        { name: 'ead', type: 'progress', get: process.env.MOODLE_EAD_PROGRESS_GET_URL, att: process.env.MOODLE_EAD_PROGRESS_ATT_URL },
+        { name: 'uni', type: 'grades', get: process.env.MOODLE_UNI_GRADES_GET_URL, att: process.env.MOODLE_UNI_GRADES_ATT_URL },
+        { name: 'uni', type: 'progress', get: process.env.MOODLE_UNI_PROGRESS_GET_URL, att: process.env.MOODLE_UNI_PROGRESS_ATT_URL },
+        { name: 'uniego', type: 'grades', get: process.env.MOODLE_UNIEGO_GRADES_GET_URL, att: process.env.MOODLE_UNIEGO_GRADES_ATT_URL },
+        { name: 'uniego', type: 'progress', get: process.env.MOODLE_UNIEGO_PROGRESS_GET_URL, att: process.env.MOODLE_UNIEGO_PROGRESS_ATT_URL },
+        { name: 'raizes', type: 'grades', get: process.env.MOODLE_RAIZES_GRADES_GET_URL, att: process.env.MOODLE_RAIZES_GRADES_ATT_URL },
+        { name: 'raizes', type: 'progress', get: process.env.MOODLE_RAIZES_PROGRESS_GET_URL, att: process.env.MOODLE_RAIZES_PROGRESS_ATT_URL },
+        { name: 'eefn', type: 'grades', get: process.env.MOODLE_EEFN_GRADES_GET_URL, att: process.env.MOODLE_EEFN_GRADES_ATT_URL },
+        { name: 'eefn', type: 'progress', get: process.env.MOODLE_EEFN_PROGRESS_GET_URL, att: process.env.MOODLE_EEFN_PROGRESS_ATT_URL },
+        { name: 'pos', type: 'grades', get: process.env.MOODLE_POS_GRADES_GET_URL, att: process.env.MOODLE_POS_GRADES_ATT_URL },
+      ];
+
+      let tasksToProcess = allTasks;
+      if (institution) tasksToProcess = tasksToProcess.filter(t => t.name === inst);
+      if (type) tasksToProcess = tasksToProcess.filter(t => t.type === type);
+
+      if (tasksToProcess.length === 0) {
+        throw new Error('Nenhuma tarefa de sincronização correspondente encontrada.');
       }
 
-      const baseUrl = `http://localhost:${process.env.PORT || 3004}`;
-      let url = `${baseUrl}/api/ava-sync?`;
-      
-      const params = new URLSearchParams();
-      if (institution) params.append('institution', institution.toLowerCase());
-      if (type) params.append('type', type);
-
-      const response = await fetch(url + params.toString(), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${process.env.CRON_SECRET}`
-        },
-        cache: 'no-store'
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Falha na sincronização');
+      const results: any[] = [];
+      for (const task of tasksToProcess) {
+        const res = task.type === 'grades'
+          ? await this.avaSyncService.syncGrades(task.name, task.get, task.att)
+          : await this.avaSyncService.syncProgress(task.name, task.get, task.att);
+        results.push(res);
       }
-      
-      return await response.json();
+
+
+      return { success: true, results };
     } catch (error: any) {
       console.error("Erro na action de sync:", error);
       throw new Error(error.message || "Erro interno na sincronização");
     }
   }
+
 
   async getGradesData(user: SessionUser, page: number, size: number, filters: any) {
     await this.assertAvaAccess(user);
