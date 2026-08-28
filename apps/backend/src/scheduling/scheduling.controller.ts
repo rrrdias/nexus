@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res, Req, BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { SchedulingService } from './scheduling.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -13,7 +13,11 @@ export class SchedulingController {
   }
 
   @Post('locals')
-  createLocal(@Body() body: { nome: string; endereco: string; linkLocal?: string; telefone?: string }) {
+  async createLocal(
+    @Req() req: any,
+    @Body() body: { nome: string; endereco: string; linkLocal?: string; telefone?: string }
+  ) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     if (!body.nome || !body.endereco) {
       throw new BadRequestException('Nome e endereço são obrigatórios.');
     }
@@ -21,10 +25,12 @@ export class SchedulingController {
   }
 
   @Put('locals/:id')
-  updateLocal(
+  async updateLocal(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() body: Partial<{ nome: string; endereco: string; linkLocal: string; telefone: string; status: boolean }>
   ) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     return this.schedulingService.updateLocal(id, body);
   }
 
@@ -45,7 +51,11 @@ export class SchedulingController {
   }
 
   @Post('options')
-  createOption(@Body() body: { localId: string; data: string; horaInicio: string; horaFim: string; vagas: number }) {
+  async createOption(
+    @Req() req: any,
+    @Body() body: { localId: string; data: string; horaInicio: string; horaFim: string; vagas: number }
+  ) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     if (!body.localId || !body.data || !body.horaInicio || !body.horaFim || body.vagas === undefined) {
       throw new BadRequestException('Todos os campos (localId, data, horaInicio, horaFim, vagas) são obrigatórios.');
     }
@@ -53,10 +63,12 @@ export class SchedulingController {
   }
 
   @Put('options/:id')
-  updateOption(
+  async updateOption(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() body: Partial<{ vagas: number; status: boolean }>
   ) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     return this.schedulingService.updateOption(id, body);
   }
 
@@ -100,17 +112,20 @@ export class SchedulingController {
   }
 
   @Post('bookings/:id/conclude')
-  concludeBooking(@Param('id') id: string) {
+  async concludeBooking(@Req() req: any, @Param('id') id: string) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     return this.schedulingService.concludeBooking(id);
   }
 
   @Post('bookings/:id/absent')
-  markAbsentBooking(@Param('id') id: string) {
+  async markAbsentBooking(@Req() req: any, @Param('id') id: string) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     return this.schedulingService.markAbsentBooking(id);
   }
 
   @Delete('bookings/:id')
-  cancelBooking(@Param('id') id: string) {
+  async cancelBooking(@Req() req: any, @Param('id') id: string) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     return this.schedulingService.cancelBooking(id);
   }
 
@@ -157,10 +172,12 @@ export class SchedulingController {
   }
 
   @Post('import')
-  importBookings(@Body() body: { bookings: any[] }) {
+  async importBookings(@Req() req: any, @Body() body: { bookings: any[] }) {
+    await this.schedulingService.assertSchedulingAdminAccess(req.user);
     if (!body.bookings || !Array.isArray(body.bookings)) {
       throw new BadRequestException('Formato inválido. Esperado array de bookings.');
     }
     return this.schedulingService.importBookings(body.bookings);
   }
 }
+

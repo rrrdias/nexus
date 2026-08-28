@@ -1,16 +1,38 @@
-import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and, or, inArray, ilike, sql, isNull, desc } from 'drizzle-orm';
-import { locals, opcaos, agendamentosMatricula, avaProgressReport } from '../db/schema';
+import { locals, opcaos, agendamentosMatricula, avaProgressReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
+type SessionUser = {
+  id?: string;
+  isSuperAdmin?: boolean;
+  isDisabled?: boolean;
+};
+
+function parseTimeToMinutes(timeStr: string): number | null {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const match = timeStr.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+  if (!match) return null;
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  return h * 60 + m;
+}
+
+function minutesToTimeStr(totalMinutes: number): string {
+  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+}
+
 function getNextTimeStr(timeStr: string, index: number): string {
-  const [h, m] = timeStr.split(':').map(Number);
-  const totalMinutes = h * 60 + m + index * 30;
-  const newH = Math.floor(totalMinutes / 60) % 24;
-  const newM = totalMinutes % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:00`;
+  const startMin = parseTimeToMinutes(timeStr);
+  if (startMin === null) {
+    return '00:00:00';
+  }
+  return minutesToTimeStr(startMin + index * 30);
 }
 
 @Injectable()
@@ -18,6 +40,44 @@ export class SchedulingService {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
   ) {}
+
+  async assertSchedulingAdminAccess(user?: SessionUser) {
+    if (!user?.id || user.isDisabled) {
+      throw new UnauthorizedException('Acesso negado.');
+    }
+
+    if (user.isSuperAdmin) return;
+
+    // Check direct user access
+    const directAccess = await this.db.select({ id: systemModules.id })
+      .from(usersSystemAccess)
+      .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
+      .where(and(
+        eq(usersSystemAccess.userId, user.id),
+        or(eq(systemModules.slug, 'backoffice'), eq(systemModules.slug, 'scheduling')),
+        eq(systemModules.isActive, true)
+      ))
+      .limit(1);
+
+    if (directAccess.length > 0) return;
+
+    // Check group access
+    const groupAccess = await this.db.select({ id: systemModules.id })
+      .from(userGroups)
+      .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
+      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+      .where(and(
+        eq(userGroups.userId, user.id),
+        or(eq(systemModules.slug, 'backoffice'), eq(systemModules.slug, 'scheduling')),
+        eq(systemModules.isActive, true)
+      ))
+      .limit(1);
+
+    if (groupAccess.length === 0) {
+      throw new UnauthorizedException('Acesso restrito a administradores.');
+    }
+  }
+
 
   async listLocals(incluirInativos = false) {
     if (incluirInativos) {
@@ -89,18 +149,32 @@ export class SchedulingService {
 
   async createOption(data: { localId: string; data: string; horaInicio: string; horaFim: string; vagas: number }) {
     await this.getLocalById(data.localId);
-    
-    let currentIndex = 0;
+
+    const startMin = parseTimeToMinutes(data.horaInicio);
+    const endMin = parseTimeToMinutes(data.horaFim);
+
+    if (startMin === null || endMin === null) {
+      throw new BadRequestException('Formato de horário inválido. Utilize o formato HH:MM (ex: 08:00).');
+    }
+
+    if (endMin <= startMin || (endMin - startMin) < 30) {
+      throw new BadRequestException('Horário final deve ser maior que o horário inicial em pelo menos 30 minutos.');
+    }
+
+    const parsedDate = new Date(data.data);
+    if (isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('Data informada é inválida.');
+    }
+
+    if (typeof data.vagas !== 'number' || data.vagas < 0) {
+      throw new BadRequestException('Quantidade de vagas deve ser um número maior ou igual a zero.');
+    }
+
     const times: string[] = [];
-    const endT = data.horaFim.includes(':') && data.horaFim.split(':').length === 2 ? `${data.horaFim}:00` : data.horaFim;
-    
-    while (true) {
-      const current = getNextTimeStr(data.horaInicio, currentIndex);
-      if (current >= endT) {
-        break;
-      }
-      times.push(current);
-      currentIndex++;
+    // Laço estritamente finito com passo de 30 minutos (máximo 48 slots por dia)
+    for (let currentMin = startMin; currentMin < endMin; currentMin += 30) {
+      times.push(minutesToTimeStr(currentMin));
+      if (times.length >= 48) break;
     }
 
     if (times.length === 0) {
@@ -109,7 +183,7 @@ export class SchedulingService {
 
     const inserts = times.map(t => ({
       localId: data.localId,
-      data: new Date(data.data),
+      data: parsedDate,
       hora: t,
       vagas: data.vagas,
       status: true
@@ -128,6 +202,7 @@ export class SchedulingService {
       .where(eq(opcaos.id, id))
       .returning();
     if (!updated) throw new NotFoundException('Horário não encontrado.');
+
     return updated;
   }
 
@@ -466,95 +541,138 @@ export class SchedulingService {
   }
 
   // 7. Import from CSV
+  // 7. Import from CSV (Otimizado com Transação e Cache de Busca)
   async importBookings(rows: any[]) {
-    let imported = 0;
-    let errors = 0;
-
-    for (const row of rows) {
-      try {
-        if (!row.matricula || !row.campus || !row.dataProva || !row.horaInicio || !row.periodo || !row.disciplinas) {
-          continue;
-        }
-
-        // Find or create local
-        let localId: string;
-        const [existingLocal] = await this.db.select().from(locals).where(ilike(locals.nome, row.campus)).limit(1);
-        if (existingLocal) {
-          localId = existingLocal.id;
-        } else {
-          const [newLocal] = await this.db.insert(locals).values({ nome: row.campus, endereco: 'Importado', status: true }).returning();
-          localId = newLocal.id;
-        }
-
-        // Find or create opcao (slot)
-        let opcaoId: string;
-        // Handle dates from Excel which might be DD/MM/YYYY or YYYY-MM-DD
-        let dateObj: Date;
-        if (row.dataProva.includes('/')) {
-          const [d, m, y] = row.dataProva.split('/');
-          dateObj = new Date(`${y}-${m}-${d}T00:00:00Z`);
-        } else {
-          dateObj = new Date(`${row.dataProva}T00:00:00Z`);
-        }
-
-        const horaStr = row.horaInicio.includes(':') && row.horaInicio.split(':').length === 2 ? `${row.horaInicio}:00` : row.horaInicio;
-        
-        const [existingOpcao] = await this.db.select().from(opcaos)
-          .where(and(eq(opcaos.localId, localId), eq(opcaos.data, dateObj), eq(opcaos.hora, horaStr)))
-          .limit(1);
-
-        if (existingOpcao) {
-          opcaoId = existingOpcao.id;
-        } else {
-          const [newOpcao] = await this.db.insert(opcaos).values({
-            localId,
-            data: dateObj,
-            hora: horaStr,
-            vagas: 50, // Default for imported
-            status: true
-          }).returning();
-          opcaoId = newOpcao.id;
-        }
-
-        // Check if booking already exists
-        const [existingBooking] = await this.db.select().from(agendamentosMatricula)
-          .where(and(eq(agendamentosMatricula.matricula, row.matricula), eq(agendamentosMatricula.periodo, row.periodo)))
-          .limit(1);
-
-        const statusStr = (row.status || 'ativo').toLowerCase();
-
-        if (existingBooking) {
-          // Update
-          await this.db.update(agendamentosMatricula)
-            .set({ 
-              status: statusStr, 
-              opcaoId, 
-              descricao: row.disciplinas, 
-              data: dateObj,
-              updatedAt: new Date(),
-              deletedAt: statusStr === 'cancelado' ? new Date() : null
-            })
-            .where(eq(agendamentosMatricula.id, existingBooking.id));
-        } else {
-          // Insert
-          await this.db.insert(agendamentosMatricula).values({
-            opcaoId,
-            matricula: row.matricula,
-            descricao: row.disciplinas,
-            status: statusStr,
-            periodo: row.periodo,
-            data: dateObj,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-        }
-        imported++;
-      } catch (err) {
-        console.error('Error importing row', row, err);
-        errors++;
-      }
+    if (!rows || rows.length === 0) {
+      return { success: true, imported: 0, errors: 0, total: 0 };
     }
 
-    return { success: true, imported, errors, total: rows.length };
+    return this.db.transaction(async (tx) => {
+      let imported = 0;
+      let errors = 0;
+
+      // 1. Pré-carregar Polos existentes em cache
+      const existingLocals = await tx.select().from(locals);
+      const localMap = new Map<string, string>(); // nome.toLowerCase() -> id
+      for (const loc of existingLocals) {
+        localMap.set(loc.nome.trim().toLowerCase(), loc.id);
+      }
+
+      // 2. Pré-carregar Opções existentes em cache
+      const existingOpcaos = await tx.select().from(opcaos);
+      const opcaoMap = new Map<string, string>(); // `${localId}_${dateStr}_${horaStr}` -> id
+      for (const opc of existingOpcaos) {
+        const dStr = new Date(opc.data).toISOString().split('T')[0];
+        const key = `${opc.localId}_${dStr}_${opc.hora}`;
+        opcaoMap.set(key, opc.id);
+      }
+
+      // 3. Pré-carregar Agendamentos existentes
+      const existingBookings = await tx.select({
+        id: agendamentosMatricula.id,
+        matricula: agendamentosMatricula.matricula,
+        periodo: agendamentosMatricula.periodo,
+      }).from(agendamentosMatricula);
+      const bookingMap = new Map<string, string>(); // `${matricula}_${periodo}` -> id
+      for (const b of existingBookings) {
+        bookingMap.set(`${b.matricula.trim()}_${b.periodo.trim()}`, b.id);
+      }
+
+      for (const row of rows) {
+        try {
+          if (!row.matricula || !row.campus || !row.dataProva || !row.horaInicio || !row.periodo || !row.disciplinas) {
+            continue;
+          }
+
+          const campusName = String(row.campus).trim();
+          const campusKey = campusName.toLowerCase();
+
+          // Obter ou criar Local (Polo)
+          let localId = localMap.get(campusKey);
+          if (!localId) {
+            const [newLocal] = await tx.insert(locals)
+              .values({ nome: campusName, endereco: 'Importado', status: true })
+              .returning();
+            localId = newLocal.id;
+            localMap.set(campusKey, localId);
+          }
+
+          // Tratar Data da Prova
+          let dateObj: Date;
+          if (String(row.dataProva).includes('/')) {
+            const [d, m, y] = String(row.dataProva).split('/');
+            dateObj = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00Z`);
+          } else {
+            dateObj = new Date(`${String(row.dataProva).split('T')[0]}T00:00:00Z`);
+          }
+
+          if (isNaN(dateObj.getTime())) {
+            errors++;
+            continue;
+          }
+
+          const dateISO = dateObj.toISOString().split('T')[0];
+          const rawHora = String(row.horaInicio).trim();
+          const horaParts = rawHora.split(':');
+          const horaStr = horaParts.length === 2 ? `${horaParts[0].padStart(2, '0')}:${horaParts[1].padStart(2, '0')}:00` : (rawHora.length === 5 ? `${rawHora}:00` : rawHora);
+
+          // Obter ou criar Opção (Slot de Horário)
+          const opcaoKey = `${localId}_${dateISO}_${horaStr}`;
+          let opcaoId = opcaoMap.get(opcaoKey);
+          if (!opcaoId) {
+            const [newOpcao] = await tx.insert(opcaos).values({
+              localId,
+              data: dateObj,
+              hora: horaStr,
+              vagas: 50,
+              status: true,
+            }).returning();
+            opcaoId = newOpcao.id;
+            opcaoMap.set(opcaoKey, opcaoId);
+          }
+
+          const matriculaStr = String(row.matricula).trim();
+          const periodoStr = String(row.periodo).trim();
+          const bKey = `${matriculaStr}_${periodoStr}`;
+          const existingBookingId = bookingMap.get(bKey);
+          const statusStr = (String(row.status || 'ativo')).trim().toLowerCase();
+
+          if (existingBookingId) {
+            // Atualizar
+            await tx.update(agendamentosMatricula)
+              .set({
+                status: statusStr,
+                opcaoId,
+                descricao: String(row.disciplinas).trim(),
+                data: dateObj,
+                updatedAt: new Date(),
+                deletedAt: statusStr === 'cancelado' ? new Date() : null,
+              })
+              .where(eq(agendamentosMatricula.id, existingBookingId));
+          } else {
+            // Inserir
+            const [newBooking] = await tx.insert(agendamentosMatricula).values({
+              opcaoId,
+              matricula: matriculaStr,
+              descricao: String(row.disciplinas).trim(),
+              status: statusStr,
+              periodo: periodoStr,
+              data: dateObj,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }).returning();
+            bookingMap.set(bKey, newBooking.id);
+          }
+
+          imported++;
+        } catch (err) {
+          console.error('Erro ao importar linha:', row, err);
+          errors++;
+        }
+      }
+
+      return { success: true, imported, errors, total: rows.length };
+    });
   }
 }
+

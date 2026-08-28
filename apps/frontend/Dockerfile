@@ -20,8 +20,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Set environment variables for Next.js build
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=http://localhost:3004
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 
 ARG NEXT_BASE_PATH=""
 ENV NEXT_BASE_PATH=$NEXT_BASE_PATH

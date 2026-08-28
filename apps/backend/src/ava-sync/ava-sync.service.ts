@@ -215,9 +215,11 @@ export class AvaSyncService {
 
         if (validItems.length === 0) return;
 
-        const inserts = validItems.map(item => ({
+        const inserts = validItems.map(item => {
+          const studentIdentifier = String(item.aluno_id || item.matricula || item.usuario || '').trim();
+          return {
             sourceInstitution: institution,
-            alunoId: String(item.aluno_id || ''),
+            alunoId: studentIdentifier,
             usuario: item.usuario,
             aluno: item.aluno,
             matricula: String(item.matricula || ''),
@@ -238,15 +240,18 @@ export class AvaSyncService {
             listaFase3: item.lista_fase3,
             diasSemAcesso: String(item.dias_sem_acesso || ''),
             updatedAt: new Date()
-        }));
+          };
+        });
 
         // Deduplicate locally to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
         const uniqueInsertsMap = new Map();
         for (const insert of inserts) {
-          const key = `${insert.sourceInstitution}-${insert.alunoId}-${insert.curso}`;
+          const studentKey = insert.alunoId || insert.matricula || insert.usuario;
+          const key = `${insert.sourceInstitution}-${studentKey}-${insert.curso}`;
           uniqueInsertsMap.set(key, insert);
         }
         const uniqueInserts = Array.from(uniqueInsertsMap.values());
+
 
         await this.db.insert(avaProgressReport)
           .values(uniqueInserts)

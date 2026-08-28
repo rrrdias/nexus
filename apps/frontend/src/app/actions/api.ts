@@ -10,7 +10,7 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
     await signOut({ redirectTo: "/nexus/login" })
   }
 
-  const baseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+  const baseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004"
   const url = `${baseUrl}${endpoint}`
 
   try {
@@ -34,7 +34,16 @@ export async function fetchFromApi<T = any>(endpoint: string, options: RequestIn
 
     return await response.json() as T
   } catch (error: any) {
-    console.error(`[API Fetch Error] Failed to connect to ${url}:`, error)
-    throw new Error(error.message || "Erro de conexão com o backend.")
+    // Next.js utiliza erros com digest NEXT_REDIRECT para realizar redirecionamentos no servidor
+    if (
+      error?.message === 'NEXT_REDIRECT' ||
+      (typeof error?.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT'))
+    ) {
+      throw error;
+    }
+
+    console.error(`[API Fetch Error] Failed to connect to ${url}:`, error);
+    throw new Error(error.message || "Erro de conexão com o backend.");
   }
 }
+

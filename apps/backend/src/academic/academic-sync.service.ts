@@ -38,7 +38,7 @@ export class AcademicSyncService {
     const startTime = Date.now();
 
     try {
-      const activePeriodsEnv = process.env.LYCEUM_ACTIVE_PERIODS || '2024-1,2024-2,2025-1,2025-2,2026-1';
+      const activePeriodsEnv = process.env.LYCEUM_ACTIVE_PERIODS || '2024-0,2024-1,2024-2,2025-0,2025-1,2025-2,2026-0,2026-1,2026-2,2027-1,2027-2';
       const activePeriods = activePeriodsEnv.split(',').map(p => p.trim()).filter(Boolean);
       
       if (activePeriods.length === 0) {
@@ -166,19 +166,29 @@ export class AcademicSyncService {
 
         for (let i = 0; i < userChunks.length; i++) {
           const chunk = userChunks[i];
-          const inParams = chunk.map(id => `'${id}'`).join(',');
+          const inParams = chunk
+
+            .map(id => String(id).replace(/[^a-zA-Z0-9_-]/g, ''))
+            .filter(Boolean)
+            .map(id => `'${id}'`)
+            .join(',');
+
+          if (!inParams) continue;
 
           // Sync Discentes
           const discRes = await lyceumPool.request().query(`
             SELECT 
               U.ID, U.NOME, U.EMAIL, U.CPF, U.SERIE, U.TURNO, U.TELEFONE, U.CIDADE, U.PAIS,
               U.CURSO, U.UNIDADE_FISICA, U.NOME_SOCIAL, U.NOME_UNIDADE_FISICA,
+              U.ID AS MATRICULA,
+              COALESCE(U.EMAIL, U.ID) AS USUARIO,
               US.SOBRENOME, US.SOBRENOME_SOCIAL, C.NOME AS CURSO_NOME, C.UNIDADE_ENS AS CURSO_INSTITUICAO
             FROM ${prefix}VW_AVA_DISCENTE U
             LEFT JOIN ${prefix}VW_AVA_USUARIOS US ON U.ID = US.ID
             LEFT JOIN ${prefix}VW_AVA_CURSO C ON U.CURSO = C.ID
             WHERE U.ID IN (${inParams})
           `);
+
 
           if (discRes.recordset.length > 0) {
             syncedDiscentes += discRes.recordset.length;
@@ -201,8 +211,8 @@ export class AcademicSyncService {
                 sobrenomeSocial: u.SOBRENOME_SOCIAL,
                 cursoNome: u.CURSO_NOME,
                 cursoInstituicao: u.CURSO_INSTITUICAO,
-                matricula: null,
-                usuario: null,
+                matricula: u.MATRICULA ? u.MATRICULA.toString() : u.ID.toString(),
+                usuario: u.USUARIO ? u.USUARIO.toString() : (u.EMAIL ? u.EMAIL.toString() : u.ID.toString()),
                 updatedAt: new Date(),
               })))
               .onConflictDoUpdate({
@@ -230,6 +240,7 @@ export class AcademicSyncService {
                 }
               });
           }
+
 
           // Sync Docentes
           const docRes = await lyceumPool.request().query(`

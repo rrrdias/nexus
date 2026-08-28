@@ -151,16 +151,18 @@ export function AcademicDashboard() {
   }
 
   const resolveClassRow = (row: any) => {
-    const codigo = row.turma || row.TURMA || row.Turma || row.codTurma || row.COD_TURMA || row.cod_turma || "---"
+    const id = row.id || row.ID || ""
+    const codigo = row.turma || row.TURMA || row.Turma || row.codTurma || row.COD_TURMA || row.cod_turma || id || "---"
     const disciplina = row.nomeDisciplina || row.NOME_DISCIPLINA || row.DISCIPLINA || row.disciplina || "---"
-    const disciplinaCod = row.codDisciplina || row.DISCIPLINA || "---"
+    const disciplinaCod = row.codDisciplina || row.DISCIPLINA || row.disciplina || "---"
     const curso = row.cursoNome || row.CURSO_NOME || row.CURSO || "---"
     const instituicao = row.cursoInstituicao || row.CURSO_INSTITUICAO || "---"
     const periodo = row.periodo || row.PERIODO || row.Periodo || "---"
     const serie = row.serie || row.SERIE || row.Serie || "---"
     const modelagem = row.modelagem || row.MODELAGEM || row.Modelagem || "---"
-    return { codigo, disciplina, disciplinaCod, curso, instituicao, periodo, serie, modelagem }
+    return { id, codigo, disciplina, disciplinaCod, curso, instituicao, periodo, serie, modelagem }
   }
+
 
   const resolveMatriculaRow = (row: any) => {
     const username = row.USUARIO || row.Usuario || row.usuario || "---"
@@ -495,7 +497,12 @@ export function AcademicDashboard() {
                     const cRow = resolveClassRow(row)
                     return (
                       <TableRow key={idx} className="hover:bg-gray-50/50 transition-colors">
-                        <TableCell className="px-5 py-3.5 text-xs font-bold text-[#5E35B1] font-mono">{cRow.codigo}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs font-bold text-[#5E35B1] font-mono">
+                          <div>{cRow.codigo}</div>
+                          {cRow.id && cRow.id !== cRow.codigo && (
+                            <span className="text-[10px] text-[#9AA0AC] font-normal block font-mono mt-0.5">{cRow.id}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="px-5 py-3.5">
                           <p className="font-bold text-navy text-xs">{cRow.disciplina}</p>
                           <span className="text-[10px] text-[#9AA0AC] block font-mono mt-0.5">ID: {cRow.disciplinaCod}</span>
@@ -511,6 +518,7 @@ export function AcademicDashboard() {
                         <TableCell className="px-5 py-3.5 text-xs text-right font-medium text-[#5F6775]">{cRow.modelagem}</TableCell>
                       </TableRow>
                     )
+
                   } else {
                     const mRow = resolveMatriculaRow(row)
                     return (

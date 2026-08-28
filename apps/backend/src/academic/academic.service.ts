@@ -10,8 +10,9 @@ import {
   usersSystemAccess,
   userGroups 
 } from '../db/schema';
-import { eq, ilike, or, and, sql as drizzleSql, desc, asc } from 'drizzle-orm';
+import { eq, ilike, or, and, sql as drizzleSql, desc, asc, inArray, isNull } from 'drizzle-orm';
 import { academicDiscente, academicDocente, academicTurma, academicMatricula } from '../db/schema';
+
 
 @Injectable()
 export class AcademicService implements OnModuleInit, OnModuleDestroy {
@@ -290,11 +291,14 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
       
       const textConditions = words.map(word => or(
+        ilike(academicTurma.id, `%${word}%`),
         ilike(academicTurma.turma, `%${word}%`),
         ilike(academicTurma.codTurma, `%${word}%`),
         ilike(academicTurma.disciplina, `%${word}%`),
         ilike(academicTurma.nomeDisciplina, `%${word}%`),
-        ilike(academicTurma.codDisciplina, `%${word}%`)
+        ilike(academicTurma.codDisciplina, `%${word}%`),
+        ilike(academicTurma.cursoNome, `%${word}%`),
+        ilike(academicTurma.periodo, `%${word}%`)
       ));
       whereClause = and(...textConditions);
     }
@@ -307,7 +311,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const data = await this.db.select()
       .from(academicTurma)
       .where(whereClause)
-      .orderBy(asc(academicTurma.turma))
+      .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina), asc(academicTurma.turma))
       .limit(size)
       .offset(offset);
 
@@ -319,6 +323,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       totalPages: Math.ceil(total / size)
     };
   }
+
 
   async getMatriculas(search?: string, page = 1, size = 15) {
     const offset = (page - 1) * size;
@@ -399,42 +404,104 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getStudentDisciplines(matricula: string) {
+    const trimmed = (matricula || '').trim();
+    if (!trimmed) return [];
+
+    // 1. Localiza o discente para capturar id, matrícula e usuário
+    const studentInfo = await this.db.select({
+      id: academicDiscente.id,
+      matricula: academicDiscente.matricula,
+      usuario: academicDiscente.usuario,
+      cpf: academicDiscente.cpf,
+    })
+    .from(academicDiscente)
+    .where(or(
+      eq(academicDiscente.id, trimmed),
+      eq(academicDiscente.matricula, trimmed),
+      eq(academicDiscente.usuario, trimmed),
+      eq(academicDiscente.cpf, trimmed)
+    ))
+    .limit(1);
+
+    const userIds = new Set<string>([trimmed]);
+    if (studentInfo[0]) {
+      if (studentInfo[0].id) userIds.add(studentInfo[0].id);
+      if (studentInfo[0].matricula) userIds.add(studentInfo[0].matricula);
+      if (studentInfo[0].usuario) userIds.add(studentInfo[0].usuario);
+    }
+
     const data = await this.db.select({
       TURMA: academicTurma.id,
       DISCIPLINA: academicTurma.disciplina,
       NOME_DISCIPLINA: academicTurma.nomeDisciplina,
       PERIODO: academicTurma.periodo,
-      COD_TURMA: academicTurma.turma
+      COD_TURMA: academicTurma.turma,
+      SITUACAO: academicMatricula.situacao,
+      ATIVO: academicMatricula.ativo,
+      NIVEL: academicMatricula.nivel,
     })
     .from(academicMatricula)
     .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
     .where(
       and(
-        eq(academicMatricula.usuarioId, matricula),
-        eq(academicMatricula.nivel, '2')
+        inArray(academicMatricula.usuarioId, Array.from(userIds)),
+        or(
+          eq(academicMatricula.nivel, '2'),
+          eq(academicMatricula.nivel, 'Aluno'),
+          isNull(academicMatricula.nivel)
+        )
       )
-    );
+    )
+    .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina));
+
     return data;
   }
 
   async getTeacherDisciplines(docenteId: string) {
+    const trimmed = (docenteId || '').trim();
+    if (!trimmed) return [];
+
+    const teacherInfo = await this.db.select({
+      id: academicDocente.id,
+      cpf: academicDocente.cpf,
+    })
+    .from(academicDocente)
+    .where(or(
+      eq(academicDocente.id, trimmed),
+      eq(academicDocente.cpf, trimmed)
+    ))
+    .limit(1);
+
+    const userIds = new Set<string>([trimmed]);
+    if (teacherInfo[0]?.id) userIds.add(teacherInfo[0].id);
+
     const data = await this.db.select({
       TURMA: academicTurma.id,
       DISCIPLINA: academicTurma.disciplina,
       NOME_DISCIPLINA: academicTurma.nomeDisciplina,
       PERIODO: academicTurma.periodo,
-      COD_TURMA: academicTurma.turma
+      COD_TURMA: academicTurma.turma,
+      SITUACAO: academicMatricula.situacao,
+      ATIVO: academicMatricula.ativo,
+      NIVEL: academicMatricula.nivel,
     })
     .from(academicMatricula)
     .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
     .where(
       and(
-        eq(academicMatricula.usuarioId, docenteId),
-        eq(academicMatricula.nivel, '1')
+        inArray(academicMatricula.usuarioId, Array.from(userIds)),
+        or(
+          eq(academicMatricula.nivel, '1'),
+          eq(academicMatricula.nivel, 'Docente'),
+          isNull(academicMatricula.nivel)
+        )
       )
-    );
+    )
+    .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina));
+
     return data;
   }
+
 
   getSqlPool() {
     if (!this.pool) throw new Error('Lyceum database not connected.');

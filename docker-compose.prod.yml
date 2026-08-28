@@ -73,8 +73,10 @@ services:
       LYCEUM_DB_USERNAME: ${LYCEUM_DB_USERNAME}
       LYCEUM_DB_PASSWORD: ${LYCEUM_DB_PASSWORD}
       LYCEUM_DB_PREFIX: ${LYCEUM_DB_PREFIX}
-    command: sh -c "cd apps/backend && npm run db:push -- --force && node dist/main.js"
+    command: sh -c "cd apps/backend && npx drizzle-kit push --force && node dist/main.js"
+
     networks:
+
       - nexus_network
       - nginx_network
 

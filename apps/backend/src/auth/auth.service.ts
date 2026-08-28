@@ -38,7 +38,7 @@ export class AuthService {
       .innerJoin(groups, eq(userGroups.groupId, groups.id))
       .where(eq(userGroups.userId, user.id));
     
-    const isSuperAdmin = adminGroups.some(g => g.group.name === 'Super Admin') || user.email === 'rrrdias25@gmail.com';
+    const isSuperAdmin = adminGroups.some(g => g.group.name === 'Super Admin');
 
     const groupNames = adminGroups.map(g => g.group.name);
 

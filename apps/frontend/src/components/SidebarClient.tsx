@@ -131,29 +131,10 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
         </div>
       </div>
 
-      {/* Perfil do Usuário */}
-      {session?.user && (
-        <div className={`transition-all duration-300 select-none flex items-center shrink-0 border ${
-          collapsedState 
-            ? "mt-4 mx-2 p-1 bg-white/0 border-white/0 justify-center" 
-            : "p-3 mt-4 bg-white/5 border-white/10 mx-4 rounded-lg"
-        }`}>
-          <div className="w-10 h-10 rounded-full bg-green-brand text-navy flex items-center justify-center font-bold text-sm shrink-0 shadow-md border border-green-brand/20 transition-all duration-300">
-            {initials}
-          </div>
-          <div className={`flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
-            collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[165px] opacity-100 ml-3"
-          }`}>
-            <span className="text-white text-sm font-medium tracking-tight truncate whitespace-nowrap">{session.user.name}</span>
-            <span className="text-green-dark text-[10px] font-bold uppercase tracking-wider mt-0.5 truncate whitespace-nowrap">
-              {session.user.groups?.length > 0 ? session.user.groups.join(', ') : 'Sem Grupo'}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Links de Navegação */}
       <nav className={`flex-1 px-4 py-6 space-y-2 ${collapsedState ? "overflow-visible" : "overflow-y-auto overflow-x-hidden"}`}>
+
         {/* Separador/Título da Seção Módulos */}
         <div className={`relative select-none transition-all duration-300 ${collapsedState ? "my-4 px-1" : "px-3 mb-2 mt-4"}`}>
           <div className={`border-t border-white/10 w-full transition-opacity duration-300 ${collapsedState ? "opacity-100" : "opacity-0 absolute h-0 pointer-events-none"}`} />
@@ -228,7 +209,14 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                       {sys.name}
                     </div>
                     <div className="px-2 py-1 space-y-1">
-                      <div className="px-3 py-1 text-[9px] font-bold text-white/30 uppercase tracking-widest mt-1">
+                      <div className="px-3 py-1 text-[9px] font-bold text-green-brand uppercase tracking-widest mt-1">
+                        Unificado (Progresso + Notas)
+                      </div>
+                      <Link href="/relatorios/consolidado/ead" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/consolidado/ead' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        ⭐ Consolidado EaD
+                      </Link>
+
+                      <div className="px-3 py-1 text-[9px] font-bold text-white/30 uppercase tracking-widest mt-2">
                         Progresso
                       </div>
                       <Link href="/relatorios/progresso" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
@@ -271,9 +259,19 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                   /* Expanded state: Accordion sub-list with smooth height/opacity transition */
                   <div 
                     className={`pl-11 pr-3 space-y-1 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10 overflow-hidden transition-all duration-300 ease-in-out ${
-                      isReportsOpen && !isTransitioning ? "max-h-[500px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
+                      isReportsOpen && !isTransitioning ? "max-h-[550px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
                     }`}
                   >
+                    {/* Link Destaque Consolidado EaD */}
+                    <Link 
+                      href="/relatorios/consolidado/ead" 
+                      className={`flex items-center gap-1.5 text-[11px] hover:text-white py-1.5 px-2 rounded-md transition-colors font-medium mb-1 ${
+                        pathname === '/relatorios/consolidado/ead' ? 'text-green-brand bg-navy-light font-bold' : 'text-green-brand/80 hover:bg-white/5'
+                      }`}
+                    >
+                      <span>⭐ Consolidado EaD</span>
+                    </Link>
+
                     {/* Grupo: Progresso */}
                     <div className="group/progress relative w-full">
                       <button 
@@ -328,6 +326,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
               </div>
             )
           }
+
 
           if (sys.name === 'Backoffice Agendamentos') {
             return (
@@ -550,29 +549,65 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
         )}
       </nav>
 
-      {/* Rodapé com botão Sair */}
-      <div className={`border-t border-white/10 transition-all duration-300 p-4 w-full shrink-0 ${collapsedState ? "px-2" : ""}`}>
-        <div className="group relative flex justify-center w-full">
-          <button 
-            onClick={() => logoutAction()}
-            className="flex items-center rounded-lg text-white/50 hover:text-white hover:bg-navy-light transition-all duration-300 ease-in-out cursor-pointer w-full h-10 px-2.5 justify-start focus:outline-none"
-          >
-            <LogOut className="w-5 h-5 shrink-0 text-red-400/80 hover:text-red-400 transition-transform duration-300 group-hover:scale-110" />
-            <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
-              Sair do sistema
-            </span>
-          </button>
-
-          {/* Balão Tooltip Lateral */}
-          {collapsedState && (
-            <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
-              isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
-            }`}>
-              Sair do sistema
-            </span>
+      {/* Rodapé com Perfil do Usuário e Botão Sair */}
+      {session?.user && (
+        <div className={`border-t border-white/10 transition-all duration-300 p-3 w-full shrink-0 select-none ${collapsedState ? "px-2 py-3" : ""}`}>
+          {collapsedState ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="group/avatar relative flex justify-center">
+                <div 
+                  className="w-8 h-8 rounded-full bg-green-brand text-navy flex items-center justify-center font-bold text-xs shrink-0 shadow-md border border-green-brand/20 cursor-default"
+                >
+                  {initials}
+                </div>
+                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
+                  isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
+                }`}>
+                  {session.user.name}
+                </span>
+              </div>
+              <div className="group/logout relative flex justify-center">
+                <button 
+                  onClick={() => logoutAction()}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-white/50 hover:text-red-400 hover:bg-white/5 transition-all duration-200 cursor-pointer focus:outline-none"
+                  title="Sair do sistema"
+                >
+                  <LogOut className="w-4 h-4 text-red-400/80 hover:text-red-400 transition-transform duration-200 group-hover/logout:scale-110" />
+                </button>
+                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover/logout:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
+                  isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
+                }`}>
+                  Sair do sistema
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-full bg-green-brand text-navy flex items-center justify-center font-bold text-xs shrink-0 shadow-md border border-green-brand/20">
+                  {initials}
+                </div>
+                <div className="flex flex-col overflow-hidden ml-2.5">
+                  <span className="text-white text-xs font-semibold tracking-tight truncate whitespace-nowrap" title={session.user.name}>
+                    {session.user.name}
+                  </span>
+                  <span className="text-green-dark text-[9px] font-bold uppercase tracking-wider truncate whitespace-nowrap">
+                    {session.user.groups?.length > 0 ? session.user.groups[0] : 'Colaborador'}
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => logoutAction()}
+                className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-white/5 transition-all duration-200 cursor-pointer focus:outline-none"
+                title="Sair do sistema"
+              >
+                <LogOut className="w-4 h-4 text-red-400/80 hover:text-red-400 transition-transform duration-200 hover:scale-110" />
+              </button>
+            </div>
           )}
         </div>
-      </div>
+      )}
+
     </aside>
   )
 }

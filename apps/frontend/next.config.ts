@@ -43,8 +43,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  eslint: {
-    ignoreDuringBuilds: true,
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/nexus",
+        basePath: false,
+        permanent: false,
+      },
+    ];
   },
   typescript: {
     ignoreBuildErrors: true,
@@ -53,5 +60,6 @@ const nextConfig: NextConfig = {
     cpus: 2,
   },
 };
+
 
 export default nextConfig;

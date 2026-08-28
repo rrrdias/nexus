@@ -51,8 +51,27 @@ export class AvaReportsController {
     return this.avaReportsService.exportGradesData(req.user, filters || {});
   }
 
+  @Post('consolidated')
+  async getConsolidatedData(
+    @Req() req: any,
+    @Body('page') page: number,
+    @Body('size') size: number,
+    @Body('filters') filters: any
+  ) {
+    return this.avaReportsService.getConsolidatedData(req.user, page, size, filters || {});
+  }
+
+  @Post('consolidated/export')
+  async exportConsolidatedData(
+    @Req() req: any,
+    @Body('filters') filters: any
+  ) {
+    return this.avaReportsService.getConsolidatedExportData(req.user, filters || {});
+  }
+
   @Get('dashboard-stats')
   async getDashboardStats(@Req() req: any) {
     return this.avaReportsService.getAvaDashboardStats(req.user);
   }
 }
+
