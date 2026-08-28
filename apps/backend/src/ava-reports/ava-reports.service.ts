@@ -1,5 +1,6 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
+
 import { eq, ilike, and, inArray, or, isNull, isNotNull, not, sql } from 'drizzle-orm';
 import { avaProgressReport, avaGradesReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -339,7 +340,7 @@ export class AvaReportsService {
       if (type) tasksToProcess = tasksToProcess.filter(t => t.type === type);
 
       if (tasksToProcess.length === 0) {
-        throw new Error('Nenhuma tarefa de sincronização correspondente encontrada.');
+        throw new BadRequestException('Nenhuma tarefa de sincronização correspondente encontrada.');
       }
 
       const results: any[] = [];
@@ -353,15 +354,18 @@ export class AvaReportsService {
       const skippedOrErrors = results.filter(r => r.status === 'skipped' || r.status === 'error');
       if (skippedOrErrors.length === results.length && results.length > 0) {
         const reasons = results.map(r => `${r.source}: ${r.reason || r.status}`).join('; ');
-        throw new Error(`Sincronização não executada: ${reasons}`);
+        throw new BadRequestException(`Sincronização não executada: ${reasons}`);
       }
 
       return { success: true, results };
-
     } catch (error: any) {
       console.error("Erro na action de sync:", error);
-      throw new Error(error.message || "Erro interno na sincronização");
+      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message || "Erro interno na sincronização");
     }
+
 
   }
 
