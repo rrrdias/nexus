@@ -40,8 +40,12 @@ export class AvaSyncService {
 
 
       if (!res.ok) {
+        if (res.status === 404) {
+          return { source: `${institution}_grades`, status: 'skipped', reason: 'Relatório de notas em fila no Moodle (aguardando geração)' };
+        }
         return { source: `${institution}_grades`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` };
       }
+
 
       const textContent = await res.text();
       if (!textContent || textContent.trim() === '') {
@@ -152,7 +156,10 @@ export class AvaSyncService {
       return { source: `${institution}_grades`, status: 'success', inserted, updated };
     } catch (error: any) {
       console.error(`Erro sync notas ${institution}:`, error);
-      return { source: `${institution}_grades`, status: 'error', reason: error.message };
+      const cleanReason = error.message && error.message.length > 150
+        ? error.message.substring(0, 150) + '...'
+        : error.message || 'Erro ao salvar notas no banco';
+      return { source: `${institution}_grades`, status: 'error', reason: cleanReason };
     }
   }
 
@@ -178,8 +185,12 @@ export class AvaSyncService {
 
 
       if (!res.ok) {
+        if (res.status === 404) {
+          return { source: `${institution}_progress`, status: 'skipped', reason: 'Relatório de progresso em fila no Moodle (aguardando geração pelo cron)' };
+        }
         return { source: `${institution}_progress`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` };
       }
+
 
       const textContent = await res.text();
       if (!textContent || textContent.trim() === '') {
@@ -293,7 +304,11 @@ export class AvaSyncService {
       return { source: `${institution}_progress`, status: 'success', inserted, updated };
     } catch (error: any) {
       console.error(`Erro sync progresso ${institution}:`, error);
-      return { source: `${institution}_progress`, status: 'error', reason: error.message };
+      const cleanReason = error.message && error.message.length > 150
+        ? error.message.substring(0, 150) + '...'
+        : error.message || 'Erro ao salvar progresso no banco';
+      return { source: `${institution}_progress`, status: 'error', reason: cleanReason };
     }
   }
+
 }
