@@ -143,6 +143,10 @@ export const avaGradesReport = pgTable("ava_grades_report", {
   media: text("media"),
   customCourse: text("custom_course"),
   lastaccess: text("lastaccess"),
+  listaFase1: text("lista_fase1"),
+  listaFase2: text("lista_fase2"),
+  listaFase3: text("lista_fase3"),
+  listaNotas: text("lista_notas"),
 
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 }, (t) => [
@@ -253,10 +257,6 @@ export const avaOpenlms = pgTable("ava_openlms", {
   tokenProd: text("tokenProd").notNull(),
   status: boolean("status").default(true).notNull(),
 })
-
-
-
-
 
 // ==========================================
 // Módulo: Academic (Cache Lyceum)

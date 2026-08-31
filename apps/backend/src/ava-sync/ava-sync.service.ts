@@ -137,6 +137,10 @@ export class AvaSyncService implements OnModuleInit {
             media: String(item.media || ''),
             customCourse: item.custom_course,
             lastaccess: item.lastaccess,
+            listaFase1: item.lista_fase1 || item.lista_notas_fase1 || null,
+            listaFase2: item.lista_fase2 || item.lista_notas_fase2 || null,
+            listaFase3: item.lista_fase3 || item.lista_notas_fase3 || null,
+            listaNotas: item.lista_notas || null,
             updatedAt: new Date()
         }));
 
@@ -172,9 +176,14 @@ export class AvaSyncService implements OnModuleInit {
               media: sql`EXCLUDED."media"`,
               customCourse: sql`EXCLUDED."custom_course"`,
               lastaccess: sql`EXCLUDED."lastaccess"`,
+              listaFase1: sql`EXCLUDED."lista_fase1"`,
+              listaFase2: sql`EXCLUDED."lista_fase2"`,
+              listaFase3: sql`EXCLUDED."lista_fase3"`,
+              listaNotas: sql`EXCLUDED."lista_notas"`,
               updatedAt: sql`EXCLUDED."updatedAt"`,
             }
           });
+
 
         inserted += inserts.length;
       });

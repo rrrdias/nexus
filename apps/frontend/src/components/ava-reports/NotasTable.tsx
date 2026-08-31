@@ -164,6 +164,7 @@ export function NotasTable({ data, institution }: { data: any[], institution?: s
     listaFase1?: string | null
     listaFase2?: string | null
     listaFase3?: string | null
+    listaNotas?: string | null
   }>({
     open: false,
     studentName: "",
@@ -184,6 +185,7 @@ export function NotasTable({ data, institution }: { data: any[], institution?: s
     listaFase1: null,
     listaFase2: null,
     listaFase3: null,
+    listaNotas: null,
   })
 
   const openGradeDialog = (row: any, faseActive: "fase1" | "fase2" | "fase3" | "media" | "all" = "all") => {
@@ -207,8 +209,10 @@ export function NotasTable({ data, institution }: { data: any[], institution?: s
       listaFase1: row.listaFase1 || null,
       listaFase2: row.listaFase2 || null,
       listaFase3: row.listaFase3 || null,
+      listaNotas: row.listaNotas || null,
     })
   }
+
 
   if (!data || data.length === 0) {
     return (
@@ -388,7 +392,9 @@ export function NotasTable({ data, institution }: { data: any[], institution?: s
         listaFase1={gradeDialogState.listaFase1}
         listaFase2={gradeDialogState.listaFase2}
         listaFase3={gradeDialogState.listaFase3}
+        listaNotas={gradeDialogState.listaNotas}
       />
+
     </>
   )
 }

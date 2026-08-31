@@ -40,12 +40,14 @@ interface ConsolidatedRecord {
   listaFase1: string
   listaFase2: string
   listaFase3: string
+  listaNotas?: string
   // Notas
   notaFase1: string
   notaFase2: string
   notaFase3: string
   mediaFinal: string
 }
+
 
 interface ConsolidatedTableProps {
   data: ConsolidatedRecord[]
@@ -130,9 +132,10 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     fase2Prog: "",
     fase3Prog: "",
     progTotal: "",
-    listaFase1: null,
-    listaFase2: null,
-    listaFase3: null,
+    listaFase1: null as string | null,
+    listaFase2: null as string | null,
+    listaFase3: null as string | null,
+    listaNotas: null as string | null | undefined,
   })
 
   const openActivityDialog = (fase: string, label: string, listaRaw: string | null, percent: string | null) => {
@@ -166,8 +169,10 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
       listaFase1: row.listaFase1,
       listaFase2: row.listaFase2,
       listaFase3: row.listaFase3,
+      listaNotas: row.listaNotas,
     })
   }
+
 
 
 
@@ -394,7 +399,9 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
         listaFase1={gradeDialogState.listaFase1}
         listaFase2={gradeDialogState.listaFase2}
         listaFase3={gradeDialogState.listaFase3}
+        listaNotas={gradeDialogState.listaNotas}
       />
+
     </>
   )
 }

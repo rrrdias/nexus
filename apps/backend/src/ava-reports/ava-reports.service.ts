@@ -438,15 +438,17 @@ export class AvaReportsService {
             customCourse: avaGradesReport.customCourse,
             lastaccess: avaGradesReport.lastaccess,
             updatedAt: avaGradesReport.updatedAt,
-            // Joined Progress / Activities
-            listaFase1: avaProgressReport.listaFase1,
-            listaFase2: avaProgressReport.listaFase2,
-            listaFase3: avaProgressReport.listaFase3,
+            // Joined Progress / Activities & Notes
+            listaFase1: sql<string>`coalesce(nullif(${avaGradesReport.listaFase1}, ''), ${avaProgressReport.listaFase1})`,
+            listaFase2: sql<string>`coalesce(nullif(${avaGradesReport.listaFase2}, ''), ${avaProgressReport.listaFase2})`,
+            listaFase3: sql<string>`coalesce(nullif(${avaGradesReport.listaFase3}, ''), ${avaProgressReport.listaFase3})`,
+            listaNotas: avaGradesReport.listaNotas,
             progressoFase1: avaProgressReport.fase1,
             progressoFase2: avaProgressReport.fase2,
             progressoFase3: avaProgressReport.fase3,
             progressoTotal: avaProgressReport.progressoTotal,
           })
+
           .from(avaGradesReport)
           .leftJoin(avaProgressReport, joinCondition)
           .where(whereClause)
@@ -693,9 +695,10 @@ export class AvaReportsService {
             progressoFase2: avaProgressReport.fase2,
             progressoFase3: avaProgressReport.fase3,
             progressoTotal: avaProgressReport.progressoTotal,
-            listaFase1: avaProgressReport.listaFase1,
-            listaFase2: avaProgressReport.listaFase2,
-            listaFase3: avaProgressReport.listaFase3,
+            listaFase1: sql<string>`coalesce(nullif(${avaGradesReport.listaFase1}, ''), ${avaProgressReport.listaFase1})`,
+            listaFase2: sql<string>`coalesce(nullif(${avaGradesReport.listaFase2}, ''), ${avaProgressReport.listaFase2})`,
+            listaFase3: sql<string>`coalesce(nullif(${avaGradesReport.listaFase3}, ''), ${avaProgressReport.listaFase3})`,
+            listaNotas: avaGradesReport.listaNotas,
             sourceInstitution: avaProgressReport.sourceInstitution,
             // Notas
             gradeId: avaGradesReport.id,
@@ -704,6 +707,7 @@ export class AvaReportsService {
             notaFase3: avaGradesReport.fase3,
             mediaFinal: avaGradesReport.media,
           })
+
           .from(avaProgressReport)
           .leftJoin(avaGradesReport, joinCondition)
           .where(whereClause)

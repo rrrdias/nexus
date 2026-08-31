@@ -120,6 +120,7 @@ interface GradeDetailDialogProps {
   listaFase1?: string | null
   listaFase2?: string | null
   listaFase3?: string | null
+  listaNotas?: string | null
 }
 
 function parseNum(val: string | null | undefined): number {
@@ -149,6 +150,7 @@ export function GradeDetailDialog({
   listaFase1,
   listaFase2,
   listaFase3,
+  listaNotas,
 }: GradeDetailDialogProps) {
   const [selectedTab, setSelectedTab] = useState<"fase1" | "fase2" | "fase3" | "all">(
     faseActive === "media" ? "all" : faseActive || "all"
@@ -157,9 +159,42 @@ export function GradeDetailDialog({
   const nMedia = parseNum(mediaFinal)
   const isAprovado = nMedia >= 6.0 || nMedia >= 60
 
-  const f1Activities = parseActivities(listaFase1)
-  const f2Activities = parseActivities(listaFase2)
-  const f3Activities = parseActivities(listaFase3)
+  const allGradedActivities = parseActivities(listaNotas)
+
+  // Extrai atividades por fase ou faz fallback para listaNotas
+  let f1Activities = parseActivities(listaFase1)
+  let f2Activities = parseActivities(listaFase2)
+  let f3Activities = parseActivities(listaFase3)
+
+  if (f1Activities.length === 0 && allGradedActivities.length > 0) {
+    f1Activities = allGradedActivities.filter(a => {
+      const lower = a.nome.toLowerCase()
+      return lower.includes("fase 1") || lower.includes("va 1") || lower.includes("1ª verificação") || lower.includes("1ª va") || lower.includes("1a verificacao")
+    })
+  }
+
+  if (f2Activities.length === 0 && allGradedActivities.length > 0) {
+    f2Activities = allGradedActivities.filter(a => {
+      const lower = a.nome.toLowerCase()
+      return lower.includes("fase 2") || lower.includes("va 2") || lower.includes("2ª verificação") || lower.includes("2ª va") || lower.includes("2a verificacao")
+    })
+  }
+
+  if (f3Activities.length === 0 && allGradedActivities.length > 0) {
+    f3Activities = allGradedActivities.filter(a => {
+      const lower = a.nome.toLowerCase()
+      return lower.includes("fase 3") || lower.includes("va 3") || lower.includes("3ª verificação") || lower.includes("3ª va") || lower.includes("3a verificacao")
+    })
+  }
+
+  // Atividades gerais/fixação que não estão explicitamente nas 3 fases
+  const knownNames = new Set([
+    ...f1Activities.map(a => a.nome),
+    ...f2Activities.map(a => a.nome),
+    ...f3Activities.map(a => a.nome),
+  ])
+  const extraActivities = allGradedActivities.filter(a => !knownNames.has(a.nome))
+
 
   const getStatusBadge = (gradeStr: string) => {
     const grade = parseNum(gradeStr)
@@ -423,6 +458,10 @@ export function GradeDetailDialog({
 
             {(selectedTab === "all" || selectedTab === "fase3") && (
               renderPhaseSection("Fase 3", fase3Nota, fase3Prog, f3Activities, "bg-purple-600")
+            )}
+
+            {selectedTab === "all" && extraActivities.length > 0 && (
+              renderPhaseSection("Outras Avaliações / Fixação", "", "", extraActivities, "bg-teal-600")
             )}
           </div>
 
