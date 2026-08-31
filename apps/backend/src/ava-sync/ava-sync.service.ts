@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { eq, and, or, sql } from 'drizzle-orm';
 import { avaProgressReport, avaGradesReport } from '../db/schema';
@@ -13,12 +13,39 @@ async function processInChunks<T>(items: T[], chunkSize: number, processor: (chu
 }
 
 @Injectable()
-export class AvaSyncService {
+export class AvaSyncService implements OnModuleInit {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
   ) {}
 
+  async onModuleInit() {
+    try {
+      await this.db.execute(sql`
+        DELETE FROM ava_grades_report a
+        USING ava_grades_report b
+        WHERE a.id < b.id
+          AND a."sourceInstitution" = b."sourceInstitution"
+          AND a.user_id = b.user_id
+          AND a.course_id = b.course_id;
+
+        DELETE FROM ava_progress_report a
+        USING ava_progress_report b
+        WHERE a.id < b.id
+          AND a."sourceInstitution" = b."sourceInstitution"
+          AND a.aluno_id = b.aluno_id
+          AND a.curso = b.curso;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_grades ON ava_grades_report ("sourceInstitution", user_id, course_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_progress ON ava_progress_report ("sourceInstitution", aluno_id, curso);
+      `);
+      console.log('[AvaSyncService] Unique constraints verificadas no PostgreSQL com sucesso.');
+    } catch (err: any) {
+      console.error('[AvaSyncService] Erro ao validar unique constraints no PostgreSQL:', err.message);
+    }
+  }
+
   async syncGrades(institution: string, getUrl: string | undefined, attUrl: string | undefined) {
+
     if (!getUrl) return { source: `${institution}_grades`, status: 'skipped', reason: 'URL missing' };
     console.log(`[SYNC] Iniciando Notas ${institution}...`);
 
