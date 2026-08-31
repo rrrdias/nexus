@@ -10,17 +10,17 @@ import {
   GraduationCap, 
   MapPin, 
   Clock, 
-  Layers,
-  FileCheck,
-  HelpCircle,
-  BookOpen,
+  FileCheck, 
   Calendar,
-  Minus
+  Sparkles,
+  BookOpen
 } from "lucide-react"
 
 interface Activity {
   nome: string
   status: string
+  nota?: string | null
+  notaMax?: string | null
   data: string
 }
 
@@ -28,10 +28,52 @@ function parseActivities(raw: string | null | undefined): Activity[] {
   if (!raw) return []
   return raw.split("|").map(item => {
     const parts = item.split(":")
+    const nome = parts[0]?.trim() || ""
+    const second = parts[1]?.trim() || "-"
+    const third = parts[2]?.trim() || "-"
+    const fourth = parts[3]?.trim() || "-"
+
+    // Formato 4 partes: Nome : Nota : NotaMax : Data
+    if (parts.length >= 4) {
+      const isNum = !isNaN(parseFloat(second.replace(",", ".")))
+      return {
+        nome,
+        status: isNum ? "Avaliado" : second,
+        nota: isNum ? second : null,
+        notaMax: third !== "-" ? third : "100",
+        data: fourth !== "-" ? fourth : "-",
+      }
+    }
+
+    // Formato 3 partes: (Nome : Nota : NotaMax) ou (Nome : Status : Data)
+    if (parts.length === 3) {
+      const isSecondNum = !isNaN(parseFloat(second.replace(",", ".")))
+      if (isSecondNum) {
+        return {
+          nome,
+          status: "Avaliado",
+          nota: second,
+          notaMax: third !== "-" ? third : "100",
+          data: "-",
+        }
+      }
+      return {
+        nome,
+        status: second,
+        nota: null,
+        notaMax: null,
+        data: third !== "-" ? third : "-",
+      }
+    }
+
+    // Formato 2 partes: Nome : Status ou Nota
+    const isNum = !isNaN(parseFloat(second.replace(",", ".")))
     return {
-      nome: parts[0]?.trim() || "",
-      status: parts[1]?.trim() || "-",
-      data: parts[2]?.trim() || "-",
+      nome,
+      status: isNum ? "Avaliado" : second,
+      nota: isNum ? second : null,
+      notaMax: null,
+      data: "-",
     }
   }).filter(a => a.nome)
 }
@@ -51,7 +93,9 @@ function isEvaluativeActivity(name: string): boolean {
     lower.includes("entrega") ||
     lower.includes("fase") ||
     lower.includes("subjetiva") ||
-    lower.includes("objetiva")
+    lower.includes("objetiva") ||
+    lower.includes("fórum") ||
+    lower.includes("forum")
   )
 }
 
@@ -140,19 +184,19 @@ export function GradeDetailDialog({
     }
   }
 
-  const renderActivityItem = (activity: Activity, idx: number) => {
+  const renderActivityItem = (activity: Activity, idx: number, phaseNota: string) => {
     const lowerStatus = activity.status.toLowerCase()
-    const isConcluido = lowerStatus.includes("conclu") || lowerStatus.includes("feito") || lowerStatus.includes("realiz")
+    const isConcluido = lowerStatus.includes("conclu") || lowerStatus.includes("feito") || lowerStatus.includes("realiz") || lowerStatus.includes("avaliad")
     const isEval = isEvaluativeActivity(activity.nome)
 
     return (
       <div 
         key={idx}
-        className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all hover:shadow-xs ${
-          isConcluido ? "bg-white border-green-200/70" : "bg-slate-50/70 border-slate-200"
+        className={`flex items-center justify-between gap-3 p-3.5 rounded-xl border transition-all hover:shadow-xs ${
+          isConcluido ? "bg-white border-slate-200" : "bg-slate-50/70 border-slate-200/80"
         }`}
       >
-        <div className="flex items-start gap-2.5 flex-1 min-w-0">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
           <div className="mt-0.5 shrink-0">
             {isConcluido ? (
               <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -160,29 +204,48 @@ export function GradeDetailDialog({
               <Clock className="w-4 h-4 text-amber-500" />
             )}
           </div>
-          <div className="space-y-0.5 min-w-0">
+          <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-semibold text-navy leading-snug break-words">
+              <span className="text-xs font-bold text-navy leading-snug break-words">
                 {activity.nome}
               </span>
               {isEval && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200/80 uppercase">
-                  <FileCheck className="w-2.5 h-2.5" /> Avaliação
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200/80 uppercase tracking-tight">
+                  <FileCheck className="w-2.5 h-2.5" /> Item Avaliativo
+                </span>
+              )}
+            </div>
+
+            {/* Informações adicionais de entrega/avaliação */}
+            <div className="flex items-center gap-2 text-[11px] text-gray-400">
+              {activity.data !== "-" && (
+                <span className="flex items-center gap-1 font-mono text-gray-500">
+                  <Calendar className="w-3 h-3 text-gray-400" /> Concluído em: {activity.data}
                 </span>
               )}
             </div>
           </div>
         </div>
 
+        {/* Bloco de Nota e Status */}
         <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-            isConcluido ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
-          }`}>
-            {isConcluido ? "Concluído" : "Pendente"}
-          </span>
-          {activity.data !== "-" && (
-            <span className="text-[10px] text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-              <Calendar className="w-3 h-3 text-gray-400" /> {activity.data}
+          {activity.nota ? (
+            <div className="flex flex-col items-end">
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-black text-xs shadow-2xs">
+                Nota: {activity.nota} {activity.notaMax ? `/ ${activity.notaMax}` : ""}
+              </span>
+            </div>
+          ) : isEval && isConcluido && phaseNota && phaseNota !== "-" && phaseNota !== "0" ? (
+            <div className="flex flex-col items-end">
+              <span className="px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-800 font-mono font-bold text-[11px]">
+                Nota Etapa: {phaseNota}
+              </span>
+            </div>
+          ) : (
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+              isConcluido ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+            }`}>
+              {isConcluido ? "Concluído" : "Pendente"}
             </span>
           )}
         </div>
@@ -197,7 +260,10 @@ export function GradeDetailDialog({
     activities: Activity[],
     badgeColor: string
   ) => {
-    const concluidas = activities.filter(a => a.status.toLowerCase().includes("conclu"))
+    const concluidas = activities.filter(a => {
+      const s = a.status.toLowerCase()
+      return s.includes("conclu") || s.includes("feito") || s.includes("avaliad") || s.includes("realiz")
+    })
     const status = getStatusBadge(nota)
 
     return (
@@ -238,14 +304,14 @@ export function GradeDetailDialog({
           <span>{activities.length} atividades no total</span>
         </div>
 
-        {/* Lista de Atividades */}
+        {/* Lista de Atividades e Notas */}
         {activities.length === 0 ? (
           <div className="text-center py-6 text-xs text-gray-400 italic bg-gray-50/70 rounded-lg">
             Nenhuma atividade vinculada a esta etapa no AVA.
           </div>
         ) : (
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-            {activities.map((a, i) => renderActivityItem(a, i))}
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {activities.map((a, i) => renderActivityItem(a, i, nota))}
           </div>
         )}
       </div>
@@ -275,7 +341,7 @@ export function GradeDetailDialog({
 
             <DialogTitle className="text-xl font-extrabold text-navy flex items-center gap-2 mt-1">
               <Award className="w-5 h-5 text-blue-600" />
-              Detalhamento de Notas e Atividades
+              Detalhamento de Notas e Atividades do Aluno
             </DialogTitle>
           </DialogHeader>
 
@@ -345,7 +411,7 @@ export function GradeDetailDialog({
             </button>
           </div>
 
-          {/* Conteúdo das Fases com Atividades */}
+          {/* Conteúdo das Fases com Itens e Notas */}
           <div className="space-y-4">
             {(selectedTab === "all" || selectedTab === "fase1") && (
               renderPhaseSection("Fase 1", fase1Nota, fase1Prog, f1Activities, "bg-blue-600")
