@@ -32,6 +32,11 @@ export class AvaSyncService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.db.execute(sql`
+        ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase1 text;
+        ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase2 text;
+        ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase3 text;
+        ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_notas text;
+
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_grades ON ava_grades_report ("sourceInstitution", user_id, course_id);
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_progress ON ava_progress_report ("sourceInstitution", aluno_id, curso);
         CREATE INDEX IF NOT EXISTS idx_ava_grades_join_user ON ava_grades_report ("sourceInstitution", user_id, course_fullname);
@@ -41,9 +46,9 @@ export class AvaSyncService implements OnModuleInit {
         CREATE INDEX IF NOT EXISTS idx_ava_progress_join_aluno ON ava_progress_report ("sourceInstitution", aluno_id, curso);
         CREATE INDEX IF NOT EXISTS idx_ava_progress_join_mat ON ava_progress_report ("sourceInstitution", matricula, curso);
       `);
-      console.log('[AvaSyncService] Unique constraints e índices de performance validados no PostgreSQL.');
+      console.log('[AvaSyncService] Colunas, unique constraints e índices de performance validados no PostgreSQL.');
     } catch (err: any) {
-      console.error('[AvaSyncService] Erro ao validar índices no PostgreSQL:', err.message);
+      console.error('[AvaSyncService] Erro ao validar schema e índices no PostgreSQL:', err.message);
     }
   }
 
