@@ -21,28 +21,21 @@ export class AvaSyncService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.db.execute(sql`
-        DELETE FROM ava_grades_report a
-        USING ava_grades_report b
-        WHERE a.id < b.id
-          AND a."sourceInstitution" = b."sourceInstitution"
-          AND a.user_id = b.user_id
-          AND a.course_id = b.course_id;
-
-        DELETE FROM ava_progress_report a
-        USING ava_progress_report b
-        WHERE a.id < b.id
-          AND a."sourceInstitution" = b."sourceInstitution"
-          AND a.aluno_id = b.aluno_id
-          AND a.curso = b.curso;
-
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_grades ON ava_grades_report ("sourceInstitution", user_id, course_id);
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_progress ON ava_progress_report ("sourceInstitution", aluno_id, curso);
+        CREATE INDEX IF NOT EXISTS idx_ava_grades_join_user ON ava_grades_report ("sourceInstitution", user_id, course_fullname);
+        CREATE INDEX IF NOT EXISTS idx_ava_grades_join_ident ON ava_grades_report ("sourceInstitution", user_identification, course_fullname);
+        CREATE INDEX IF NOT EXISTS idx_ava_grades_join_user_short ON ava_grades_report ("sourceInstitution", user_id, course_shortname);
+        CREATE INDEX IF NOT EXISTS idx_ava_grades_join_ident_short ON ava_grades_report ("sourceInstitution", user_identification, course_shortname);
+        CREATE INDEX IF NOT EXISTS idx_ava_progress_join_aluno ON ava_progress_report ("sourceInstitution", aluno_id, curso);
+        CREATE INDEX IF NOT EXISTS idx_ava_progress_join_mat ON ava_progress_report ("sourceInstitution", matricula, curso);
       `);
-      console.log('[AvaSyncService] Unique constraints verificadas no PostgreSQL com sucesso.');
+      console.log('[AvaSyncService] Unique constraints e índices de performance validados no PostgreSQL.');
     } catch (err: any) {
-      console.error('[AvaSyncService] Erro ao validar unique constraints no PostgreSQL:', err.message);
+      console.error('[AvaSyncService] Erro ao validar índices no PostgreSQL:', err.message);
     }
   }
+
 
   async syncGrades(institution: string, getUrl: string | undefined, attUrl: string | undefined) {
 
@@ -101,8 +94,9 @@ export class AvaSyncService implements OnModuleInit {
       let inserted = 0;
       let updated = 0;
 
-      await processInChunks(data, 1000, async (chunk) => {
+      await processInChunks(data, 250, async (chunk) => {
         const validItems = chunk.filter(item => {
+
           const userId = String(item.user_id || item.aluno_id || '');
           const courseId = String(item.course_id || '');
           return userId && courseId;
@@ -246,8 +240,9 @@ export class AvaSyncService implements OnModuleInit {
       let inserted = 0;
       let updated = 0;
 
-      await processInChunks(data, 1000, async (chunk) => {
+      await processInChunks(data, 250, async (chunk) => {
         const validItems = chunk.filter(item => {
+
           const matricula = String(item.matricula || '');
           const curso = String(item.curso || '');
           return matricula && curso;
