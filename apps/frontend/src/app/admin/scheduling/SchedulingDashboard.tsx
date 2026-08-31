@@ -773,10 +773,12 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
                   value={periodo}
                   onChange={(e) => setPeriodo(e.target.value)}
                 >
+                  <option value="2026-2">2026/2</option>
                   <option value="2026-1">2026/1</option>
                   <option value="2025-2">2025/2</option>
                   <option value="2025-1">2025/1</option>
                 </select>
+
               </div>
 
               {/* Date Filter */}

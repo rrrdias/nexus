@@ -105,8 +105,9 @@ export function DashboardProgresso({ title, metrics, institution }: { title: str
     curso_perfil: searchParams.get("curso_perfil") || "",
     periodo_perfil: searchParams.get("periodo_perfil") || "",
     enrolment_status: searchParams.get("enrolment_status") || "",
-    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-1",
+    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-2",
   }
+
 
   // Card 3 percentage of critical disciplines
   const critical_percent = metrics.total_disciplines > 0 

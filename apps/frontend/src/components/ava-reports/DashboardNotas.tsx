@@ -134,8 +134,9 @@ export function DashboardNotas({ title, metrics, institution }: { title: string,
     curso_perfil: searchParams.get("curso_perfil") || "",
     periodo_perfil: searchParams.get("periodo_perfil") || "",
     enrolment_status: searchParams.get("enrolment_status") || "",
-    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-1",
+    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-2",
   }
+
 
   // Dynamic status helpers based on thresholds
   const getGradeStatus = (val: number): 'success' | 'warning' | 'danger' => {

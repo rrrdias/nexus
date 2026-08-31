@@ -23,7 +23,7 @@ export function ProgressoFilters() {
     curso_perfil: searchParams.get("curso_perfil") || "",
     periodo_perfil: searchParams.get("periodo_perfil") || "",
     enrolment_status: searchParams.get("enrolment_status") || "",
-    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-1",
+    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-2",
     unidade_fisica: searchParams.get("unidade_fisica") || "",
   })
 
@@ -89,7 +89,7 @@ export function ProgressoFilters() {
       curso_perfil: "",
       periodo_perfil: "",
       enrolment_status: "",
-      periodo: "2026-1",
+      periodo: "2026-2",
       unidade_fisica: "",
     })
     startTransition(() => {
@@ -169,7 +169,10 @@ export function ProgressoFilters() {
                 onChange={(e) => setFilters({ ...filters, periodo: e.target.value })}
                 className={selectCls}
               >
+                <option value="2026-2">2026-2</option>
                 <option value="2026-1">2026-1</option>
+                <option value="2025-2">2025-2</option>
+                <option value="2025-1">2025-1</option>
                 <option value="">Todos</option>
               </select>
             </div>

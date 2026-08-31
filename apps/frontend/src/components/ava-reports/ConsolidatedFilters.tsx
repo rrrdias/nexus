@@ -13,7 +13,7 @@ interface ConsolidatedFiltersProps {
 }
 
 export function ConsolidatedFilters({ 
-  uniquePeriodos = ["2026-1", "2025-2", "2025-1"], 
+  uniquePeriodos = ["2026-2", "2026-1", "2025-2", "2025-1"], 
   uniquePolos = [], 
   uniqueCursos = [] 
 }: ConsolidatedFiltersProps) {
@@ -26,7 +26,7 @@ export function ConsolidatedFilters({
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
-    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-1",
+    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-2",
     unidade_fisica: searchParams.get("unidade_fisica") || "",
     curso: searchParams.get("curso") || "",
     enrolment_status: searchParams.get("enrolment_status") || "",
@@ -75,7 +75,7 @@ export function ConsolidatedFilters({
   const handleClear = () => {
     setFilters({
       search: "",
-      periodo: "2026-1",
+      periodo: "2026-2",
       unidade_fisica: "",
       curso: "",
       enrolment_status: "",
@@ -92,8 +92,9 @@ export function ConsolidatedFilters({
     filters.curso,
     filters.enrolment_status,
     filters.lastaccess,
-    filters.periodo && filters.periodo !== "2026-1" ? filters.periodo : null,
+    filters.periodo && filters.periodo !== "2026-2" ? filters.periodo : null,
   ].filter(Boolean).length
+
 
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-2 shadow-sm select-none">

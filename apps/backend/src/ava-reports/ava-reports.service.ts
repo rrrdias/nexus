@@ -1,7 +1,8 @@
 import { Injectable, Inject, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 
-import { eq, ilike, and, inArray, or, isNull, isNotNull, not, sql } from 'drizzle-orm';
+import { eq, ilike, and, inArray, or, isNull, isNotNull, not, sql, desc, asc } from 'drizzle-orm';
+
 import { avaProgressReport, avaGradesReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
@@ -105,8 +106,9 @@ export class AvaReportsService {
     if (filters.usuario) conditions.push(ilike(avaProgressReport.usuario, `%${filters.usuario}%`));
     if (filters.matricula) conditions.push(ilike(avaProgressReport.matricula, `%${filters.matricula}%`));
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-1";
+    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-2";
     if (periodoFilter) conditions.push(ilike(avaProgressReport.periodo, `%${periodoFilter}%`));
+
 
     if (filters.curso_perfil) conditions.push(ilike(avaProgressReport.cursoPerfil, `%${filters.curso_perfil}%`));
     if (filters.periodo_perfil) conditions.push(ilike(avaProgressReport.periodoPerfil, `%${filters.periodo_perfil}%`));
@@ -157,8 +159,9 @@ export class AvaReportsService {
     if (filters.usuario) conditions.push(ilike(avaGradesReport.userUsername, `%${filters.usuario}%`));
     if (filters.matricula) conditions.push(ilike(avaGradesReport.userIdentification, `%${filters.matricula}%`));
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-1";
+    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-2";
     if (periodoFilter) conditions.push(ilike(avaGradesReport.periodo, `%${periodoFilter}%`));
+
 
     if (filters.curso_perfil) conditions.push(ilike(avaGradesReport.cursoPerfil, `%${filters.curso_perfil}%`));
     if (filters.periodo_perfil) conditions.push(ilike(avaGradesReport.periodoPerfil, `%${filters.periodo_perfil}%`));
@@ -563,7 +566,7 @@ export class AvaReportsService {
     if (filters.unidade_fisica) conditions.push(ilike(avaProgressReport.unidadeFisica, `%${filters.unidade_fisica}%`));
     if (filters.enrolment_status) conditions.push(ilike(avaProgressReport.enrolmentStatus, `%${filters.enrolment_status}%`));
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-1";
+    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-2";
     if (periodoFilter) conditions.push(ilike(avaProgressReport.periodo, `%${periodoFilter}%`));
 
     if (filters.search) {
@@ -693,7 +696,7 @@ export class AvaReportsService {
         this.db.selectDistinct({ value: avaProgressReport.periodo })
           .from(avaProgressReport)
           .where(and(eq(avaProgressReport.sourceInstitution, sourceInstitution), isNotNull(avaProgressReport.periodo)))
-          .orderBy(avaProgressReport.periodo),
+          .orderBy(desc(avaProgressReport.periodo)),
         this.db.selectDistinct({ value: avaProgressReport.curso })
           .from(avaProgressReport)
           .where(and(eq(avaProgressReport.sourceInstitution, sourceInstitution), isNotNull(avaProgressReport.curso)))
