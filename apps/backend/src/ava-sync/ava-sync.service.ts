@@ -4,13 +4,24 @@ import { eq, and, or, sql } from 'drizzle-orm';
 import { avaProgressReport, avaGradesReport } from '../db/schema';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
-async function processInChunks<T>(items: T[], chunkSize: number, processor: (chunk: T[]) => Promise<void>) {
+async function processInChunks<T>(
+  label: string,
+  items: T[],
+  chunkSize: number,
+  processor: (chunk: T[]) => Promise<void>
+) {
+  const totalChunks = Math.ceil(items.length / chunkSize);
+  console.log(`[SYNC] ${label}: total de ${items.length} registros para processar em ${totalChunks} lotes...`);
   for (let i = 0; i < items.length; i += chunkSize) {
     const chunk = items.slice(i, i + chunkSize);
+    const chunkNum = Math.floor(i / chunkSize) + 1;
+    if (chunkNum === 1 || chunkNum % 10 === 0 || chunkNum === totalChunks) {
+      console.log(`[SYNC] ${label}: gravando lote ${chunkNum}/${totalChunks} (${Math.min(i + chunkSize, items.length)}/${items.length} registros)...`);
+    }
     await processor(chunk);
-    await new Promise((resolve) => setTimeout(resolve, 50));
   }
 }
+
 
 @Injectable()
 export class AvaSyncService implements OnModuleInit {
@@ -94,9 +105,8 @@ export class AvaSyncService implements OnModuleInit {
       let inserted = 0;
       let updated = 0;
 
-      await processInChunks(data, 250, async (chunk) => {
+      await processInChunks(`Notas ${institution}`, data, 250, async (chunk) => {
         const validItems = chunk.filter(item => {
-
           const userId = String(item.user_id || item.aluno_id || '');
           const courseId = String(item.course_id || '');
           return userId && courseId;
@@ -169,7 +179,19 @@ export class AvaSyncService implements OnModuleInit {
         inserted += inserts.length;
       });
 
+      console.log(`[SYNC] Notas ${institution} concluído: ${inserted} registros salvos no banco.`);
+
+      if (attUrl) {
+        console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Notas)...`);
+        setTimeout(() => {
+          fetch(attUrl, { cache: 'no-store' })
+            .then(r => console.log(`[MOODLE] Atualização de SQL Adiado disparada para ${institution} (Notas) - HTTP ${r.status}`))
+            .catch(e => console.error(`[MOODLE] Erro ao disparar atualização para ${institution} (Notas):`, e.message));
+        }, 1500);
+      }
+
       return { source: `${institution}_grades`, status: 'success', inserted, updated };
+
     } catch (error: any) {
       console.error(`Erro sync notas ${institution}:`, error);
       const cleanReason = error.message && error.message.length > 150
@@ -235,9 +257,8 @@ export class AvaSyncService implements OnModuleInit {
       let inserted = 0;
       let updated = 0;
 
-      await processInChunks(data, 250, async (chunk) => {
+      await processInChunks(`Progresso ${institution}`, data, 250, async (chunk) => {
         const validItems = chunk.filter(item => {
-
           const matricula = String(item.matricula || '');
           const curso = String(item.curso || '');
           return matricula && curso;
@@ -313,7 +334,19 @@ export class AvaSyncService implements OnModuleInit {
         inserted += inserts.length;
       });
 
+      console.log(`[SYNC] Progresso ${institution} concluído: ${inserted} registros salvos no banco.`);
+
+      if (attUrl) {
+        console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Progresso)...`);
+        setTimeout(() => {
+          fetch(attUrl, { cache: 'no-store' })
+            .then(r => console.log(`[MOODLE] Atualização de SQL Adiado disparada para ${institution} (Progresso) - HTTP ${r.status}`))
+            .catch(e => console.error(`[MOODLE] Erro ao disparar atualização para ${institution} (Progresso):`, e.message));
+        }, 1500);
+      }
+
       return { source: `${institution}_progress`, status: 'success', inserted, updated };
+
     } catch (error: any) {
       console.error(`Erro sync progresso ${institution}:`, error);
       const cleanReason = error.message && error.message.length > 150
