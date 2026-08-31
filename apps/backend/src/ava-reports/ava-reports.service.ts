@@ -402,15 +402,59 @@ export class AvaReportsService {
       const total_pages = Math.ceil(total_records / size) || 1;
       const offset = (page - 1) * size;
 
+      const joinCondition = and(
+        eq(avaProgressReport.sourceInstitution, avaGradesReport.sourceInstitution),
+        or(
+          and(isNotNull(avaGradesReport.userId), eq(avaGradesReport.userId, avaProgressReport.alunoId)),
+          and(isNotNull(avaGradesReport.userIdentification), eq(avaGradesReport.userIdentification, avaProgressReport.matricula))
+        ),
+        eq(avaProgressReport.curso, avaGradesReport.courseFullname)
+      );
+
       // 2. Consulta paginada no PostgreSQL
       const pageRows = total_records > 0
-        ? await this.db.select()
-            .from(avaGradesReport)
-            .where(whereClause)
-            .orderBy(avaGradesReport.studentName, avaGradesReport.courseFullname, avaGradesReport.id)
-            .limit(size)
-            .offset(offset)
+        ? await this.db.select({
+            id: avaGradesReport.id,
+            sourceInstitution: avaGradesReport.sourceInstitution,
+            courseId: avaGradesReport.courseId,
+            courseFullname: avaGradesReport.courseFullname,
+            courseShortname: avaGradesReport.courseShortname,
+            userId: avaGradesReport.userId,
+            userIdentification: avaGradesReport.userIdentification,
+            userUsername: avaGradesReport.userUsername,
+            studentName: avaGradesReport.studentName,
+            userEmail: avaGradesReport.userEmail,
+            userPhone1: avaGradesReport.userPhone1,
+            userPhone2: avaGradesReport.userPhone2,
+            enrolmentStatus: avaGradesReport.enrolmentStatus,
+            cursoPerfil: avaGradesReport.cursoPerfil,
+            periodoPerfil: avaGradesReport.periodoPerfil,
+            unidadeFisica: avaGradesReport.unidadeFisica,
+            periodo: avaGradesReport.periodo,
+            fase1: avaGradesReport.fase1,
+            fase2: avaGradesReport.fase2,
+            fase3: avaGradesReport.fase3,
+            media: avaGradesReport.media,
+            customCourse: avaGradesReport.customCourse,
+            lastaccess: avaGradesReport.lastaccess,
+            updatedAt: avaGradesReport.updatedAt,
+            // Joined Progress / Activities
+            listaFase1: avaProgressReport.listaFase1,
+            listaFase2: avaProgressReport.listaFase2,
+            listaFase3: avaProgressReport.listaFase3,
+            progressoFase1: avaProgressReport.fase1,
+            progressoFase2: avaProgressReport.fase2,
+            progressoFase3: avaProgressReport.fase3,
+            progressoTotal: avaProgressReport.progressoTotal,
+          })
+          .from(avaGradesReport)
+          .leftJoin(avaProgressReport, joinCondition)
+          .where(whereClause)
+          .orderBy(avaGradesReport.studentName, avaGradesReport.courseFullname, avaGradesReport.id)
+          .limit(size)
+          .offset(offset)
         : [];
+
 
       const data = pageRows.map(row => {
         const f1Norm = getNormalizedGrade(row.fase1);

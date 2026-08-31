@@ -110,6 +110,9 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     fase2Prog: string
     fase3Prog: string
     progTotal: string
+    listaFase1?: string | null
+    listaFase2?: string | null
+    listaFase3?: string | null
   }>({
     open: false,
     studentName: "",
@@ -127,6 +130,9 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     fase2Prog: "",
     fase3Prog: "",
     progTotal: "",
+    listaFase1: null,
+    listaFase2: null,
+    listaFase3: null,
   })
 
   const openActivityDialog = (fase: string, label: string, listaRaw: string | null, percent: string | null) => {
@@ -157,8 +163,12 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
       fase2Prog: row.progressoFase2,
       fase3Prog: row.progressoFase3,
       progTotal: row.progressoTotal,
+      listaFase1: row.listaFase1,
+      listaFase2: row.listaFase2,
+      listaFase3: row.listaFase3,
     })
   }
+
 
 
   if (isLoading) {
@@ -381,7 +391,11 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
         fase2Prog={gradeDialogState.fase2Prog}
         fase3Prog={gradeDialogState.fase3Prog}
         progTotal={gradeDialogState.progTotal}
+        listaFase1={gradeDialogState.listaFase1}
+        listaFase2={gradeDialogState.listaFase2}
+        listaFase3={gradeDialogState.listaFase3}
       />
     </>
   )
 }
+

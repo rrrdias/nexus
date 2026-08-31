@@ -3,17 +3,13 @@
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { MessageCircle, MoreHorizontal, MessageSquare } from "lucide-react"
+import { GradeDetailDialog } from "./GradeDetailDialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu"
 
 // ──────────────────────────────────────────
@@ -27,7 +23,6 @@ function parseProgressNum(value: any): number | null {
 
 function calcDiasSemAcesso(lastaccess: string | null): number | null {
   if (!lastaccess || lastaccess.trim() === "" || lastaccess.toLowerCase() === "nunca acessou") return null
-  // Formato esperado: "08/05/2026" (DD/MM/YYYY)
   const parts = lastaccess.split("/")
   if (parts.length !== 3) return null
   const d = parseInt(parts[0]), m = parseInt(parts[1]) - 1, y = parseInt(parts[2])
@@ -39,27 +34,7 @@ function calcDiasSemAcesso(lastaccess: string | null): number | null {
   return diff >= 0 ? diff : null
 }
 
-// ──────────────────────────────────────────
-// Sub-componentes
-// ──────────────────────────────────────────
-function GradeBadge({ value }: { value: string | null }) {
-  const num = parseProgressNum(value)
-
-  if (num === null) return <span className="text-xs text-[#C9CDD4]">-</span>
-
-  let cls = "text-[10px] font-bold px-2 py-0.5 rounded-full select-none "
-  if (num < 60) cls += "bg-red-100 text-red-700"
-  else cls += "bg-green-100 text-green-700"
-
-  return (
-    <span className={cls}>
-      {num.toFixed(1)}
-    </span>
-  )
-}
-
 function InativBadge({ lastaccess, diasSemAcessoDB }: { lastaccess: string | null, diasSemAcessoDB: string | null }) {
-  // Preferir o valor do banco; caso vazio, calcular a partir do lastaccess
   let dias: number | null = null
   if (diasSemAcessoDB && diasSemAcessoDB !== "" && diasSemAcessoDB !== "-") {
     const n = parseInt(diasSemAcessoDB)
@@ -101,7 +76,7 @@ function buildWhatsAppUrl(phone: string | null, aluno: string | null): string | 
   const digits = phone.replace(/\D/g, "")
   if (digits.length < 10) return null
   const num = digits.startsWith("55") ? digits : `55${digits}`
-  const msg = encodeURIComponent(`Olá, ${aluno || "aluno"}! Entramos em contato referente ao seu progresso nas atividades.`)
+  const msg = encodeURIComponent(`Olá, ${aluno || "aluno"}! Entramos em contato referente ao seu desempenho acadêmico no AVA.`)
   return `https://wa.me/${num}?text=${msg}`
 }
 
@@ -127,9 +102,6 @@ function buildMoodleUrl(institution: string | null, alunoId: string | null): str
   return `${baseUrl}/message/index.php?id=${alunoId}`
 }
 
-// ──────────────────────────────────────────
-// Ações da Linha (Dropdown Menu com Submenus)
-// ──────────────────────────────────────────
 function RowActions({ row, phoneFormatted, waUrl }: {
   row: any
   phoneFormatted: string | null
@@ -172,6 +144,72 @@ function RowActions({ row, phoneFormatted, waUrl }: {
 // Componente Principal
 // ──────────────────────────────────────────
 export function NotasTable({ data, institution }: { data: any[], institution?: string }) {
+  const [gradeDialogState, setGradeDialogState] = useState<{
+    open: boolean
+    studentName: string
+    matricula: string
+    curso: string
+    polo: string
+    lastaccess: string
+    diasSemAcesso: string
+    faseActive: "fase1" | "fase2" | "fase3" | "media" | "all"
+    fase1Nota: string
+    fase2Nota: string
+    fase3Nota: string
+    mediaFinal: string
+    fase1Prog: string
+    fase2Prog: string
+    fase3Prog: string
+    progTotal: string
+    listaFase1?: string | null
+    listaFase2?: string | null
+    listaFase3?: string | null
+  }>({
+    open: false,
+    studentName: "",
+    matricula: "",
+    curso: "",
+    polo: "",
+    lastaccess: "",
+    diasSemAcesso: "",
+    faseActive: "all",
+    fase1Nota: "",
+    fase2Nota: "",
+    fase3Nota: "",
+    mediaFinal: "",
+    fase1Prog: "",
+    fase2Prog: "",
+    fase3Prog: "",
+    progTotal: "",
+    listaFase1: null,
+    listaFase2: null,
+    listaFase3: null,
+  })
+
+  const openGradeDialog = (row: any, faseActive: "fase1" | "fase2" | "fase3" | "media" | "all" = "all") => {
+    setGradeDialogState({
+      open: true,
+      studentName: row.studentName || row.aluno || "Aluno",
+      matricula: row.userIdentification || row.matricula || "-",
+      curso: row.courseFullname || row.curso || "-",
+      polo: row.unidadeFisica || "Polo Principal",
+      lastaccess: row.lastaccess || "-",
+      diasSemAcesso: row.diasSemAcesso || "-",
+      faseActive,
+      fase1Nota: row.fase1 || "-",
+      fase2Nota: row.fase2 || "-",
+      fase3Nota: row.fase3 || "-",
+      mediaFinal: row.media || "-",
+      fase1Prog: row.progressoFase1 || "0",
+      fase2Prog: row.progressoFase2 || "0",
+      fase3Prog: row.progressoFase3 || "0",
+      progTotal: row.progressoTotal || "0",
+      listaFase1: row.listaFase1 || null,
+      listaFase2: row.listaFase2 || null,
+      listaFase3: row.listaFase3 || null,
+    })
+  }
+
   if (!data || data.length === 0) {
     return (
       <div className="p-12 text-center">
@@ -190,109 +228,167 @@ export function NotasTable({ data, institution }: { data: any[], institution?: s
     "Status", "Fase 1", "Fase 2", "Fase 3", "Média Final", "Ações"
   ]
 
+  const getGradeStyle = (val: any) => {
+    const num = parseProgressNum(val)
+    if (num === null) return "text-gray-400 bg-gray-50 border-gray-200"
+    if (num >= 60 || (num >= 6.0 && num <= 10.0)) return "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+    if (num > 0) return "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+    return "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+  }
+
   return (
-    <div className="overflow-auto">
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="bg-[#F4F5F7] border-b border-gray-200">
-            {headers.map(h => (
-              <th
-                key={h}
-                className="px-3 py-2.5 text-[9px] font-bold text-[#9AA0AC] uppercase tracking-wider whitespace-nowrap"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, idx) => {
-            const phone = row.userPhone1 || null
-            const waUrl = buildWhatsAppUrl(phone, row.aluno)
-            const phoneFormatted = formatPhone(phone)
+    <>
+      <div className="overflow-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-[#F4F5F7] border-b border-gray-200">
+              {headers.map(h => (
+                <th
+                  key={h}
+                  className="px-3 py-2.5 text-[9px] font-bold text-[#9AA0AC] uppercase tracking-wider whitespace-nowrap"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, idx) => {
+              const phone = row.userPhone1 || null
+              const waUrl = buildWhatsAppUrl(phone, row.studentName || row.aluno)
+              const phoneFormatted = formatPhone(phone)
 
-            return (
-              <tr
-                key={row.id}
-                className={`border-b border-gray-100 text-xs transition-colors hover:bg-blue-50/20 ${
-                  idx % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"
-                }`}
-              >
-                {/* Matrícula */}
-                <td className="px-3 py-2 font-mono font-bold text-navy whitespace-nowrap">{row.userIdentification || row.matricula || "-"}</td>
+              return (
+                <tr
+                  key={row.id}
+                  className={`border-b border-gray-100 text-xs transition-colors hover:bg-blue-50/20 ${
+                    idx % 2 === 0 ? "bg-white" : "bg-[#FAFBFC]"
+                  }`}
+                >
+                  {/* Matrícula */}
+                  <td className="px-3 py-2 font-mono font-bold text-navy whitespace-nowrap">{row.userIdentification || row.matricula || "-"}</td>
 
-                {/* Nome */}
-                <td className="px-3 py-2 font-semibold text-gray-800 min-w-[160px]">{row.studentName || row.aluno || "-"}</td>
+                  {/* Nome */}
+                  <td className="px-3 py-2 font-semibold text-gray-800 min-w-[160px]">{row.studentName || row.aluno || "-"}</td>
 
-                {/* Telefone */}
-                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                  {phoneFormatted ? (
-                    <span className="font-mono">{phoneFormatted}</span>
-                  ) : (
-                    <span className="text-[#C9CDD4]">-</span>
-                  )}
-                </td>
-
-                {/* Disciplina */}
-                <td className="px-3 py-2 text-[#1976D2] font-medium min-w-[180px] max-w-[240px] whitespace-normal break-words leading-snug">
-                  {row.courseFullname || row.curso || "-"}
-                </td>
-
-                {/* Curso */}
-                <td className="px-3 py-2 text-gray-600 min-w-[140px] max-w-[200px] whitespace-normal break-words leading-snug">
-                  {row.cursoPerfil || "-"}
-                </td>
-
-                {/* Período */}
-                <td className="px-3 py-2 text-gray-600 text-center whitespace-nowrap">{row.periodoPerfil || row.periodo || "-"}</td>
-
-                {/* Polo */}
-                {showPolo && (
-                  <td className="px-3 py-2 text-gray-600 min-w-[150px] max-w-[220px] whitespace-normal break-words leading-snug">
-                    {row.unidadeFisica || "-"}
+                  {/* Telefone */}
+                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    {phoneFormatted ? (
+                      <span className="font-mono">{phoneFormatted}</span>
+                    ) : (
+                      <span className="text-[#C9CDD4]">-</span>
+                    )}
                   </td>
-                )}
 
-                {/* Último Acesso */}
-                <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{row.lastaccess || "-"}</td>
+                  {/* Disciplina */}
+                  <td className="px-3 py-2 text-[#1976D2] font-medium min-w-[180px] max-w-[240px] whitespace-normal break-words leading-snug">
+                    {row.courseFullname || row.curso || "-"}
+                  </td>
 
-                {/* Inatividade */}
-                <td className="px-3 py-2 text-center">
-                  <InativBadge lastaccess={row.lastaccess} diasSemAcessoDB={row.diasSemAcesso} />
-                </td>
+                  {/* Curso */}
+                  <td className="px-3 py-2 text-gray-600 min-w-[140px] max-w-[200px] whitespace-normal break-words leading-snug">
+                    {row.cursoPerfil || "-"}
+                  </td>
 
-                {/* Status */}
-                <td className="px-3 py-2"><StatusBadge status={row.enrolmentStatus} /></td>
+                  {/* Período */}
+                  <td className="px-3 py-2 text-gray-600 text-center whitespace-nowrap">{row.periodoPerfil || row.periodo || "-"}</td>
 
-                {/* Fase 1 */}
-                <td className="px-3 py-2 text-center">
-                  <GradeBadge value={row.fase1} />
-                </td>
+                  {/* Polo */}
+                  {showPolo && (
+                    <td className="px-3 py-2 text-gray-600 min-w-[150px] max-w-[220px] whitespace-normal break-words leading-snug">
+                      {row.unidadeFisica || "-"}
+                    </td>
+                  )}
 
-                {/* Fase 2 */}
-                <td className="px-3 py-2 text-center">
-                  <GradeBadge value={row.fase2} />
-                </td>
+                  {/* Último Acesso */}
+                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{row.lastaccess || "-"}</td>
 
-                {/* Fase 3 */}
-                <td className="px-3 py-2 text-center">
-                  <GradeBadge value={row.fase3} />
-                </td>
+                  {/* Inatividade */}
+                  <td className="px-3 py-2 text-center">
+                    <InativBadge lastaccess={row.lastaccess} diasSemAcessoDB={row.diasSemAcesso} />
+                  </td>
 
-                {/* Total */}
-                <td className="px-3 py-2 text-center">
-                  <GradeBadge value={row.media} />
-                </td>
+                  {/* Status */}
+                  <td className="px-3 py-2"><StatusBadge status={row.enrolmentStatus} /></td>
 
-                {/* Ações */}
-                <td className="px-3 py-2 text-center">
-                  <RowActions row={row} phoneFormatted={phoneFormatted} waUrl={waUrl} />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+                  {/* Fase 1 */}
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => openGradeDialog(row, "fase1")}
+                      className={`px-2.5 py-0.5 rounded-md border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeStyle(row.fase1)}`}
+                      title="Clique para ver o extrato de atividades e notas da Fase 1"
+                    >
+                      {row.fase1 || '-'}
+                    </button>
+                  </td>
+
+                  {/* Fase 2 */}
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => openGradeDialog(row, "fase2")}
+                      className={`px-2.5 py-0.5 rounded-md border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeStyle(row.fase2)}`}
+                      title="Clique para ver o extrato de atividades e notas da Fase 2"
+                    >
+                      {row.fase2 || '-'}
+                    </button>
+                  </td>
+
+                  {/* Fase 3 */}
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => openGradeDialog(row, "fase3")}
+                      className={`px-2.5 py-0.5 rounded-md border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeStyle(row.fase3)}`}
+                      title="Clique para ver o extrato de atividades e notas da Fase 3"
+                    >
+                      {row.fase3 || '-'}
+                    </button>
+                  </td>
+
+                  {/* Total */}
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => openGradeDialog(row, "media")}
+                      className={`px-2.5 py-0.5 rounded-md border text-[11px] font-mono font-black cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeStyle(row.media)}`}
+                      title="Clique para ver o extrato completo de atividades e notas"
+                    >
+                      {row.media || '-'}
+                    </button>
+                  </td>
+
+                  {/* Ações */}
+                  <td className="px-3 py-2 text-center">
+                    <RowActions row={row} phoneFormatted={phoneFormatted} waUrl={waUrl} />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal de Detalhamento de Notas e Atividades */}
+      <GradeDetailDialog
+        open={gradeDialogState.open}
+        onClose={() => setGradeDialogState(prev => ({ ...prev, open: false }))}
+        studentName={gradeDialogState.studentName}
+        matricula={gradeDialogState.matricula}
+        curso={gradeDialogState.curso}
+        polo={gradeDialogState.polo}
+        lastaccess={gradeDialogState.lastaccess}
+        diasSemAcesso={gradeDialogState.diasSemAcesso}
+        faseActive={gradeDialogState.faseActive}
+        fase1Nota={gradeDialogState.fase1Nota}
+        fase2Nota={gradeDialogState.fase2Nota}
+        fase3Nota={gradeDialogState.fase3Nota}
+        mediaFinal={gradeDialogState.mediaFinal}
+        fase1Prog={gradeDialogState.fase1Prog}
+        fase2Prog={gradeDialogState.fase2Prog}
+        fase3Prog={gradeDialogState.fase3Prog}
+        progTotal={gradeDialogState.progTotal}
+        listaFase1={gradeDialogState.listaFase1}
+        listaFase2={gradeDialogState.listaFase2}
+        listaFase3={gradeDialogState.listaFase3}
+      />
+    </>
   )
 }
