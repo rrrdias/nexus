@@ -17,11 +17,18 @@ export async function getProgressExportData(filters: any) {
 }
 
 export async function syncMoodleData(institution?: string, type?: 'grades' | 'progress') {
-  return fetchFromApi('/api/ava-reports/sync', {
-    method: 'POST',
-    body: JSON.stringify({ institution, type })
-  });
+  try {
+    const data = await fetchFromApi('/api/ava-reports/sync', {
+      method: 'POST',
+      body: JSON.stringify({ institution, type })
+    });
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("[syncMoodleData Action Error]:", error);
+    return { success: false, error: error.message || 'Falha na sincronização' };
+  }
 }
+
 
 export async function getGradesData(page: number, size: number, filters: any) {
   return fetchFromApi('/api/ava-reports/grades', {

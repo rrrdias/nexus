@@ -234,7 +234,10 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
   const confirmSync = async () => {
     setSyncStatus("syncing")
     try {
-      await syncMoodleData(institution, "progress")
+      const res = await syncMoodleData(institution, "progress")
+      if (!res.success) {
+        throw new Error(res.error || "Falha na sincronização")
+      }
       setSyncStatus("success")
     } catch (error: any) {
       console.error(error)
@@ -242,6 +245,7 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
       setSyncStatus("error")
     }
   }
+
 
   const handleExport = async () => {
     setIsExporting(true)

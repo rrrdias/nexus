@@ -234,7 +234,10 @@ export function NotasActions({ filters, institution }: { filters: any, instituti
   const confirmSync = async () => {
     setSyncStatus("syncing")
     try {
-      await syncMoodleData(institution, "grades")
+      const res = await syncMoodleData(institution, "grades")
+      if (!res.success) {
+        throw new Error(res.error || "Falha na sincronização")
+      }
       setSyncStatus("success")
     } catch (error: any) {
       console.error(error)
@@ -242,6 +245,7 @@ export function NotasActions({ filters, institution }: { filters: any, instituti
       setSyncStatus("error")
     }
   }
+
 
   const handleExport = async () => {
     setIsExporting(true)

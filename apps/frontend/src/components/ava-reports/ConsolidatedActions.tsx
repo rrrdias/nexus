@@ -23,8 +23,14 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
   const confirmSync = async () => {
     setSyncStatus("syncing")
     try {
-      await syncMoodleData(institution, "progress")
-      await syncMoodleData(institution, "grades")
+      const resProgress = await syncMoodleData(institution, "progress")
+      if (!resProgress.success) {
+        throw new Error(resProgress.error || "Falha na sincronização de progresso")
+      }
+      const resGrades = await syncMoodleData(institution, "grades")
+      if (!resGrades.success) {
+        throw new Error(resGrades.error || "Falha na sincronização de notas")
+      }
       setSyncStatus("success")
     } catch (error: any) {
       console.error(error)
@@ -32,6 +38,7 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
       setSyncStatus("error")
     }
   }
+
 
   const handleExport = async () => {
     setIsExporting(true)
