@@ -169,11 +169,6 @@ export class AvaSyncService implements OnModuleInit {
         inserted += inserts.length;
       });
 
-      if (attUrl) {
-        console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Notas)...`);
-        fetch(attUrl, { cache: 'no-store' }).catch(e => console.error(`Erro ao disparar atualização moodle ${institution}:`, e));
-      }
-
       return { source: `${institution}_grades`, status: 'success', inserted, updated };
     } catch (error: any) {
       console.error(`Erro sync notas ${institution}:`, error);
@@ -317,11 +312,6 @@ export class AvaSyncService implements OnModuleInit {
 
         inserted += inserts.length;
       });
-
-      if (attUrl) {
-        console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Progresso)...`);
-        fetch(attUrl, { cache: 'no-store' }).catch(e => console.error(`Erro ao disparar atualização moodle progress ${institution}:`, e));
-      }
 
       return { source: `${institution}_progress`, status: 'success', inserted, updated };
     } catch (error: any) {
