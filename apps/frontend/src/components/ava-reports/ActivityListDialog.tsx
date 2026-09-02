@@ -115,8 +115,9 @@ export function ActivityListDialog({ fase, faseLabel, listaRaw, fasePercent, ope
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl w-[92vw] p-0 border-0 shadow-2xl rounded-2xl overflow-hidden bg-white select-none">
+      <DialogContent className="max-w-3xl sm:max-w-3xl md:max-w-3xl w-[92vw] p-0 border-0 shadow-2xl rounded-2xl overflow-hidden bg-white select-none">
         <div className="p-6 md:p-8 max-h-[85vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] space-y-5">
+
           
           <DialogHeader className="border-b border-slate-100 pb-4">
             <div className="flex items-center justify-between gap-3">
