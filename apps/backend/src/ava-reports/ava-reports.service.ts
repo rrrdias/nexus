@@ -711,10 +711,12 @@ export class AvaReportsService {
             progressoFase2: avaProgressReport.fase2,
             progressoFase3: avaProgressReport.fase3,
             progressoTotal: avaProgressReport.progressoTotal,
-            listaFase1: sql<string>`coalesce(nullif(${avaGradesReport.listaFase1}, ''), ${avaProgressReport.listaFase1})`,
-            listaFase2: sql<string>`coalesce(nullif(${avaGradesReport.listaFase2}, ''), ${avaProgressReport.listaFase2})`,
-            listaFase3: sql<string>`coalesce(nullif(${avaGradesReport.listaFase3}, ''), ${avaProgressReport.listaFase3})`,
-            listaNotas: avaGradesReport.listaNotas,
+            progressoListaFase1: avaProgressReport.listaFase1,
+            progressoListaFase2: avaProgressReport.listaFase2,
+            progressoListaFase3: avaProgressReport.listaFase3,
+            listaFase1: avaProgressReport.listaFase1,
+            listaFase2: avaProgressReport.listaFase2,
+            listaFase3: avaProgressReport.listaFase3,
             sourceInstitution: avaProgressReport.sourceInstitution,
             // Notas
             gradeId: avaGradesReport.id,
@@ -722,7 +724,12 @@ export class AvaReportsService {
             notaFase2: avaGradesReport.fase2,
             notaFase3: avaGradesReport.fase3,
             mediaFinal: avaGradesReport.media,
+            notasListaFase1: avaGradesReport.listaFase1,
+            notasListaFase2: avaGradesReport.listaFase2,
+            notasListaFase3: avaGradesReport.listaFase3,
+            listaNotas: avaGradesReport.listaNotas,
           })
+
 
           .from(avaProgressReport)
           .leftJoin(avaGradesReport, joinCondition)

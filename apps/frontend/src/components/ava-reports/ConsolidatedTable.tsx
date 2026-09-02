@@ -37,16 +37,23 @@ interface ConsolidatedRecord {
   progressoFase2: string
   progressoFase3: string
   progressoTotal: string
+  progressoListaFase1?: string
+  progressoListaFase2?: string
+  progressoListaFase3?: string
   listaFase1: string
   listaFase2: string
   listaFase3: string
-  listaNotas?: string
   // Notas
   notaFase1: string
   notaFase2: string
   notaFase3: string
   mediaFinal: string
+  notasListaFase1?: string
+  notasListaFase2?: string
+  notasListaFase3?: string
+  listaNotas?: string
 }
+
 
 
 interface ConsolidatedTableProps {
@@ -166,12 +173,13 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
       fase2Prog: row.progressoFase2,
       fase3Prog: row.progressoFase3,
       progTotal: row.progressoTotal,
-      listaFase1: row.listaFase1,
-      listaFase2: row.listaFase2,
-      listaFase3: row.listaFase3,
+      listaFase1: row.notasListaFase1 || row.progressoListaFase1 || row.listaFase1,
+      listaFase2: row.notasListaFase2 || row.progressoListaFase2 || row.listaFase2,
+      listaFase3: row.notasListaFase3 || row.progressoListaFase3 || row.listaFase3,
       listaNotas: row.listaNotas,
     })
   }
+
 
 
 
@@ -269,7 +277,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     <td className="py-3 px-3 text-center bg-blue-50/15 border-x border-gray-1">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => openActivityDialog("fase1", "Atividades - Fase 1", row.listaFase1, row.progressoFase1)}
+                          onClick={() => openActivityDialog("fase1", "Progresso das Atividades - Fase 1", row.progressoListaFase1 || row.listaFase1, row.progressoFase1)}
                           className={`px-2 py-0.5 rounded-md border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF1)}`}
                           title="Clique para ver as atividades da Fase 1"
                         >
@@ -290,7 +298,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     <td className="py-3 px-3 text-center bg-indigo-50/15 border-r border-gray-1">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => openActivityDialog("fase2", "Atividades - Fase 2", row.listaFase2, row.progressoFase2)}
+                          onClick={() => openActivityDialog("fase2", "Progresso das Atividades - Fase 2", row.progressoListaFase2 || row.listaFase2, row.progressoFase2)}
                           className={`px-2 py-0.5 rounded-md border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF2)}`}
                           title="Clique para ver as atividades da Fase 2"
                         >
@@ -311,7 +319,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     <td className="py-3 px-3 text-center bg-purple-50/15 border-r border-gray-1">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => openActivityDialog("fase3", "Atividades - Fase 3", row.listaFase3, row.progressoFase3)}
+                          onClick={() => openActivityDialog("fase3", "Progresso das Atividades - Fase 3", row.progressoListaFase3 || row.listaFase3, row.progressoFase3)}
                           className={`px-2 py-0.5 rounded-md border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF3)}`}
                           title="Clique para ver as atividades da Fase 3"
                         >
@@ -327,6 +335,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                         </button>
                       </div>
                     </td>
+
 
                     {/* Consolidado: Progresso Total + Média Final */}
                     <td className="py-3 px-3 text-center bg-emerald-50/20">
