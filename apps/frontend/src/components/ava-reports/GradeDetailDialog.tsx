@@ -12,7 +12,6 @@ import {
   Clock, 
   FileCheck, 
   Calendar,
-  Sparkles,
   BookOpen
 } from "lucide-react"
 
@@ -22,6 +21,17 @@ interface Activity {
   nota?: string | null
   notaMax?: string | null
   data: string
+}
+
+function normalizeName(name: string): string {
+  if (!name) return ""
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[\u2010-\u2015\u2212\u002d]/g, "-") // normaliza hífens e travessões
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 function parseActivities(raw: string | null | undefined): Activity[] {
@@ -79,58 +89,54 @@ function parseActivities(raw: string | null | undefined): Activity[] {
 }
 
 function isEvaluativeActivity(name: string): boolean {
-  const lower = name.toLowerCase()
+  const norm = normalizeName(name)
   return (
-    lower.includes("prova") ||
-    lower.includes("verificação") ||
-    lower.includes("verificacao") ||
-    lower.includes("avaliação") ||
-    lower.includes("avaliacao") ||
-    lower.includes("quiz") ||
-    lower.includes("questionário") ||
-    lower.includes("questionario") ||
-    lower.includes("trabalho") ||
-    lower.includes("subjetiva") ||
-    lower.includes("objetiva") ||
-    lower.includes("exame")
+    norm.includes("prova") ||
+    norm.includes("verificacao") ||
+    norm.includes("avaliacao") ||
+    norm.includes("quiz") ||
+    norm.includes("questionario") ||
+    norm.includes("trabalho") ||
+    norm.includes("subjetiva") ||
+    norm.includes("objetiva") ||
+    norm.includes("exame") ||
+    norm.includes("entrega")
   )
 }
 
 function classifyActivityPhase(name: string): 1 | 2 | 3 {
-  const lower = name.toLowerCase()
+  const norm = normalizeName(name)
 
-  // Regras Fase 2
-  if (
-    lower.includes("fase 2") || lower.includes("fase2") ||
-    lower.includes("2ª verificação") || lower.includes("2ª va") || lower.includes("2a verif") ||
-    lower.includes("unidade temática 03") || lower.includes("unidade temática 3") ||
-    lower.includes("unidade 03") || lower.includes("unidade 3") ||
-    lower.includes("unidade temática 04") || lower.includes("unidade temática 4") ||
-    lower.includes("unidade 04") || lower.includes("unidade 4") ||
-    lower.includes("fixação - unidade temática 03") || lower.includes("fixacao - unidade tematica 03") ||
-    lower.includes("fixação - unidade temática 04") || lower.includes("fixacao - unidade tematica 04") ||
-    lower.includes("entrega 2")
-  ) {
+  // 1. Verificações / Provas explícitas
+  if (norm.includes("1a verificacao") || norm.includes("1a va") || norm.includes("fase 1") || norm.includes("entrega 1")) {
+    return 1
+  }
+  if (norm.includes("2a verificacao") || norm.includes("2a va") || norm.includes("fase 2") || norm.includes("entrega 2") || norm.includes("entrega 3")) {
     return 2
   }
-
-  // Regras Fase 3
-  if (
-    lower.includes("fase 3") || lower.includes("fase3") ||
-    lower.includes("3ª verificação") || lower.includes("3ª va") || lower.includes("3a verif") ||
-    lower.includes("unidade temática 05") || lower.includes("unidade temática 5") ||
-    lower.includes("unidade 05") || lower.includes("unidade 5") ||
-    lower.includes("unidade temática 06") || lower.includes("unidade temática 6") ||
-    lower.includes("unidade 06") || lower.includes("unidade 6") ||
-    lower.includes("fixação - unidade temática 05") || lower.includes("fixacao - unidade tematica 05") ||
-    lower.includes("fixação - unidade temática 06") || lower.includes("fixacao - unidade tematica 06") ||
-    lower.includes("exame") || lower.includes("final") || lower.includes("substitutiva") ||
-    lower.includes("entrega 3") || lower.includes("entrega 4")
-  ) {
+  if (norm.includes("3a verificacao") || norm.includes("3a va") || norm.includes("fase 3") || norm.includes("exame") || norm.includes("final") || norm.includes("entrega 4") || norm.includes("entrega 5") || norm.includes("entrega 6") || norm.includes("entrega 7")) {
     return 3
   }
 
-  // Padrão Fase 1 (Unidade 1, 2, Verificação 1, etc.)
+  // 2. Extração numérica da Unidade Temática (ex: Unidade Temática 07 -> 7)
+  const matchUnit = norm.match(/(?:unidade\s+tematica|unidade|ut|fixacao\s*-\s*unidade\s+tematica)\s*(\d+)/i)
+  if (matchUnit && matchUnit[1]) {
+    const unitNum = parseInt(matchUnit[1], 10)
+    if (unitNum >= 7) return 3
+    if (unitNum >= 4) return 2
+    if (unitNum === 3) return 1 // UT 03 geralmente pertence à Fase 1 em cursos de 8 UTs (1-3, 4-6, 7-8)
+    if (unitNum <= 2) return 1
+  }
+
+  // 3. Fallback inteligente baseado em outros números na string
+  const generalNum = norm.match(/\b(\d+)\b/)
+  if (generalNum && generalNum[1]) {
+    const num = parseInt(generalNum[1], 10)
+    if (num >= 7) return 3
+    if (num >= 3 && num <= 6) return 2
+    if (num <= 2) return 1
+  }
+
   return 1
 }
 
@@ -199,36 +205,53 @@ export function GradeDetailDialog({
   const rawF2 = parseActivities(listaFase2)
   const rawF3 = parseActivities(listaFase3)
 
-  // Mapas para agrupar todas as atividades dentro das 3 Fases sem deixar nenhuma solta
+  // Mapas normalizados para agrupar todas as atividades dentro das 3 Fases com matching flexível
   const f1Map = new Map<string, Activity>()
   const f2Map = new Map<string, Activity>()
   const f3Map = new Map<string, Activity>()
 
-  // 1. Adiciona atividades explícitas das fases
-  rawF1.forEach(a => f1Map.set(a.nome, a))
-  rawF2.forEach(a => f2Map.set(a.nome, a))
-  rawF3.forEach(a => f3Map.set(a.nome, a))
+  // 1. Adiciona atividades explícitas das fases com chave normalizada
+  rawF1.forEach(a => f1Map.set(normalizeName(a.nome), a))
+  rawF2.forEach(a => f2Map.set(normalizeName(a.nome), a))
+  rawF3.forEach(a => f3Map.set(normalizeName(a.nome), a))
 
-  // 2. Classifica todas as atividades de listaNotas dentro das Fases correspondentes
+  // 2. Mescla e classifica todas as atividades de listaNotas
   allGradedActivities.forEach(act => {
-    if (f1Map.has(act.nome)) {
-      f1Map.set(act.nome, { ...f1Map.get(act.nome)!, ...act })
-    } else if (f2Map.has(act.nome)) {
-      f2Map.set(act.nome, { ...f2Map.get(act.nome)!, ...act })
-    } else if (f3Map.has(act.nome)) {
-      f3Map.set(act.nome, { ...f3Map.get(act.nome)!, ...act })
+    const key = normalizeName(act.nome)
+    if (f1Map.has(key)) {
+      f1Map.set(key, { ...f1Map.get(key)!, ...act })
+    } else if (f2Map.has(key)) {
+      f2Map.set(key, { ...f2Map.get(key)!, ...act })
+    } else if (f3Map.has(key)) {
+      f3Map.set(key, { ...f3Map.get(key)!, ...act })
     } else {
-      // Classificação automática baseada no nome (Unidade 1/2 -> Fase 1, Unidade 3/4 -> Fase 2, etc.)
+      // Classificação automática inteligente com suporte a UT 01 até UT 12
       const phase = classifyActivityPhase(act.nome)
-      if (phase === 1) f1Map.set(act.nome, act)
-      else if (phase === 2) f2Map.set(act.nome, act)
-      else f3Map.set(act.nome, act)
+      if (phase === 1) f1Map.set(key, act)
+      else if (phase === 2) f2Map.set(key, act)
+      else f3Map.set(key, act)
     }
   })
 
-  const f1Activities = Array.from(f1Map.values())
-  const f2Activities = Array.from(f2Map.values())
-  const f3Activities = Array.from(f3Map.values())
+  // Ordena atividades de forma cronológica / numérica dentro de cada fase
+  const sortActivities = (activities: Activity[]) => {
+    return activities.sort((a, b) => {
+      const aNorm = normalizeName(a.nome)
+      const bNorm = normalizeName(b.nome)
+      
+      const aNumMatch = aNorm.match(/\d+/)
+      const bNumMatch = bNorm.match(/\d+/)
+      const aNum = aNumMatch ? parseInt(aNumMatch[0], 10) : 999
+      const bNum = bNumMatch ? parseInt(bNumMatch[0], 10) : 999
+      
+      if (aNum !== bNum) return aNum - bNum
+      return a.nome.localeCompare(b.nome)
+    })
+  }
+
+  const f1Activities = sortActivities(Array.from(f1Map.values()))
+  const f2Activities = sortActivities(Array.from(f2Map.values()))
+  const f3Activities = sortActivities(Array.from(f3Map.values()))
 
   const getStatusBadge = (gradeStr: string) => {
     const grade = parseNum(gradeStr)
@@ -255,7 +278,7 @@ export function GradeDetailDialog({
 
   const renderActivityItem = (activity: Activity, idx: number, phaseNota: string) => {
     const lowerStatus = activity.status.toLowerCase()
-    const isConcluido = lowerStatus.includes("conclu") || lowerStatus.includes("feito") || lowerStatus.includes("realiz") || lowerStatus.includes("avaliad") || activity.nota !== null && activity.nota !== "-"
+    const isConcluido = lowerStatus.includes("conclu") || lowerStatus.includes("feito") || lowerStatus.includes("realiz") || lowerStatus.includes("avaliad") || (activity.nota !== null && activity.nota !== "-")
     const isEval = isEvaluativeActivity(activity.nome)
 
     return (
@@ -394,7 +417,6 @@ export function GradeDetailDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl sm:max-w-4xl md:max-w-4xl lg:max-w-4xl w-[94vw] p-0 border-0 shadow-2xl rounded-2xl overflow-hidden bg-white select-none">
         <div className="p-6 md:p-8 max-h-[88vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] space-y-6">
-
           
           {/* Header */}
           <DialogHeader className="border-b border-slate-100 pb-4">
