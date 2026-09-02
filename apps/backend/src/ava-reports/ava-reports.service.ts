@@ -24,12 +24,22 @@ export class AvaReportsService {
   ) {}
 
 
+  private static avaAccessCache = new Map<string, { hasAccess: boolean; timestamp: number }>();
+  private static readonly ACCESS_CACHE_TTL_MS = 60_000;
+
   async assertAvaAccess(user?: SessionUser) {
     if (!user?.id || user.isDisabled) {
       throw new UnauthorizedException("Acesso negado.");
     }
 
     if (user.isSuperAdmin) return;
+
+    const now = Date.now();
+    const cached = AvaReportsService.avaAccessCache.get(user.id);
+    if (cached && (now - cached.timestamp < AvaReportsService.ACCESS_CACHE_TTL_MS)) {
+      if (!cached.hasAccess) throw new UnauthorizedException("Acesso negado.");
+      return;
+    }
 
     const directAccess = await this.db.select({ id: systemModules.id })
       .from(usersSystemAccess)
@@ -41,7 +51,10 @@ export class AvaReportsService {
       ))
       .limit(1);
 
-    if (directAccess.length > 0) return;
+    if (directAccess.length > 0) {
+      AvaReportsService.avaAccessCache.set(user.id, { hasAccess: true, timestamp: now });
+      return;
+    }
 
     const groupAccess = await this.db.select({ id: systemModules.id })
       .from(userGroups)
@@ -55,8 +68,11 @@ export class AvaReportsService {
       .limit(1);
 
     if (groupAccess.length === 0) {
+      AvaReportsService.avaAccessCache.set(user.id, { hasAccess: false, timestamp: now });
       throw new UnauthorizedException("Acesso negado.");
     }
+
+    AvaReportsService.avaAccessCache.set(user.id, { hasAccess: true, timestamp: now });
   }
 
   private parseProgress(value: any) {

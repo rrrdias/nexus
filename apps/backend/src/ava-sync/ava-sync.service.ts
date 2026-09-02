@@ -32,10 +32,13 @@ export class AvaSyncService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.db.execute(sql`
+        CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase1 text;
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase2 text;
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase3 text;
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_notas text;
+
 
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_grades ON ava_grades_report ("sourceInstitution", user_id, course_id);
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_progress ON ava_progress_report ("sourceInstitution", aluno_id, curso);

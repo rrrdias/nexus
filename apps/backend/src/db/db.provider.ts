@@ -13,11 +13,17 @@ export const DbProvider: Provider = {
       throw new Error('DATABASE_URL is required');
     }
 
+    const maxConnections = process.env.DB_MAX_CONNECTIONS
+      ? parseInt(process.env.DB_MAX_CONNECTIONS, 10)
+      : process.env.NODE_ENV === 'development' ? 10 : 25;
+
     const conn = postgres(connectionString, {
       prepare: false,
-      max: process.env.NODE_ENV === 'development' ? 10 : undefined,
-      idle_timeout: 30,
-      connect_timeout: 15,
+      max: maxConnections,
+      idle_timeout: 20,
+      connect_timeout: 10,
+      max_lifetime: 60 * 30, // 30 minutes connection recycling
+      onnotice: () => {}, // Suppress routine server notices from polluting logs
     });
 
     return drizzle(conn, { schema });

@@ -8,8 +8,17 @@ import { users } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
+interface UserActiveCacheEntry {
+  isActive: boolean;
+  timestamp: number;
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  // In-memory LRU-style TTL cache (30s) to avoid querying Postgres on every single sub-request
+  private static userActiveCache = new Map<string, UserActiveCacheEntry>();
+  private static readonly CACHE_TTL_MS = 30_000;
+
   constructor(
     private jwtService: JwtService,
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
@@ -52,13 +61,39 @@ export class JwtAuthGuard implements CanActivate {
         secret: process.env.JWT_SECRET || 'nexus-secret-key-2026'
       });
 
-      // Consultar banco para garantir que o usuário ainda existe e está ativo no sistema
-      const userResult = await this.db.select({ isActive: users.isActive })
-        .from(users)
-        .where(eq(users.id, payload.sub))
-        .limit(1);
+      const userId = payload.sub;
+      let isActive = false;
+      const now = Date.now();
+      const cached = JwtAuthGuard.userActiveCache.get(userId);
 
-      if (userResult.length === 0 || !userResult[0].isActive) {
+      if (cached && (now - cached.timestamp < JwtAuthGuard.CACHE_TTL_MS)) {
+        isActive = cached.isActive;
+      } else {
+        // Consultar banco para garantir que o usuário ainda existe e está ativo no sistema
+        const userResult = await this.db.select({ isActive: users.isActive })
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+
+        if (userResult.length === 0 || !userResult[0].isActive) {
+          JwtAuthGuard.userActiveCache.delete(userId);
+          throw new UnauthorizedException('Usuário inativo ou não encontrado');
+        }
+
+        isActive = Boolean(userResult[0].isActive);
+        JwtAuthGuard.userActiveCache.set(userId, { isActive, timestamp: now });
+
+        // Auto-prune cache if it grows too large (> 1000 items)
+        if (JwtAuthGuard.userActiveCache.size > 1000) {
+          for (const [key, value] of JwtAuthGuard.userActiveCache.entries()) {
+            if (now - value.timestamp > JwtAuthGuard.CACHE_TTL_MS) {
+              JwtAuthGuard.userActiveCache.delete(key);
+            }
+          }
+        }
+      }
+
+      if (!isActive) {
         throw new UnauthorizedException('Usuário inativo ou não encontrado');
       }
 
@@ -66,7 +101,7 @@ export class JwtAuthGuard implements CanActivate {
         id: payload.sub,
         email: payload.email,
         isSuperAdmin: payload.isSuperAdmin,
-        isDisabled: !userResult[0].isActive
+        isDisabled: !isActive
       };
     } catch {
       throw new UnauthorizedException();
@@ -79,4 +114,3 @@ export class JwtAuthGuard implements CanActivate {
     return type === 'Bearer' ? token : undefined;
   }
 }
-
