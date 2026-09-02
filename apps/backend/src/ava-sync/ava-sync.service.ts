@@ -39,7 +39,6 @@ export class AvaSyncService implements OnModuleInit {
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase3 text;
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_notas text;
 
-
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_grades ON ava_grades_report ("sourceInstitution", user_id, course_id);
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_progress ON ava_progress_report ("sourceInstitution", aluno_id, curso);
         CREATE INDEX IF NOT EXISTS idx_ava_grades_join_user ON ava_grades_report ("sourceInstitution", user_id, course_fullname);
@@ -48,12 +47,184 @@ export class AvaSyncService implements OnModuleInit {
         CREATE INDEX IF NOT EXISTS idx_ava_grades_join_ident_short ON ava_grades_report ("sourceInstitution", user_identification, course_shortname);
         CREATE INDEX IF NOT EXISTS idx_ava_progress_join_aluno ON ava_progress_report ("sourceInstitution", aluno_id, curso);
         CREATE INDEX IF NOT EXISTS idx_ava_progress_join_mat ON ava_progress_report ("sourceInstitution", matricula, curso);
+
+        CREATE TABLE IF NOT EXISTS ava_consolidated_report (
+          "id" text PRIMARY KEY DEFAULT gen_random_uuid(),
+          "sourceInstitution" text NOT NULL,
+          "aluno_id" text,
+          "matricula" text,
+          "usuario" text,
+          "aluno" text,
+          "email" text,
+          "user_phone1" text,
+          "periodo" text,
+          "curso" text,
+          "curso_perfil" text,
+          "periodo_perfil" text,
+          "unidade_fisica" text,
+          "enrolment_status" text,
+          "lastaccess" text,
+          "dias_sem_acesso" text,
+          "progresso_fase1" text,
+          "progresso_fase2" text,
+          "progresso_fase3" text,
+          "progresso_total" text,
+          "progresso_lista_fase1" text,
+          "progresso_lista_fase2" text,
+          "progresso_lista_fase3" text,
+          "grade_id" text,
+          "nota_fase1" text,
+          "nota_fase2" text,
+          "nota_fase3" text,
+          "media_final" text,
+          "notas_lista_fase1" text,
+          "notas_lista_fase2" text,
+          "notas_lista_fase3" text,
+          "lista_notas" text,
+          "updatedAt" timestamp DEFAULT now() NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_consolidated ON ava_consolidated_report ("sourceInstitution", aluno_id, curso);
+        CREATE INDEX IF NOT EXISTS idx_ava_consolidated_inst_period ON ava_consolidated_report ("sourceInstitution", periodo);
+        CREATE INDEX IF NOT EXISTS idx_ava_consolidated_filters ON ava_consolidated_report ("sourceInstitution", periodo, curso_perfil, periodo_perfil, unidade_fisica);
+        CREATE INDEX IF NOT EXISTS idx_ava_consolidated_status ON ava_consolidated_report ("sourceInstitution", enrolment_status);
+        CREATE INDEX IF NOT EXISTS idx_ava_consolidated_aluno_trgm ON ava_consolidated_report USING gin (aluno gin_trgm_ops);
+        CREATE INDEX IF NOT EXISTS idx_ava_consolidated_curso_trgm ON ava_consolidated_report USING gin (curso gin_trgm_ops);
+        CREATE INDEX IF NOT EXISTS idx_ava_consolidated_matricula_trgm ON ava_consolidated_report USING gin (matricula gin_trgm_ops);
       `);
       console.log('[AvaSyncService] Colunas, unique constraints e índices de performance validados no PostgreSQL.');
+
+      // População inicial automática caso o snapshot esteja vazio
+      const countRes: any = await this.db.execute(sql`SELECT count(*) as total FROM ava_consolidated_report;`);
+      if (Number(countRes[0]?.total || 0) === 0) {
+        console.log('[AvaSyncService] Snapshot consolidado vazio. Executando população inicial automática...');
+        await this.refreshConsolidatedSnapshot();
+      }
     } catch (err: any) {
       console.error('[AvaSyncService] Erro ao validar schema e índices no PostgreSQL:', err.message);
     }
   }
+
+  async refreshConsolidatedSnapshot(institution?: string) {
+    console.log(`[AvaSyncService] Atualizando snapshot consolidado${institution ? ` (${institution})` : ''}...`);
+    const t0 = Date.now();
+    try {
+      const instFilter = institution ? sql`AND p."sourceInstitution" = ${institution}` : sql``;
+
+      await this.db.execute(sql`
+        INSERT INTO ava_consolidated_report (
+          "id",
+          "sourceInstitution",
+          "aluno_id",
+          "matricula",
+          "usuario",
+          "aluno",
+          "email",
+          "user_phone1",
+          "periodo",
+          "curso",
+          "curso_perfil",
+          "periodo_perfil",
+          "unidade_fisica",
+          "enrolment_status",
+          "lastaccess",
+          "dias_sem_acesso",
+          "progresso_fase1",
+          "progresso_fase2",
+          "progresso_fase3",
+          "progresso_total",
+          "progresso_lista_fase1",
+          "progresso_lista_fase2",
+          "progresso_lista_fase3",
+          "grade_id",
+          "nota_fase1",
+          "nota_fase2",
+          "nota_fase3",
+          "media_final",
+          "notas_lista_fase1",
+          "notas_lista_fase2",
+          "notas_lista_fase3",
+          "lista_notas",
+          "updatedAt"
+        )
+        SELECT 
+          gen_random_uuid(),
+          p."sourceInstitution",
+          p.aluno_id,
+          p.matricula,
+          p.usuario,
+          p.aluno,
+          g.user_email,
+          p.user_phone1,
+          p.periodo,
+          p.curso,
+          p.curso_perfil,
+          p.periodo_perfil,
+          p.unidade_fisica,
+          p.enrolment_status,
+          p.lastaccess,
+          p.dias_sem_acesso,
+          p.fase1,
+          p.fase2,
+          p.fase3,
+          p.progresso_total,
+          p.lista_fase1,
+          p.lista_fase2,
+          p.lista_fase3,
+          g.id,
+          g.fase1,
+          g.fase2,
+          g.fase3,
+          g.media,
+          g.lista_fase1,
+          g.lista_fase2,
+          g.lista_fase3,
+          g.lista_notas,
+          now()
+        FROM ava_progress_report p
+        LEFT JOIN ava_grades_report g
+          ON p."sourceInstitution" = g."sourceInstitution"
+         AND (p.aluno_id = g.user_id OR p.matricula = g.user_identification)
+         AND (p.curso = g.course_fullname OR p.curso = g.course_shortname)
+        WHERE 1=1 ${instFilter}
+        ON CONFLICT ("sourceInstitution", aluno_id, curso) DO UPDATE SET
+          "matricula" = EXCLUDED."matricula",
+          "usuario" = EXCLUDED."usuario",
+          "aluno" = EXCLUDED."aluno",
+          "email" = EXCLUDED."email",
+          "user_phone1" = EXCLUDED."user_phone1",
+          "periodo" = EXCLUDED."periodo",
+          "curso_perfil" = EXCLUDED."curso_perfil",
+          "periodo_perfil" = EXCLUDED."periodo_perfil",
+          "unidade_fisica" = EXCLUDED."unidade_fisica",
+          "enrolment_status" = EXCLUDED."enrolment_status",
+          "lastaccess" = EXCLUDED."lastaccess",
+          "dias_sem_acesso" = EXCLUDED."dias_sem_acesso",
+          "progresso_fase1" = EXCLUDED."progresso_fase1",
+          "progresso_fase2" = EXCLUDED."progresso_fase2",
+          "progresso_fase3" = EXCLUDED."progresso_fase3",
+          "progresso_total" = EXCLUDED."progresso_total",
+          "progresso_lista_fase1" = EXCLUDED."progresso_lista_fase1",
+          "progresso_lista_fase2" = EXCLUDED."progresso_lista_fase2",
+          "progresso_lista_fase3" = EXCLUDED."progresso_lista_fase3",
+          "grade_id" = EXCLUDED."grade_id",
+          "nota_fase1" = EXCLUDED."nota_fase1",
+          "nota_fase2" = EXCLUDED."nota_fase2",
+          "nota_fase3" = EXCLUDED."nota_fase3",
+          "media_final" = EXCLUDED."media_final",
+          "notas_lista_fase1" = EXCLUDED."notas_lista_fase1",
+          "notas_lista_fase2" = EXCLUDED."notas_lista_fase2",
+          "notas_lista_fase3" = EXCLUDED."notas_lista_fase3",
+          "lista_notas" = EXCLUDED."lista_notas",
+          "updatedAt" = now();
+      `);
+
+      console.log(`[AvaSyncService] Snapshot consolidado atualizado com sucesso em ${Date.now() - t0}ms.`);
+    } catch (err: any) {
+      console.error('[AvaSyncService] Erro ao atualizar snapshot consolidado:', err.message);
+    }
+  }
+
 
 
   async syncGrades(institution: string, getUrl: string | undefined, attUrl: string | undefined) {
@@ -197,6 +368,9 @@ export class AvaSyncService implements OnModuleInit {
       });
 
       console.log(`[SYNC] Notas ${institution} concluído: ${inserted} registros salvos no banco.`);
+
+      // Atualizar Snapshot Consolidado automaticamente
+      await this.refreshConsolidatedSnapshot(institution);
 
       if (attUrl) {
         console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Notas)...`);
@@ -352,6 +526,9 @@ export class AvaSyncService implements OnModuleInit {
       });
 
       console.log(`[SYNC] Progresso ${institution} concluído: ${inserted} registros salvos no banco.`);
+
+      // Atualizar Snapshot Consolidado automaticamente
+      await this.refreshConsolidatedSnapshot(institution);
 
       if (attUrl) {
         console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Progresso)...`);

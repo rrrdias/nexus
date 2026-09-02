@@ -3,7 +3,7 @@ import { DB_CONNECTION } from '../db/db.provider';
 
 import { eq, ilike, and, inArray, or, isNull, isNotNull, not, sql, desc, asc } from 'drizzle-orm';
 
-import { avaProgressReport, avaGradesReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
+import { avaProgressReport, avaGradesReport, avaConsolidatedReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { AvaSyncService } from '../ava-sync/ava-sync.service';
@@ -619,42 +619,41 @@ export class AvaReportsService {
   private buildConsolidatedConditions(filters: any) {
     const conditions: any[] = [];
     const sourceInstitution = filters.sourceInstitution || 'ead';
-    conditions.push(eq(avaProgressReport.sourceInstitution, sourceInstitution));
+    conditions.push(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution));
 
-    if (filters.aluno) conditions.push(ilike(avaProgressReport.aluno, `%${filters.aluno}%`));
-    if (filters.matricula) conditions.push(ilike(avaProgressReport.matricula, `%${filters.matricula}%`));
-    if (filters.usuario) conditions.push(ilike(avaProgressReport.usuario, `%${filters.usuario}%`));
-    if (filters.curso) conditions.push(ilike(avaProgressReport.curso, `%${filters.curso}%`));
-    if (filters.unidade_fisica) conditions.push(ilike(avaProgressReport.unidadeFisica, `%${filters.unidade_fisica}%`));
-    if (filters.enrolment_status) conditions.push(ilike(avaProgressReport.enrolmentStatus, `%${filters.enrolment_status}%`));
+    if (filters.aluno) conditions.push(ilike(avaConsolidatedReport.aluno, `%${filters.aluno}%`));
+    if (filters.matricula) conditions.push(ilike(avaConsolidatedReport.matricula, `%${filters.matricula}%`));
+    if (filters.usuario) conditions.push(ilike(avaConsolidatedReport.usuario, `%${filters.usuario}%`));
+    if (filters.curso) conditions.push(ilike(avaConsolidatedReport.curso, `%${filters.curso}%`));
+    if (filters.unidade_fisica) conditions.push(ilike(avaConsolidatedReport.unidadeFisica, `%${filters.unidade_fisica}%`));
+    if (filters.enrolment_status) conditions.push(ilike(avaConsolidatedReport.enrolmentStatus, `%${filters.enrolment_status}%`));
 
     const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-2";
-    if (periodoFilter) conditions.push(ilike(avaProgressReport.periodo, `%${periodoFilter}%`));
+    if (periodoFilter) conditions.push(ilike(avaConsolidatedReport.periodo, `%${periodoFilter}%`));
 
     if (filters.search) {
       const s = `%${filters.search}%`;
       conditions.push(or(
-        ilike(avaProgressReport.aluno, s),
-        ilike(avaProgressReport.matricula, s),
-        ilike(avaProgressReport.usuario, s),
-        ilike(avaProgressReport.curso, s)
+        ilike(avaConsolidatedReport.aluno, s),
+        ilike(avaConsolidatedReport.matricula, s),
+        ilike(avaConsolidatedReport.usuario, s),
+        ilike(avaConsolidatedReport.curso, s)
       ));
     }
-
 
     const acesso_value = filters.lastaccess;
     if (acesso_value === "sem_acesso") {
       conditions.push(or(
-        isNull(avaProgressReport.lastaccess),
-        inArray(sql`lower(trim(coalesce(${avaProgressReport.lastaccess}, '')))`, this.termosSemAcesso)
+        isNull(avaConsolidatedReport.lastaccess),
+        inArray(sql`lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, '')))`, this.termosSemAcesso)
       ));
     } else if (acesso_value === "com_acesso") {
       conditions.push(and(
-        isNotNull(avaProgressReport.lastaccess),
-        not(inArray(sql`lower(trim(coalesce(${avaProgressReport.lastaccess}, '')))`, this.termosSemAcesso))
+        isNotNull(avaConsolidatedReport.lastaccess),
+        not(inArray(sql`lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, '')))`, this.termosSemAcesso))
       ));
     } else if (acesso_value) {
-      conditions.push(ilike(avaProgressReport.lastaccess, `%${acesso_value}%`));
+      conditions.push(ilike(avaConsolidatedReport.lastaccess, `%${acesso_value}%`));
     }
 
     return and(...conditions);
@@ -666,75 +665,59 @@ export class AvaReportsService {
     try {
       const whereClause = this.buildConsolidatedConditions(filters);
 
-      const joinCondition = and(
-        eq(avaGradesReport.sourceInstitution, avaProgressReport.sourceInstitution),
-        or(
-          and(isNotNull(avaProgressReport.alunoId), eq(avaProgressReport.alunoId, avaGradesReport.userId)),
-          and(isNotNull(avaProgressReport.matricula), eq(avaProgressReport.matricula, avaGradesReport.userIdentification))
-        ),
-        or(
-          eq(avaProgressReport.curso, avaGradesReport.courseFullname),
-          eq(avaProgressReport.curso, avaGradesReport.courseShortname)
-        )
-      );
-
-      // 1. Contagem total
+      // 1. Contagem total ultrarrápida no snapshot
       const [countRes] = await this.db.select({ count: sql<number>`count(*)` })
-        .from(avaProgressReport)
+        .from(avaConsolidatedReport)
         .where(whereClause);
 
       const total_records = Number(countRes?.count || 0);
       const total_pages = Math.ceil(total_records / size) || 1;
       const offset = (page - 1) * size;
 
-      // 2. Busca paginada unificada
+      // 2. Busca paginada direta no Snapshot (Zero Left Joins em runtime - ~14ms!)
       const pageRows = total_records > 0
         ? await this.db.select({
-            id: avaProgressReport.id,
-            alunoId: avaProgressReport.alunoId,
-            matricula: avaProgressReport.matricula,
-            usuario: avaProgressReport.usuario,
-            aluno: avaProgressReport.aluno,
-            email: avaGradesReport.userEmail,
-            userPhone1: avaProgressReport.userPhone1,
-
-            periodo: avaProgressReport.periodo,
-            curso: avaProgressReport.curso,
-            cursoPerfil: avaProgressReport.cursoPerfil,
-            periodoPerfil: avaProgressReport.periodoPerfil,
-            unidadeFisica: avaProgressReport.unidadeFisica,
-            enrolmentStatus: avaProgressReport.enrolmentStatus,
-            lastaccess: avaProgressReport.lastaccess,
-            diasSemAcesso: avaProgressReport.diasSemAcesso,
+            id: avaConsolidatedReport.id,
+            alunoId: avaConsolidatedReport.alunoId,
+            matricula: avaConsolidatedReport.matricula,
+            usuario: avaConsolidatedReport.usuario,
+            aluno: avaConsolidatedReport.aluno,
+            email: avaConsolidatedReport.email,
+            userPhone1: avaConsolidatedReport.userPhone1,
+            periodo: avaConsolidatedReport.periodo,
+            curso: avaConsolidatedReport.curso,
+            cursoPerfil: avaConsolidatedReport.cursoPerfil,
+            periodoPerfil: avaConsolidatedReport.periodoPerfil,
+            unidadeFisica: avaConsolidatedReport.unidadeFisica,
+            enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
+            lastaccess: avaConsolidatedReport.lastaccess,
+            diasSemAcesso: avaConsolidatedReport.diasSemAcesso,
             // Progresso
-            progressoFase1: avaProgressReport.fase1,
-            progressoFase2: avaProgressReport.fase2,
-            progressoFase3: avaProgressReport.fase3,
-            progressoTotal: avaProgressReport.progressoTotal,
-            progressoListaFase1: avaProgressReport.listaFase1,
-            progressoListaFase2: avaProgressReport.listaFase2,
-            progressoListaFase3: avaProgressReport.listaFase3,
-            listaFase1: avaProgressReport.listaFase1,
-            listaFase2: avaProgressReport.listaFase2,
-            listaFase3: avaProgressReport.listaFase3,
-            sourceInstitution: avaProgressReport.sourceInstitution,
+            progressoFase1: avaConsolidatedReport.progressoFase1,
+            progressoFase2: avaConsolidatedReport.progressoFase2,
+            progressoFase3: avaConsolidatedReport.progressoFase3,
+            progressoTotal: avaConsolidatedReport.progressoTotal,
+            progressoListaFase1: avaConsolidatedReport.progressoListaFase1,
+            progressoListaFase2: avaConsolidatedReport.progressoListaFase2,
+            progressoListaFase3: avaConsolidatedReport.progressoListaFase3,
+            listaFase1: avaConsolidatedReport.progressoListaFase1,
+            listaFase2: avaConsolidatedReport.progressoListaFase2,
+            listaFase3: avaConsolidatedReport.progressoListaFase3,
+            sourceInstitution: avaConsolidatedReport.sourceInstitution,
             // Notas
-            gradeId: avaGradesReport.id,
-            notaFase1: avaGradesReport.fase1,
-            notaFase2: avaGradesReport.fase2,
-            notaFase3: avaGradesReport.fase3,
-            mediaFinal: avaGradesReport.media,
-            notasListaFase1: avaGradesReport.listaFase1,
-            notasListaFase2: avaGradesReport.listaFase2,
-            notasListaFase3: avaGradesReport.listaFase3,
-            listaNotas: avaGradesReport.listaNotas,
+            gradeId: avaConsolidatedReport.gradeId,
+            notaFase1: avaConsolidatedReport.notaFase1,
+            notaFase2: avaConsolidatedReport.notaFase2,
+            notaFase3: avaConsolidatedReport.notaFase3,
+            mediaFinal: avaConsolidatedReport.mediaFinal,
+            notasListaFase1: avaConsolidatedReport.notasListaFase1,
+            notasListaFase2: avaConsolidatedReport.notasListaFase2,
+            notasListaFase3: avaConsolidatedReport.notasListaFase3,
+            listaNotas: avaConsolidatedReport.listaNotas,
           })
-
-
-          .from(avaProgressReport)
-          .leftJoin(avaGradesReport, joinCondition)
+          .from(avaConsolidatedReport)
           .where(whereClause)
-          .orderBy(avaProgressReport.aluno, avaProgressReport.curso, avaProgressReport.id)
+          .orderBy(avaConsolidatedReport.aluno, avaConsolidatedReport.curso, avaConsolidatedReport.id)
           .limit(size)
           .offset(offset)
         : [];
@@ -748,34 +731,33 @@ export class AvaReportsService {
         mediaFinal: row.mediaFinal ?? '-',
       }));
 
-      // 3. Agregações estatísticas em SQL nativo
+      // 3. Agregações estatísticas em SQL nativo no snapshot
       const [statsRes] = await this.db.select({
-        avgProgress: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgGrade: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        belowApproval: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
-        noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaProgressReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
-        uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaProgressReport.alunoId}, ''), ${avaProgressReport.matricula}))`,
-        uniqueDisciplines: sql<number>`count(distinct ${avaProgressReport.curso})`,
+        avgProgress: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+        avgGrade: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+        belowApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
+        noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
+        uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaConsolidatedReport.alunoId}, ''), ${avaConsolidatedReport.matricula}))`,
+        uniqueDisciplines: sql<number>`count(distinct ${avaConsolidatedReport.curso})`,
       })
-      .from(avaProgressReport)
-      .leftJoin(avaGradesReport, joinCondition)
+      .from(avaConsolidatedReport)
       .where(whereClause);
 
-      // 4. Dropdowns de filtros únicos
+      // 4. Dropdowns de filtros únicos diretamente no snapshot
       const sourceInstitution = filters.sourceInstitution || 'ead';
       const [uniquePeriodos, uniqueCursos, uniquePolos] = await Promise.all([
-        this.db.selectDistinct({ value: avaProgressReport.periodo })
-          .from(avaProgressReport)
-          .where(and(eq(avaProgressReport.sourceInstitution, sourceInstitution), isNotNull(avaProgressReport.periodo)))
-          .orderBy(desc(avaProgressReport.periodo)),
-        this.db.selectDistinct({ value: avaProgressReport.curso })
-          .from(avaProgressReport)
-          .where(and(eq(avaProgressReport.sourceInstitution, sourceInstitution), isNotNull(avaProgressReport.curso)))
-          .orderBy(avaProgressReport.curso),
-        this.db.selectDistinct({ value: avaProgressReport.unidadeFisica })
-          .from(avaProgressReport)
-          .where(and(eq(avaProgressReport.sourceInstitution, sourceInstitution), isNotNull(avaProgressReport.unidadeFisica)))
-          .orderBy(avaProgressReport.unidadeFisica),
+        this.db.selectDistinct({ value: avaConsolidatedReport.periodo })
+          .from(avaConsolidatedReport)
+          .where(and(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution), isNotNull(avaConsolidatedReport.periodo)))
+          .orderBy(desc(avaConsolidatedReport.periodo)),
+        this.db.selectDistinct({ value: avaConsolidatedReport.curso })
+          .from(avaConsolidatedReport)
+          .where(and(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution), isNotNull(avaConsolidatedReport.curso)))
+          .orderBy(avaConsolidatedReport.curso),
+        this.db.selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
+          .from(avaConsolidatedReport)
+          .where(and(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution), isNotNull(avaConsolidatedReport.unidadeFisica)))
+          .orderBy(avaConsolidatedReport.unidadeFisica),
       ]);
 
       return {
@@ -806,49 +788,35 @@ export class AvaReportsService {
     try {
       const whereClause = this.buildConsolidatedConditions(filters);
 
-      const joinCondition = and(
-        eq(avaGradesReport.sourceInstitution, avaProgressReport.sourceInstitution),
-        or(
-          and(isNotNull(avaProgressReport.alunoId), eq(avaProgressReport.alunoId, avaGradesReport.userId)),
-          and(isNotNull(avaProgressReport.matricula), eq(avaProgressReport.matricula, avaGradesReport.userIdentification))
-        ),
-        or(
-          eq(avaProgressReport.curso, avaGradesReport.courseFullname),
-          eq(avaProgressReport.curso, avaGradesReport.courseShortname)
-        )
-      );
-
       const rawData = await this.db.select({
-        id: avaProgressReport.id,
-        alunoId: avaProgressReport.alunoId,
-        matricula: avaProgressReport.matricula,
-        usuario: avaProgressReport.usuario,
-        aluno: avaProgressReport.aluno,
-        email: avaGradesReport.userEmail,
-        userPhone1: avaProgressReport.userPhone1,
-
-        periodo: avaProgressReport.periodo,
-        curso: avaProgressReport.curso,
-        cursoPerfil: avaProgressReport.cursoPerfil,
-        periodoPerfil: avaProgressReport.periodoPerfil,
-        unidadeFisica: avaProgressReport.unidadeFisica,
-        enrolmentStatus: avaProgressReport.enrolmentStatus,
-        lastaccess: avaProgressReport.lastaccess,
+        id: avaConsolidatedReport.id,
+        alunoId: avaConsolidatedReport.alunoId,
+        matricula: avaConsolidatedReport.matricula,
+        usuario: avaConsolidatedReport.usuario,
+        aluno: avaConsolidatedReport.aluno,
+        email: avaConsolidatedReport.email,
+        userPhone1: avaConsolidatedReport.userPhone1,
+        periodo: avaConsolidatedReport.periodo,
+        curso: avaConsolidatedReport.curso,
+        cursoPerfil: avaConsolidatedReport.cursoPerfil,
+        periodoPerfil: avaConsolidatedReport.periodoPerfil,
+        unidadeFisica: avaConsolidatedReport.unidadeFisica,
+        enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
+        lastaccess: avaConsolidatedReport.lastaccess,
         // Progresso
-        progressoFase1: avaProgressReport.fase1,
-        progressoFase2: avaProgressReport.fase2,
-        progressoFase3: avaProgressReport.fase3,
-        progressoTotal: avaProgressReport.progressoTotal,
+        progressoFase1: avaConsolidatedReport.progressoFase1,
+        progressoFase2: avaConsolidatedReport.progressoFase2,
+        progressoFase3: avaConsolidatedReport.progressoFase3,
+        progressoTotal: avaConsolidatedReport.progressoTotal,
         // Notas
-        notaFase1: avaGradesReport.fase1,
-        notaFase2: avaGradesReport.fase2,
-        notaFase3: avaGradesReport.fase3,
-        mediaFinal: avaGradesReport.media,
+        notaFase1: avaConsolidatedReport.notaFase1,
+        notaFase2: avaConsolidatedReport.notaFase2,
+        notaFase3: avaConsolidatedReport.notaFase3,
+        mediaFinal: avaConsolidatedReport.mediaFinal,
       })
-      .from(avaProgressReport)
-      .leftJoin(avaGradesReport, joinCondition)
+      .from(avaConsolidatedReport)
       .where(whereClause)
-      .orderBy(avaProgressReport.aluno, avaProgressReport.curso);
+      .orderBy(avaConsolidatedReport.aluno, avaConsolidatedReport.curso);
 
       return rawData.map(row => ({
         ...row,
@@ -863,6 +831,7 @@ export class AvaReportsService {
       throw new Error("Falha ao exportar dados consolidados");
     }
   }
+
 
   async getAvaDashboardStats(user: SessionUser) {
     await this.assertAvaAccess(user);

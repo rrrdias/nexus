@@ -161,6 +161,57 @@ export const avaGradesReport = pgTable("ava_grades_report", {
   index("idx_ava_grades_identification_trgm").using("gin", t.userIdentification.op("gin_trgm_ops")),
 ])
 
+export const avaConsolidatedReport = pgTable("ava_consolidated_report", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sourceInstitution: text("sourceInstitution").notNull(),
+
+  alunoId: text("aluno_id"),
+  matricula: text("matricula"),
+  usuario: text("usuario"),
+  aluno: text("aluno"),
+  email: text("email"),
+  userPhone1: text("user_phone1"),
+  periodo: text("periodo"),
+  curso: text("curso"),
+  cursoPerfil: text("curso_perfil"),
+  periodoPerfil: text("periodo_perfil"),
+  unidadeFisica: text("unidade_fisica"),
+  enrolmentStatus: text("enrolment_status"),
+  lastaccess: text("lastaccess"),
+  diasSemAcesso: text("dias_sem_acesso"),
+
+  // Progresso
+  progressoFase1: text("progresso_fase1"),
+  progressoFase2: text("progresso_fase2"),
+  progressoFase3: text("progresso_fase3"),
+  progressoTotal: text("progresso_total"),
+  progressoListaFase1: text("progresso_lista_fase1"),
+  progressoListaFase2: text("progresso_lista_fase2"),
+  progressoListaFase3: text("progresso_lista_fase3"),
+
+  // Notas
+  gradeId: text("grade_id"),
+  notaFase1: text("nota_fase1"),
+  notaFase2: text("nota_fase2"),
+  notaFase3: text("nota_fase3"),
+  mediaFinal: text("media_final"),
+  notasListaFase1: text("notas_lista_fase1"),
+  notasListaFase2: text("notas_lista_fase2"),
+  notasListaFase3: text("notas_lista_fase3"),
+  listaNotas: text("lista_notas"),
+
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+}, (t) => [
+  unique("unq_ava_consolidated").on(t.sourceInstitution, t.alunoId, t.curso),
+  index("idx_ava_consolidated_inst_period").on(t.sourceInstitution, t.periodo),
+  index("idx_ava_consolidated_filters").on(t.sourceInstitution, t.periodo, t.cursoPerfil, t.periodoPerfil, t.unidadeFisica),
+  index("idx_ava_consolidated_status").on(t.sourceInstitution, t.enrolmentStatus),
+  index("idx_ava_consolidated_aluno_trgm").using("gin", t.aluno.op("gin_trgm_ops")),
+  index("idx_ava_consolidated_curso_trgm").using("gin", t.curso.op("gin_trgm_ops")),
+  index("idx_ava_consolidated_matricula_trgm").using("gin", t.matricula.op("gin_trgm_ops")),
+])
+
+
 // ==========================================
 // Módulo: Scheduling (Agendamento de Provas)
 // ==========================================
