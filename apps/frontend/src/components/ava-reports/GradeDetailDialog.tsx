@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { 
   Award, 
@@ -12,7 +12,8 @@ import {
   Clock, 
   FileCheck, 
   Calendar,
-  BookOpen
+  BookOpen,
+  Layers
 } from "lucide-react"
 
 interface Activity {
@@ -124,7 +125,7 @@ function classifyActivityPhase(name: string): 1 | 2 | 3 {
     const unitNum = parseInt(matchUnit[1], 10)
     if (unitNum >= 7) return 3
     if (unitNum >= 4) return 2
-    if (unitNum === 3) return 1 // UT 03 geralmente pertence à Fase 1 em cursos de 8 UTs (1-3, 4-6, 7-8)
+    if (unitNum === 3) return 1
     if (unitNum <= 2) return 1
   }
 
@@ -193,12 +194,61 @@ export function GradeDetailDialog({
   listaFase3,
   listaNotas,
 }: GradeDetailDialogProps) {
+  const isSinglePhase = faseActive === "fase1" || faseActive === "fase2" || faseActive === "fase3"
+
   const [selectedTab, setSelectedTab] = useState<"fase1" | "fase2" | "fase3" | "all">(
-    faseActive === "media" ? "all" : faseActive || "all"
+    isSinglePhase ? faseActive : "all"
   )
 
-  const nMedia = parseNum(mediaFinal)
-  const isAprovado = nMedia >= 6.0 || nMedia >= 60
+  useEffect(() => {
+    if (isSinglePhase) {
+      setSelectedTab(faseActive)
+    } else {
+      setSelectedTab("all")
+    }
+  }, [faseActive, isSinglePhase, open])
+
+  // Identificação do título e nota de referência para o badge de status
+  let referenceNota = mediaFinal
+  let referenceLabel = "Média Consolidada"
+  let modalTitle = "Detalhamento de Notas e Atividades"
+  let modalSubtitle = "Extrato Geral Consolidado"
+  let activeMetricTitle = "Média Final"
+  let activeMetricValue = mediaFinal || "-"
+  let activeProgTitle = "Progresso Geral"
+  let activeProgValue = `${progTotal || "0"}%`
+
+  if (faseActive === "fase1") {
+    referenceNota = fase1Nota
+    referenceLabel = "Fase 1"
+    modalTitle = "Detalhamento de Notas e Atividades — Fase 1"
+    modalSubtitle = "Extrato Específico da Fase 1"
+    activeMetricTitle = "Nota Fase 1"
+    activeMetricValue = fase1Nota || "-"
+    activeProgTitle = "Progresso Fase 1"
+    activeProgValue = `${fase1Prog || "0"}%`
+  } else if (faseActive === "fase2") {
+    referenceNota = fase2Nota
+    referenceLabel = "Fase 2"
+    modalTitle = "Detalhamento de Notas e Atividades — Fase 2"
+    modalSubtitle = "Extrato Específico da Fase 2"
+    activeMetricTitle = "Nota Fase 2"
+    activeMetricValue = fase2Nota || "-"
+    activeProgTitle = "Progresso Fase 2"
+    activeProgValue = `${fase2Prog || "0"}%`
+  } else if (faseActive === "fase3") {
+    referenceNota = fase3Nota
+    referenceLabel = "Fase 3"
+    modalTitle = "Detalhamento de Notas e Atividades — Fase 3"
+    modalSubtitle = "Extrato Específico da Fase 3"
+    activeMetricTitle = "Nota Fase 3"
+    activeMetricValue = fase3Nota || "-"
+    activeProgTitle = "Progresso Fase 3"
+    activeProgValue = `${fase3Prog || "0"}%`
+  }
+
+  const nRef = parseNum(referenceNota)
+  const isAprovado = nRef >= 6.0 || nRef >= 60
 
   const allGradedActivities = parseActivities(listaNotas)
   const rawF1 = parseActivities(listaFase1)
@@ -423,7 +473,7 @@ export function GradeDetailDialog({
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-black uppercase tracking-wider border border-blue-200/60">
-                  Extrato Consolidado de Notas e Atividades
+                  {modalSubtitle}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">Moodle EaD</span>
               </div>
@@ -431,13 +481,13 @@ export function GradeDetailDialog({
                 isAprovado ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
               }`}>
                 {isAprovado ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <AlertCircle className="w-3.5 h-3.5 text-rose-600" />}
-                {isAprovado ? "Média Aprovada" : "Abaixo da Média"}
+                {isAprovado ? "Apto / Aprovado" : "Abaixo da Média"}
               </span>
             </div>
 
             <DialogTitle className="text-2xl font-extrabold text-navy flex items-center gap-2.5 mt-2">
-              <Award className="w-6 h-6 text-blue-600" />
-              Detalhamento de Notas e Atividades do Aluno
+              {isSinglePhase ? <Layers className="w-6 h-6 text-blue-600" /> : <Award className="w-6 h-6 text-blue-600" />}
+              {modalTitle}
             </DialogTitle>
           </DialogHeader>
 
@@ -455,13 +505,13 @@ export function GradeDetailDialog({
               </div>
               <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-xl border border-slate-200/80 shadow-2xs">
                 <div className="text-right">
-                  <div className="text-[10px] text-slate-400 uppercase font-black">Média Final</div>
-                  <div className="text-xl font-black font-mono text-navy">{mediaFinal || "-"}</div>
+                  <div className="text-[10px] text-slate-400 uppercase font-black">{activeMetricTitle}</div>
+                  <div className="text-xl font-black font-mono text-navy">{activeMetricValue}</div>
                 </div>
                 <div className="w-px h-8 bg-slate-200" />
                 <div className="text-right">
-                  <div className="text-[10px] text-slate-400 uppercase font-black">Progresso Geral</div>
-                  <div className="text-xl font-black font-mono text-emerald-600">{progTotal || "0"}%</div>
+                  <div className="text-[10px] text-slate-400 uppercase font-black">{activeProgTitle}</div>
+                  <div className="text-xl font-black font-mono text-emerald-600">{activeProgValue}</div>
                 </div>
               </div>
             </div>
@@ -478,41 +528,43 @@ export function GradeDetailDialog({
             </div>
           </div>
 
-          {/* Navegação por Abas (Fase 1, Fase 2, Fase 3, Todas) */}
-          <div className="flex items-center justify-between gap-1.5 bg-slate-100 p-1.5 rounded-xl">
-            <button
-              onClick={() => setSelectedTab("all")}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === "all" ? "bg-white text-navy shadow-xs" : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              Visão Completa (Todas as Fases)
-            </button>
-            <button
-              onClick={() => setSelectedTab("fase1")}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === "fase1" ? "bg-white text-blue-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              Fase 1 ({fase1Nota || "-"})
-            </button>
-            <button
-              onClick={() => setSelectedTab("fase2")}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === "fase2" ? "bg-white text-indigo-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              Fase 2 ({fase2Nota || "-"})
-            </button>
-            <button
-              onClick={() => setSelectedTab("fase3")}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === "fase3" ? "bg-white text-purple-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              Fase 3 ({fase3Nota || "-"})
-            </button>
-          </div>
+          {/* Navegação por Abas SOMENTE quando for o modal Consolidado / Total */}
+          {!isSinglePhase && (
+            <div className="flex items-center justify-between gap-1.5 bg-slate-100 p-1.5 rounded-xl">
+              <button
+                onClick={() => setSelectedTab("all")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  selectedTab === "all" ? "bg-white text-navy shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Visão Completa (Todas as Fases)
+              </button>
+              <button
+                onClick={() => setSelectedTab("fase1")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  selectedTab === "fase1" ? "bg-white text-blue-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Fase 1 ({fase1Nota || "-"})
+              </button>
+              <button
+                onClick={() => setSelectedTab("fase2")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  selectedTab === "fase2" ? "bg-white text-indigo-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Fase 2 ({fase2Nota || "-"})
+              </button>
+              <button
+                onClick={() => setSelectedTab("fase3")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  selectedTab === "fase3" ? "bg-white text-purple-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Fase 3 ({fase3Nota || "-"})
+              </button>
+            </div>
+          )}
 
           {/* Conteúdo das Fases com Itens e Notas */}
           <div className="space-y-4">
