@@ -13,7 +13,12 @@ import {
   CheckCircle2, 
   AlertCircle,
   FileSpreadsheet,
-  Award
+  Award,
+  BookOpen,
+  MessageCircle,
+  Copy,
+  ExternalLink,
+  Check
 } from "lucide-react"
 
 interface ConsolidatedRecord {
@@ -54,8 +59,6 @@ interface ConsolidatedRecord {
   listaNotas?: string
 }
 
-
-
 interface ConsolidatedTableProps {
   data: ConsolidatedRecord[]
   isLoading?: boolean
@@ -69,12 +72,12 @@ function parseVal(val: string | null | undefined): number {
 
 function getProgressBadgeStyle(percent: number) {
   if (percent >= 70) {
-    return "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+    return "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
   }
   if (percent >= 40) {
     return "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
   }
-  return "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+  return "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
 }
 
 function getGradeBadgeStyle(grade: number) {
@@ -84,10 +87,53 @@ function getGradeBadgeStyle(grade: number) {
   if (grade > 0) {
     return "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
   }
-  return "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
+  return "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+}
+
+function formatPhone(phone: string | null | undefined): string | null {
+  if (!phone) return null
+  const cleaned = phone.replace(/\D/g, '')
+  if (cleaned.length === 11) {
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`
+  }
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`
+  }
+  return phone
+}
+
+function getWhatsAppLink(phone: string | null | undefined, studentName: string): string | null {
+  if (!phone) return null
+  const cleaned = phone.replace(/\D/g, '')
+  if (cleaned.length < 10) return null
+  const fullNumber = cleaned.startsWith('55') ? cleaned : `55${cleaned}`
+  const firstName = studentName.split(' ')[0] || studentName
+  const msg = encodeURIComponent(`Olá, ${firstName}! Aqui é do suporte acadêmico UniEVANGÉLICA referente ao acompanhamento de suas disciplinas no AVA.`)
+  return `https://wa.me/${fullNumber}?text=${msg}`
+}
+
+function splitCourseAndCode(fullCourse: string | null | undefined) {
+  if (!fullCourse) return { name: '-', code: null }
+  const match = fullCourse.match(/^(.*?)\s*[-–—]\s*([A-Za-z0-9]+[A-Za-z0-9_-]*)$/)
+  if (match) {
+    return {
+      name: match[1].trim(),
+      code: match[2].trim()
+    }
+  }
+  return { name: fullCourse.trim(), code: null }
+}
+
+function getInitials(name: string): string {
+  if (!name) return "AL"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
 export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
   const [dialogState, setDialogState] = useState<{
     open: boolean
     fase: string
@@ -122,6 +168,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     listaFase1?: string | null
     listaFase2?: string | null
     listaFase3?: string | null
+    listaNotas?: string | null
   }>({
     open: false,
     studentName: "",
@@ -144,6 +191,12 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     listaFase3: null as string | null,
     listaNotas: null as string | null | undefined,
   })
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
 
   const openActivityDialog = (fase: string, label: string, listaRaw: string | null, percent: string | null) => {
     setDialogState({
@@ -180,58 +233,57 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     })
   }
 
-
-
-
-
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-2 p-12 text-center shadow-sm">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-navy border-r-transparent mb-3" />
-        <p className="text-sm font-semibold text-gray-5">Carregando relatório consolidado...</p>
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center shadow-sm">
+        <div className="inline-block animate-spin rounded-full h-9 w-9 border-4 border-navy border-r-transparent mb-3.5" />
+        <p className="text-sm font-bold text-navy">Carregando relatório consolidado...</p>
+        <p className="text-xs text-slate-400 mt-1">Sincronizando métricas e notas em tempo real</p>
       </div>
     )
   }
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-2 p-12 text-center shadow-sm select-none">
-        <AlertCircle className="w-10 h-10 text-gray-3 mx-auto mb-3" />
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center shadow-sm select-none">
+        <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
         <h3 className="text-base font-extrabold text-navy">Nenhum registro encontrado</h3>
-        <p className="text-xs text-gray-4 mt-1">Ajuste os filtros de busca ou período letivo acima.</p>
+        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          Não localizamos matrículas para os filtros selecionados. Tente ajustar o período letivo, polo ou termo de busca.
+        </p>
       </div>
     )
   }
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-gray-2 shadow-sm overflow-hidden select-none">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden select-none">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-[#F8FAFC] border-b border-gray-2 text-[11px] font-extrabold text-navy uppercase tracking-wider">
-                <th className="py-3.5 px-4 min-w-[240px]">Aluno / Matrícula</th>
-                <th className="py-3.5 px-4 min-w-[200px]">Curso / Polo</th>
-                <th className="py-3.5 px-4 min-w-[150px] text-center bg-blue-50/40 border-x border-gray-2">
-                  <div className="text-blue-900 font-black">Fase 1</div>
-                  <div className="text-[9px] font-medium text-blue-600 lowercase tracking-normal">progresso | nota</div>
+              <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold text-navy uppercase tracking-wider">
+                <th className="py-4 px-4 min-w-[280px]">Aluno / Contato</th>
+                <th className="py-4 px-4 min-w-[340px]">Disciplina / Curso / Polo</th>
+                <th className="py-4 px-3 min-w-[145px] text-center bg-blue-50/50 border-x border-slate-200/80">
+                  <div className="text-blue-950 font-black">Fase 1</div>
+                  <div className="text-[10px] font-semibold text-blue-700/80 tracking-normal capitalize">Progresso | Nota</div>
                 </th>
-                <th className="py-3.5 px-4 min-w-[150px] text-center bg-indigo-50/40 border-r border-gray-2">
-                  <div className="text-indigo-900 font-black">Fase 2</div>
-                  <div className="text-[9px] font-medium text-indigo-600 lowercase tracking-normal">progresso | nota</div>
+                <th className="py-4 px-3 min-w-[145px] text-center bg-indigo-50/50 border-r border-slate-200/80">
+                  <div className="text-indigo-950 font-black">Fase 2</div>
+                  <div className="text-[10px] font-semibold text-indigo-700/80 tracking-normal capitalize">Progresso | Nota</div>
                 </th>
-                <th className="py-3.5 px-4 min-w-[150px] text-center bg-purple-50/40 border-r border-gray-2">
-                  <div className="text-purple-900 font-black">Fase 3</div>
-                  <div className="text-[9px] font-medium text-purple-600 lowercase tracking-normal">progresso | nota</div>
+                <th className="py-4 px-3 min-w-[145px] text-center bg-purple-50/50 border-r border-slate-200/80">
+                  <div className="text-purple-950 font-black">Fase 3</div>
+                  <div className="text-[10px] font-semibold text-purple-700/80 tracking-normal capitalize">Progresso | Nota</div>
                 </th>
-                <th className="py-3.5 px-4 min-w-[170px] text-center bg-emerald-50/50">
-                  <div className="text-emerald-900 font-black">Consolidado</div>
-                  <div className="text-[9px] font-medium text-emerald-700 lowercase tracking-normal">total | média</div>
+                <th className="py-4 px-3 min-w-[160px] text-center bg-emerald-50/60 border-r border-slate-200/80">
+                  <div className="text-emerald-950 font-black">Consolidado</div>
+                  <div className="text-[10px] font-semibold text-emerald-700/80 tracking-normal capitalize">Total | Média</div>
                 </th>
-                <th className="py-3.5 px-4 text-center">Status / Acesso</th>
+                <th className="py-4 px-4 text-center min-w-[120px]">Status / Acesso</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-1">
+            <tbody className="divide-y divide-slate-100">
               {data.map((row) => {
                 const progF1 = parseVal(row.progressoFase1)
                 const progF2 = parseVal(row.progressoFase2)
@@ -244,110 +296,157 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                 const mediaTot = parseVal(row.mediaFinal)
 
                 const isAtivo = String(row.enrolmentStatus).toLowerCase().includes("ativo")
+                const parsedCourse = splitCourseAndCode(row.curso)
+                const phoneFormatted = formatPhone(row.userPhone1)
+                const waLink = getWhatsAppLink(row.userPhone1, row.aluno)
+                const initials = getInitials(row.aluno)
 
                 return (
-                  <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
-                    {/* Aluno / Matrícula */}
-                    <td className="py-3 px-4">
-                      <div className="font-extrabold text-navy text-[13px] leading-tight flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-navy/40 shrink-0" />
-                        <span>{row.aluno}</span>
-                      </div>
-                      <div className="text-[10px] text-gray-500 font-mono mt-0.5 flex items-center gap-2">
-                        <span>Matrícula: <strong>{row.matricula || row.usuario || '-'}</strong></span>
-                        {row.userPhone1 && (
-                          <span className="text-gray-400">· 📞 {row.userPhone1}</span>
-                        )}
+                  <tr key={row.id} className="hover:bg-slate-50/90 transition-colors group">
+                    
+                    {/* Aluno / Contato */}
+                    <td className="py-3.5 px-4 align-top">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-navy/5 text-navy border border-navy/10 flex items-center justify-center font-black text-[11px] shrink-0 mt-0.5 shadow-2xs">
+                          {initials}
+                        </div>
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="font-extrabold text-navy text-[13px] leading-snug break-words">
+                            {row.aluno}
+                          </div>
+                          
+                          <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-slate-500">
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/80 text-slate-700 font-bold">
+                              ID: {row.matricula || row.usuario || '-'}
+                            </span>
+                            
+                            {phoneFormatted && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-600 font-medium">📞 {phoneFormatted}</span>
+                                {waLink && (
+                                  <a
+                                    href={waLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                    title="Iniciar conversa no WhatsApp com o aluno"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5 fill-emerald-600/20" />
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </td>
 
-                    {/* Curso / Polo */}
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-gray-8 text-xs flex items-center gap-1.5 leading-tight" title={row.curso}>
-                        <GraduationCap className="w-3.5 h-3.5 text-navy/40 shrink-0" />
-                        <span className="truncate max-w-[220px]">{row.curso}</span>
-                      </div>
-                      <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
-                        <span className="truncate max-w-[200px]">{row.unidadeFisica || 'Polo Principal'}</span>
+                    {/* Disciplina / Curso / Polo */}
+                    <td className="py-3.5 px-4 align-top">
+                      <div className="space-y-1.5 min-w-0">
+                        {/* Linha 1: Nome da Disciplina Limpo */}
+                        <div className="font-bold text-slate-900 text-xs leading-snug break-words flex items-start gap-1.5">
+                          <GraduationCap className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                          <span className="break-words">{parsedCourse.name}</span>
+                        </div>
+
+                        {/* Linha 2: Código da Turma + Graduação */}
+                        <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600">
+                          {parsedCourse.code && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-50/80 text-blue-700 border border-blue-200/70 font-mono font-bold text-[10px]">
+                              {parsedCourse.code}
+                            </span>
+                          )}
+                          {row.cursoPerfil && (
+                            <span className="font-semibold text-slate-700 flex items-center gap-1">
+                              <BookOpen className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="break-words">{row.cursoPerfil}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Linha 3: Polo / Unidade Física */}
+                        <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="break-words">{row.unidadeFisica || 'Polo Principal'}</span>
+                        </div>
                       </div>
                     </td>
 
-                    {/* Fase 1: Progresso + Nota */}
-                    <td className="py-3 px-3 text-center bg-blue-50/15 border-x border-gray-1">
-                      <div className="flex items-center justify-center gap-2">
+                    {/* Fase 1: Progresso + Nota (Pill Unificada) */}
+                    <td className="py-3.5 px-3 text-center align-middle bg-blue-50/20 border-x border-slate-200/60">
+                      <div className="inline-flex items-center rounded-xl bg-white border border-slate-200 p-1 shadow-2xs gap-1.5">
                         <button
                           onClick={() => openActivityDialog("fase1", "Progresso das Atividades - Fase 1", row.progressoListaFase1 || row.listaFase1, row.progressoFase1)}
-                          className={`px-2 py-0.5 rounded-md border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF1)}`}
+                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF1)}`}
                           title="Clique para ver as atividades da Fase 1"
                         >
                           {row.progressoFase1 || '0'}%
                         </button>
-                        <span className="text-gray-300 font-light">|</span>
+                        <span className="w-px h-3.5 bg-slate-200" />
                         <button
                           onClick={() => openGradeDialog(row, "fase1")}
-                          className={`px-2 py-0.5 rounded-md border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF1)}`}
-                          title="Clique para ver o extrato de notas do aluno"
+                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF1)}`}
+                          title="Clique para ver o extrato de notas da Fase 1"
                         >
                           {row.notaFase1 || '-'}
                         </button>
                       </div>
                     </td>
 
-                    {/* Fase 2: Progresso + Nota */}
-                    <td className="py-3 px-3 text-center bg-indigo-50/15 border-r border-gray-1">
-                      <div className="flex items-center justify-center gap-2">
+                    {/* Fase 2: Progresso + Nota (Pill Unificada) */}
+                    <td className="py-3.5 px-3 text-center align-middle bg-indigo-50/20 border-r border-slate-200/60">
+                      <div className="inline-flex items-center rounded-xl bg-white border border-slate-200 p-1 shadow-2xs gap-1.5">
                         <button
                           onClick={() => openActivityDialog("fase2", "Progresso das Atividades - Fase 2", row.progressoListaFase2 || row.listaFase2, row.progressoFase2)}
-                          className={`px-2 py-0.5 rounded-md border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF2)}`}
+                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF2)}`}
                           title="Clique para ver as atividades da Fase 2"
                         >
                           {row.progressoFase2 || '0'}%
                         </button>
-                        <span className="text-gray-300 font-light">|</span>
+                        <span className="w-px h-3.5 bg-slate-200" />
                         <button
                           onClick={() => openGradeDialog(row, "fase2")}
-                          className={`px-2 py-0.5 rounded-md border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF2)}`}
-                          title="Clique para ver o extrato de notas do aluno"
+                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF2)}`}
+                          title="Clique para ver o extrato de notas da Fase 2"
                         >
                           {row.notaFase2 || '-'}
                         </button>
                       </div>
                     </td>
 
-                    {/* Fase 3: Progresso + Nota */}
-                    <td className="py-3 px-3 text-center bg-purple-50/15 border-r border-gray-1">
-                      <div className="flex items-center justify-center gap-2">
+                    {/* Fase 3: Progresso + Nota (Pill Unificada) */}
+                    <td className="py-3.5 px-3 text-center align-middle bg-purple-50/20 border-r border-slate-200/60">
+                      <div className="inline-flex items-center rounded-xl bg-white border border-slate-200 p-1 shadow-2xs gap-1.5">
                         <button
                           onClick={() => openActivityDialog("fase3", "Progresso das Atividades - Fase 3", row.progressoListaFase3 || row.listaFase3, row.progressoFase3)}
-                          className={`px-2 py-0.5 rounded-md border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF3)}`}
+                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF3)}`}
                           title="Clique para ver as atividades da Fase 3"
                         >
                           {row.progressoFase3 || '0'}%
                         </button>
-                        <span className="text-gray-300 font-light">|</span>
+                        <span className="w-px h-3.5 bg-slate-200" />
                         <button
                           onClick={() => openGradeDialog(row, "fase3")}
-                          className={`px-2 py-0.5 rounded-md border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF3)}`}
-                          title="Clique para ver o extrato de notas do aluno"
+                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF3)}`}
+                          title="Clique para ver o extrato de notas da Fase 3"
                         >
                           {row.notaFase3 || '-'}
                         </button>
                       </div>
                     </td>
 
-
-                    {/* Consolidado: Progresso Total + Média Final */}
-                    <td className="py-3 px-3 text-center bg-emerald-50/20">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className={`px-2.5 py-0.5 rounded-md border text-xs font-black ${getProgressBadgeStyle(progTot)}`}>
+                    {/* Consolidado: Progresso Total + Média Final (Pill Destacada) */}
+                    <td className="py-3.5 px-3 text-center align-middle bg-emerald-50/30 border-r border-slate-200/60">
+                      <div className="inline-flex items-center rounded-xl bg-white border border-emerald-200 p-1 shadow-2xs gap-1.5">
+                        <div className={`px-2.5 py-0.5 rounded-lg border text-xs font-black ${getProgressBadgeStyle(progTot)}`}>
                           {row.progressoTotal || '0'}%
                         </div>
-                        <span className="text-emerald-300 font-bold">|</span>
+                        <span className="w-px h-3.5 bg-emerald-200" />
                         <button
                           onClick={() => openGradeDialog(row, "media")}
-                          className={`px-2.5 py-0.5 rounded-md border text-xs font-mono font-black cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(mediaTot)}`}
-                          title="Clique para ver o extrato completo de notas"
+                          className={`px-2.5 py-0.5 rounded-lg border text-xs font-mono font-black cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(mediaTot)}`}
+                          title="Clique para ver o extrato completo de notas e atividades"
                         >
                           {row.mediaFinal || '-'}
                         </button>
@@ -355,15 +454,17 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     </td>
 
                     {/* Status & Acesso */}
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3.5 px-4 text-center align-middle">
                       <div className="flex flex-col items-center gap-1">
-                        <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                          isAtivo ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+                          isAtivo 
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                            : "bg-rose-50 text-rose-700 border-rose-200"
                         }`}>
                           {row.enrolmentStatus || 'Ativo'}
                         </span>
-                        <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-gray-400" />
+                        <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
                           {row.diasSemAcesso === "-" ? "Sem acesso" : `${row.diasSemAcesso}d atrás`}
                         </span>
                       </div>
@@ -378,15 +479,14 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
 
       {/* Modal de Detalhamento de Atividades */}
       <ActivityListDialog
-        fase={dialogState.fase}
+        open={dialogState.open}
+        onClose={() => setDialogState({ open: false, fase: "", faseLabel: "", listaRaw: null, fasePercent: null })}
         faseLabel={dialogState.faseLabel}
         listaRaw={dialogState.listaRaw}
         fasePercent={dialogState.fasePercent}
-        open={dialogState.open}
-        onClose={() => setDialogState(prev => ({ ...prev, open: false }))}
       />
 
-      {/* Modal de Detalhamento de Notas */}
+      {/* Modal de Detalhamento de Notas e Extrato Completo */}
       <GradeDetailDialog
         open={gradeDialogState.open}
         onClose={() => setGradeDialogState(prev => ({ ...prev, open: false }))}
@@ -410,8 +510,6 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
         listaFase3={gradeDialogState.listaFase3}
         listaNotas={gradeDialogState.listaNotas}
       />
-
     </>
   )
 }
-
