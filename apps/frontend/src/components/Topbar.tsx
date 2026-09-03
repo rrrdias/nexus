@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { TopbarBreadcrumbs } from "./TopbarBreadcrumbs"
+import { TopbarUserMenu } from "./TopbarUserMenu"
 
 export async function Topbar() {
   const session = await auth()
@@ -11,21 +12,18 @@ export async function Topbar() {
   const userGroup = (session?.user?.groups ?? [])[0] || 'Usuário'
 
   return (
-    <header className="h-16 shrink-0 bg-white border-b border-gray-2 flex items-center justify-between px-6 shadow-sm select-none">
+    <header className="h-16 shrink-0 bg-white border-b border-slate-200/80 flex items-center justify-between px-6 shadow-2xs select-none z-20">
       <div className="flex items-center gap-4">
         <TopbarBreadcrumbs />
       </div>
 
       <div className="flex items-center gap-4">
         {session?.user && (
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-8 h-8 rounded-full bg-navy text-white flex items-center justify-center font-bold text-xs shadow-sm border border-navy/10 hover:ring-2 hover:ring-green-brand/50 transition-all cursor-default"
-              title={`${session.user.name} (${userGroup})`}
-            >
-              {initials}
-            </div>
-          </div>
+          <TopbarUserMenu 
+            session={session} 
+            initials={initials} 
+            userGroup={userGroup} 
+          />
         )}
       </div>
     </header>

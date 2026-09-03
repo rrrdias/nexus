@@ -549,30 +549,18 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
         )}
       </nav>
 
-      {/* Rodapé com Perfil do Usuário e Botão Sair */}
+      {/* Rodapé com Botão Sair Minimalista */}
       {session?.user && (
         <div className={`border-t border-white/10 transition-all duration-300 p-3 w-full shrink-0 select-none ${collapsedState ? "px-2 py-3" : ""}`}>
           {collapsedState ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="group/avatar relative flex justify-center">
-                <div 
-                  className="w-8 h-8 rounded-full bg-green-brand text-navy flex items-center justify-center font-bold text-xs shrink-0 shadow-md border border-green-brand/20 cursor-default"
-                >
-                  {initials}
-                </div>
-                <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
-                  isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
-                }`}>
-                  {session.user.name}
-                </span>
-              </div>
+            <div className="flex flex-col items-center">
               <div className="group/logout relative flex justify-center">
                 <button 
                   onClick={() => logoutAction()}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-white/50 hover:text-red-400 hover:bg-white/5 transition-all duration-200 cursor-pointer focus:outline-none"
+                  className="w-10 h-10 flex items-center justify-center rounded-xl text-white/50 hover:text-red-400 hover:bg-white/5 transition-all duration-200 cursor-pointer focus:outline-none"
                   title="Sair do sistema"
                 >
-                  <LogOut className="w-4 h-4 text-red-400/80 hover:text-red-400 transition-transform duration-200 group-hover/logout:scale-110" />
+                  <LogOut className="w-5 h-5 text-red-400/80 hover:text-red-400 transition-transform duration-200 group-hover/logout:scale-110" />
                 </button>
                 <span className={`absolute left-[48px] top-1/2 -translate-y-1/2 ml-2 bg-navy border border-white/10 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-2xl opacity-0 group-hover/logout:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none select-none after:content-[''] after:absolute after:right-full after:top-1/2 after:-translate-y-1/2 after:border-4 after:border-transparent after:border-r-navy ${
                   isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
@@ -582,28 +570,16 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-full bg-green-brand text-navy flex items-center justify-center font-bold text-xs shrink-0 shadow-md border border-green-brand/20">
-                  {initials}
-                </div>
-                <div className="flex flex-col overflow-hidden ml-2.5">
-                  <span className="text-white text-xs font-semibold tracking-tight truncate whitespace-nowrap" title={session.user.name}>
-                    {session.user.name}
-                  </span>
-                  <span className="text-green-dark text-[9px] font-bold uppercase tracking-wider truncate whitespace-nowrap">
-                    {session.user.groups?.length > 0 ? session.user.groups[0] : 'Colaborador'}
-                  </span>
-                </div>
-              </div>
-              <button 
-                onClick={() => logoutAction()}
-                className="p-1.5 rounded-lg text-white/40 hover:text-red-400 hover:bg-white/5 transition-all duration-200 cursor-pointer focus:outline-none"
-                title="Sair do sistema"
-              >
-                <LogOut className="w-4 h-4 text-red-400/80 hover:text-red-400 transition-transform duration-200 hover:scale-110" />
-              </button>
-            </div>
+            <button 
+              onClick={() => logoutAction()}
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-white/60 hover:text-red-400 hover:bg-white/5 transition-all duration-200 cursor-pointer focus:outline-none text-xs font-semibold group"
+              title="Sair do sistema"
+            >
+              <LogOut className="w-4 h-4 text-red-400/80 group-hover:text-red-400 transition-transform duration-200 group-hover:scale-110 shrink-0" />
+              <span className="text-white/70 group-hover:text-red-400 transition-colors">
+                Sair do sistema
+              </span>
+            </button>
           )}
         </div>
       )}
