@@ -16,6 +16,7 @@ import {
   Award,
   BookOpen,
   MessageCircle,
+  MessageSquare,
   Copy,
   ExternalLink,
   Check
@@ -110,6 +111,42 @@ function getWhatsAppLink(phone: string | null | undefined, studentName: string):
   const firstName = studentName.split(' ')[0] || studentName
   const msg = encodeURIComponent(`Olá, ${firstName}! Aqui é do suporte acadêmico UniEVANGÉLICA referente ao acompanhamento de suas disciplinas no AVA.`)
   return `https://wa.me/${fullNumber}?text=${msg}`
+}
+
+function buildMoodleUrl(institution: string | null | undefined, alunoId: string | null | undefined): string | null {
+  if (!alunoId) return null
+  const inst = String(institution || "ead").trim().toLowerCase()
+  let baseUrl = "https://avaead.unievangelica.edu.br"
+  
+  if (inst === "uni" || inst.includes("uni")) {
+    baseUrl = "https://avagrad.unievangelica.edu.br"
+  } else if (inst === "uniego" || inst.includes("faceg")) {
+    baseUrl = "https://ava.uniego.edu.br"
+  } else if (inst === "raizes") {
+    baseUrl = "https://ava.faculdaderaizes.edu.br"
+  } else if (inst === "eefn" || inst.includes("aee")) {
+    baseUrl = "https://ava.aee.edu.br"
+  }
+  
+  return `${baseUrl}/message/index.php?id=${alunoId}`
+}
+
+function buildMoodleProfileUrl(institution: string | null | undefined, alunoId: string | null | undefined): string | null {
+  if (!alunoId) return null
+  const inst = String(institution || "ead").trim().toLowerCase()
+  let baseUrl = "https://avaead.unievangelica.edu.br"
+  
+  if (inst === "uni" || inst.includes("uni")) {
+    baseUrl = "https://avagrad.unievangelica.edu.br"
+  } else if (inst === "uniego" || inst.includes("faceg")) {
+    baseUrl = "https://ava.uniego.edu.br"
+  } else if (inst === "raizes") {
+    baseUrl = "https://ava.faculdaderaizes.edu.br"
+  } else if (inst === "eefn" || inst.includes("aee")) {
+    baseUrl = "https://ava.aee.edu.br"
+  }
+  
+  return `${baseUrl}/user/view.php?id=${alunoId}`
 }
 
 function splitCourseAndCode(fullCourse: string | null | undefined) {
@@ -299,20 +336,35 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                 const parsedCourse = splitCourseAndCode(row.curso)
                 const phoneFormatted = formatPhone(row.userPhone1)
                 const waLink = getWhatsAppLink(row.userPhone1, row.aluno)
+                const moodleMessageUrl = buildMoodleUrl(row.sourceInstitution, row.alunoId)
+                const moodleProfileUrl = buildMoodleProfileUrl(row.sourceInstitution, row.alunoId)
                 const initials = getInitials(row.aluno)
 
                 return (
                   <tr key={row.id} className="hover:bg-slate-50/90 transition-colors group">
                     
-                    {/* Aluno / Contato */}
+                    {/* Aluno / Contato & Atendimento do Tutor */}
                     <td className="py-3.5 px-4 align-top">
                       <div className="flex items-start gap-2.5">
                         <div className="w-8 h-8 rounded-full bg-navy/5 text-navy border border-navy/10 flex items-center justify-center font-black text-[11px] shrink-0 mt-0.5 shadow-2xs">
                           {initials}
                         </div>
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="font-extrabold text-navy text-[13px] leading-snug break-words">
-                            {row.aluno}
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-navy text-[13px] leading-snug break-words">
+                              {row.aluno}
+                            </span>
+                            {moodleProfileUrl && (
+                              <a
+                                href={moodleProfileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-slate-400 hover:text-blue-600 transition-colors p-0.5"
+                                title="Ver perfil do aluno no AVA (Moodle)"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
                           </div>
                           
                           <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-slate-500">
@@ -321,20 +373,36 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                             </span>
                             
                             {phoneFormatted && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-slate-600 font-medium">📞 {phoneFormatted}</span>
-                                {waLink && (
-                                  <a
-                                    href={waLink}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                    title="Iniciar conversa no WhatsApp com o aluno"
-                                  >
-                                    <MessageCircle className="w-3.5 h-3.5 fill-emerald-600/20" />
-                                  </a>
-                                )}
-                              </div>
+                              <span className="text-slate-600 font-medium">📞 {phoneFormatted}</span>
+                            )}
+                          </div>
+
+                          {/* Botões de Ação Direta para o Tutor / Atendimento */}
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            {moodleMessageUrl && (
+                              <a
+                                href={moodleMessageUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/80 text-[10px] font-bold hover:bg-blue-100 transition-all shadow-2xs cursor-pointer"
+                                title="Abrir chat de mensagens privadas / atendimento com o aluno no AVA Moodle"
+                              >
+                                <MessageSquare className="w-3 h-3 text-blue-600" />
+                                <span>Mensagem no AVA</span>
+                              </a>
+                            )}
+
+                            {waLink && (
+                              <a
+                                href={waLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-bold hover:bg-emerald-100 transition-all shadow-2xs cursor-pointer"
+                                title="Iniciar conversa no WhatsApp com o aluno"
+                              >
+                                <MessageCircle className="w-3 h-3 text-emerald-600" />
+                                <span>WhatsApp</span>
+                              </a>
                             )}
                           </div>
                         </div>
