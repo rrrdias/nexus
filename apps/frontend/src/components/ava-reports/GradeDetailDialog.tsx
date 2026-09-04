@@ -16,130 +16,14 @@ import {
   Layers
 } from "lucide-react"
 
-interface Activity {
-  nome: string
-  status: string
-  nota?: string | null
-  notaMax?: string | null
-  data: string
-}
-
-function normalizeName(name: string): string {
-  if (!name) return ""
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // remove acentos
-    .replace(/[\u2010-\u2015\u2212\u002d]/g, "-") // normaliza hífens e travessões
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function parseActivities(raw: string | null | undefined): Activity[] {
-  if (!raw) return []
-  return raw.split("|").map(item => {
-    const parts = item.split(":")
-    const nome = parts[0]?.trim() || ""
-    const second = parts[1]?.trim() || "-"
-    const third = parts[2]?.trim() || "-"
-    const fourth = parts[3]?.trim() || "-"
-
-    // Formato 4 partes: Nome : Nota : NotaMax : Data
-    if (parts.length >= 4) {
-      const isNum = !isNaN(parseFloat(second.replace(",", ".")))
-      return {
-        nome,
-        status: isNum ? "Avaliado" : second,
-        nota: isNum ? second : null,
-        notaMax: third !== "-" ? third : "100",
-        data: fourth !== "-" ? fourth : "-",
-      }
-    }
-
-    // Formato 3 partes: (Nome : Nota : NotaMax) ou (Nome : Status : Data)
-    if (parts.length === 3) {
-      const isSecondNum = !isNaN(parseFloat(second.replace(",", ".")))
-      if (isSecondNum) {
-        return {
-          nome,
-          status: "Avaliado",
-          nota: second,
-          notaMax: third !== "-" ? third : "100",
-          data: "-",
-        }
-      }
-      return {
-        nome,
-        status: second,
-        nota: null,
-        notaMax: null,
-        data: third !== "-" ? third : "-",
-      }
-    }
-
-    // Formato 2 partes: Nome : Status ou Nota
-    const isNum = !isNaN(parseFloat(second.replace(",", ".")))
-    return {
-      nome,
-      status: isNum ? "Avaliado" : second,
-      nota: isNum ? second : null,
-      notaMax: null,
-      data: "-",
-    }
-  }).filter(a => a.nome)
-}
-
-function isEvaluativeActivity(name: string): boolean {
-  const norm = normalizeName(name)
-  return (
-    norm.includes("prova") ||
-    norm.includes("verificacao") ||
-    norm.includes("avaliacao") ||
-    norm.includes("quiz") ||
-    norm.includes("questionario") ||
-    norm.includes("trabalho") ||
-    norm.includes("subjetiva") ||
-    norm.includes("objetiva") ||
-    norm.includes("exame") ||
-    norm.includes("entrega")
-  )
-}
-
-function classifyActivityPhase(name: string): 1 | 2 | 3 {
-  const norm = normalizeName(name)
-
-  // 1. Verificações / Provas explícitas
-  if (norm.includes("1a verificacao") || norm.includes("1a va") || norm.includes("fase 1") || norm.includes("entrega 1")) {
-    return 1
-  }
-  if (norm.includes("2a verificacao") || norm.includes("2a va") || norm.includes("fase 2") || norm.includes("entrega 2") || norm.includes("entrega 3")) {
-    return 2
-  }
-  if (norm.includes("3a verificacao") || norm.includes("3a va") || norm.includes("fase 3") || norm.includes("exame") || norm.includes("final") || norm.includes("entrega 4") || norm.includes("entrega 5") || norm.includes("entrega 6") || norm.includes("entrega 7")) {
-    return 3
-  }
-
-  // 2. Extração numérica da Unidade Temática (ex: Unidade Temática 07 -> 7)
-  const matchUnit = norm.match(/(?:unidade\s+tematica|unidade|ut|fixacao\s*-\s*unidade\s+tematica)\s*(\d+)/i)
-  if (matchUnit && matchUnit[1]) {
-    const unitNum = parseInt(matchUnit[1], 10)
-    if (unitNum >= 7) return 3
-    if (unitNum >= 4) return 2
-    if (unitNum === 3) return 1
-    if (unitNum <= 2) return 1
-  }
-
-  // 3. Fallback inteligente baseado em outros números na string
-  const generalNum = norm.match(/\b(\d+)\b/)
-  if (generalNum && generalNum[1]) {
-    const num = parseInt(generalNum[1], 10)
-    if (num >= 7) return 3
-    if (num >= 3 && num <= 6) return 2
-    if (num <= 2) return 1
-  }
-
-  return 1
-}
+import {
+  parseActivities,
+  isEvaluativeActivity,
+  classifyActivityPhase,
+  normalizeName,
+  Activity
+} from "@/lib/activity-utils"
+import { splitCourseAndCode } from "@/lib/course-utils"
 
 interface GradeDetailDialogProps {
   open: boolean
@@ -254,33 +138,42 @@ export function GradeDetailDialog({
   const rawF1 = parseActivities(listaFase1)
   const rawF2 = parseActivities(listaFase2)
   const rawF3 = parseActivities(listaFase3)
-
+  
   // Mapas normalizados para agrupar todas as atividades dentro das 3 Fases com matching flexível
   const f1Map = new Map<string, Activity>()
   const f2Map = new Map<string, Activity>()
   const f3Map = new Map<string, Activity>()
 
-  // 1. Adiciona atividades explícitas das fases com chave normalizada
-  rawF1.forEach(a => f1Map.set(normalizeName(a.nome), a))
-  rawF2.forEach(a => f2Map.set(normalizeName(a.nome), a))
-  rawF3.forEach(a => f3Map.set(normalizeName(a.nome), a))
-
-  // 2. Mescla e classifica todas as atividades de listaNotas
-  allGradedActivities.forEach(act => {
+  const addOrMergeToMap = (map: Map<string, Activity>, act: Activity) => {
     const key = normalizeName(act.nome)
-    if (f1Map.has(key)) {
-      f1Map.set(key, { ...f1Map.get(key)!, ...act })
-    } else if (f2Map.has(key)) {
-      f2Map.set(key, { ...f2Map.get(key)!, ...act })
-    } else if (f3Map.has(key)) {
-      f3Map.set(key, { ...f3Map.get(key)!, ...act })
+    if (!map.has(key)) {
+      map.set(key, act)
     } else {
-      // Classificação automática inteligente com suporte a UT 01 até UT 12
-      const phase = classifyActivityPhase(act.nome)
-      if (phase === 1) f1Map.set(key, act)
-      else if (phase === 2) f2Map.set(key, act)
-      else f3Map.set(key, act)
+      const existing = map.get(key)!
+      map.set(key, {
+        nome: existing.nome || act.nome,
+        status: (act.status && act.status !== "Pendente") ? act.status : existing.status,
+        nota: act.nota || existing.nota,
+        notaMax: act.notaMax || existing.notaMax,
+        data: (act.data && act.data !== "-") ? act.data : existing.data,
+      })
     }
+  }
+
+  // 1. Coleta todas as atividades de todas as fontes disponíveis
+  const combinedRaw = [
+    ...rawF1,
+    ...rawF2,
+    ...rawF3,
+    ...allGradedActivities,
+  ]
+
+  // 2. Classifica cada atividade estritamente na sua fase correta (eliminando qualquer duplicação entre fases)
+  combinedRaw.forEach(act => {
+    const phase = classifyActivityPhase(act.nome)
+    if (phase === 1) addOrMergeToMap(f1Map, act)
+    else if (phase === 2) addOrMergeToMap(f2Map, act)
+    else addOrMergeToMap(f3Map, act)
   })
 
   // Ordena atividades de forma cronológica / numérica dentro de cada fase
@@ -380,10 +273,10 @@ export function GradeDetailDialog({
                 Nota: {activity.nota} {activity.notaMax ? `/ ${activity.notaMax}` : ""}
               </span>
             </div>
-          ) : isEval && isConcluido && phaseNota && phaseNota !== "-" && phaseNota !== "0" ? (
+          ) : isEval && isConcluido && phaseNota && phaseNota !== "-" && phaseNota !== "null" ? (
             <div className="flex flex-col items-end">
-              <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 font-mono font-bold text-xs">
-                Nota Etapa: {phaseNota}
+              <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 font-mono font-bold text-xs" title="Nota consolidada da etapa avaliativa">
+                Nota: {phaseNota}
               </span>
             </div>
           ) : (
@@ -516,16 +409,26 @@ export function GradeDetailDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-3 border-t border-slate-200/60 text-xs text-slate-600">
-              <div className="flex items-center gap-2 truncate">
-                <GraduationCap className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="truncate font-medium" title={curso}>{curso}</span>
-              </div>
-              <div className="flex items-center gap-2 truncate">
-                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                <span className="truncate font-medium">{polo || "Polo Principal"}</span>
-              </div>
-            </div>
+            {(() => {
+              const parsedCourse = splitCourseAndCode(curso)
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-3 border-t border-slate-200/60 text-xs text-slate-600">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <GraduationCap className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span className="font-bold text-slate-900 truncate" title={parsedCourse.name}>{parsedCourse.name}</span>
+                    {parsedCourse.code && (
+                      <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/70 font-mono font-bold text-[10px] shrink-0">
+                        {parsedCourse.code}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 truncate">
+                    <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="truncate font-medium">{polo || "Polo Principal"}</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Navegação por Abas SOMENTE quando for o modal Consolidado / Total */}

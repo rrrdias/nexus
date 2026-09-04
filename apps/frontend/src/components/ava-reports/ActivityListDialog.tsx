@@ -3,67 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CheckCircle2, Clock, Minus, Award, FileCheck, BookOpen, Calendar } from "lucide-react"
 
-interface Activity {
-  nome: string
-  status: string
-  nota?: string | null
-  notaMax?: string | null
-  data: string
-}
-
-function parseActivities(raw: string | null | undefined): Activity[] {
-  if (!raw) return []
-  return raw.split("|").map(item => {
-    const parts = item.split(":")
-    const nome = parts[0]?.trim() || ""
-    const second = parts[1]?.trim() || "-"
-    const third = parts[2]?.trim() || "-"
-    const fourth = parts[3]?.trim() || "-"
-
-    // Formato 4 partes: Nome : Nota : NotaMax : Data
-    if (parts.length >= 4) {
-      const isNum = !isNaN(parseFloat(second.replace(",", ".")))
-      return {
-        nome,
-        status: isNum ? "Avaliado" : second,
-        nota: isNum ? second : null,
-        notaMax: third !== "-" ? third : "100",
-        data: fourth !== "-" ? fourth : "-",
-      }
-    }
-
-    // Formato 3 partes: (Nome : Nota : NotaMax) ou (Nome : Status : Data)
-    if (parts.length === 3) {
-      const isSecondNum = !isNaN(parseFloat(second.replace(",", ".")))
-      if (isSecondNum) {
-        return {
-          nome,
-          status: "Avaliado",
-          nota: second,
-          notaMax: third !== "-" ? third : "100",
-          data: "-",
-        }
-      }
-      return {
-        nome,
-        status: second,
-        nota: null,
-        notaMax: null,
-        data: third !== "-" ? third : "-",
-      }
-    }
-
-    // Formato 2 partes: Nome : Status ou Nota
-    const isNum = !isNaN(parseFloat(second.replace(",", ".")))
-    return {
-      nome,
-      status: isNum ? "Avaliado" : second,
-      nota: isNum ? second : null,
-      notaMax: null,
-      data: "-",
-    }
-  }).filter(a => a.nome)
-}
+import { parseActivities, isEvaluativeActivity, Activity } from "@/lib/activity-utils"
 
 interface ActivityListDialogProps {
   fase: string

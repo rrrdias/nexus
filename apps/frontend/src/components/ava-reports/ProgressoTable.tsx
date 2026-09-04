@@ -17,6 +17,8 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu"
 
+import { splitCourseAndCode } from "@/lib/course-utils"
+
 // ──────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────
@@ -338,8 +340,20 @@ export function ProgressoTable({ data, institution }: { data: any[], institution
                 </td>
 
                 {/* Disciplina */}
-                <td className="px-3 py-2 text-[#1976D2] font-medium min-w-[180px] max-w-[240px] whitespace-normal break-words leading-snug">
-                  {row.curso || "-"}
+                <td className="px-3 py-2 min-w-[180px] max-w-[240px] whitespace-normal break-words leading-snug">
+                  {(() => {
+                    const parsed = splitCourseAndCode(row.curso)
+                    return (
+                      <div className="space-y-1">
+                        <div className="text-[#1976D2] font-semibold">{parsed.name}</div>
+                        {parsed.code && (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/70 font-mono font-bold text-[10px]">
+                            {parsed.code}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </td>
 
                 {/* Curso */}

@@ -91,75 +91,13 @@ function getGradeBadgeStyle(grade: number) {
   return "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
 }
 
-function formatPhone(phone: string | null | undefined): string | null {
-  if (!phone) return null
-  const cleaned = phone.replace(/\D/g, '')
-  if (cleaned.length === 11) {
-    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`
-  }
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`
-  }
-  return phone
-}
-
-function getWhatsAppLink(phone: string | null | undefined, studentName: string): string | null {
-  if (!phone) return null
-  const cleaned = phone.replace(/\D/g, '')
-  if (cleaned.length < 10) return null
-  const fullNumber = cleaned.startsWith('55') ? cleaned : `55${cleaned}`
-  const firstName = studentName.split(' ')[0] || studentName
-  const msg = encodeURIComponent(`Olá, ${firstName}! Aqui é do suporte acadêmico UniEVANGÉLICA referente ao acompanhamento de suas disciplinas no AVA.`)
-  return `https://wa.me/${fullNumber}?text=${msg}`
-}
-
-function buildMoodleUrl(institution: string | null | undefined, alunoId: string | null | undefined): string | null {
-  if (!alunoId) return null
-  const inst = String(institution || "ead").trim().toLowerCase()
-  let baseUrl = "https://avaead.unievangelica.edu.br"
-  
-  if (inst === "uni" || inst.includes("uni")) {
-    baseUrl = "https://avagrad.unievangelica.edu.br"
-  } else if (inst === "uniego" || inst.includes("faceg")) {
-    baseUrl = "https://ava.uniego.edu.br"
-  } else if (inst === "raizes") {
-    baseUrl = "https://ava.faculdaderaizes.edu.br"
-  } else if (inst === "eefn" || inst.includes("aee")) {
-    baseUrl = "https://ava.aee.edu.br"
-  }
-  
-  return `${baseUrl}/message/index.php?id=${alunoId}`
-}
-
-function buildMoodleProfileUrl(institution: string | null | undefined, alunoId: string | null | undefined): string | null {
-  if (!alunoId) return null
-  const inst = String(institution || "ead").trim().toLowerCase()
-  let baseUrl = "https://avaead.unievangelica.edu.br"
-  
-  if (inst === "uni" || inst.includes("uni")) {
-    baseUrl = "https://avagrad.unievangelica.edu.br"
-  } else if (inst === "uniego" || inst.includes("faceg")) {
-    baseUrl = "https://ava.uniego.edu.br"
-  } else if (inst === "raizes") {
-    baseUrl = "https://ava.faculdaderaizes.edu.br"
-  } else if (inst === "eefn" || inst.includes("aee")) {
-    baseUrl = "https://ava.aee.edu.br"
-  }
-  
-  return `${baseUrl}/user/view.php?id=${alunoId}`
-}
-
-function splitCourseAndCode(fullCourse: string | null | undefined) {
-  if (!fullCourse) return { name: '-', code: null }
-  const match = fullCourse.match(/^(.*?)\s*[-–—]\s*([A-Za-z0-9]+[A-Za-z0-9_-]*)$/)
-  if (match) {
-    return {
-      name: match[1].trim(),
-      code: match[2].trim()
-    }
-  }
-  return { name: fullCourse.trim(), code: null }
-}
+import {
+  splitCourseAndCode,
+  formatPhone,
+  getWhatsAppLink,
+  buildMoodleUrl,
+  buildMoodleProfileUrl
+} from "@/lib/course-utils"
 
 function getInitials(name: string): string {
   if (!name) return "AL"
@@ -262,10 +200,9 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
       fase1Prog: row.progressoFase1,
       fase2Prog: row.progressoFase2,
       fase3Prog: row.progressoFase3,
-      progTotal: row.progressoTotal,
-      listaFase1: row.notasListaFase1 || row.progressoListaFase1 || row.listaFase1,
-      listaFase2: row.notasListaFase2 || row.progressoListaFase2 || row.listaFase2,
-      listaFase3: row.notasListaFase3 || row.progressoListaFase3 || row.listaFase3,
+      listaFase1: [row.progressoListaFase1, row.notasListaFase1, row.listaFase1].filter(Boolean).join("|"),
+      listaFase2: [row.progressoListaFase2, row.notasListaFase2, row.listaFase2].filter(Boolean).join("|"),
+      listaFase3: [row.progressoListaFase3, row.notasListaFase3, row.listaFase3].filter(Boolean).join("|"),
       listaNotas: row.listaNotas,
     })
   }

@@ -68,12 +68,13 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
         "Média Final": item.mediaFinal || "-",
       }))
 
+      const instLabel = institution.toUpperCase()
       const csv = toCsv(exportRows)
       const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" })
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = `Relatorio_Consolidado_EaD_${new Date().toISOString().split("T")[0]}.csv`
+      link.download = `Relatorio_Consolidado_${instLabel}_${new Date().toISOString().split("T")[0]}.csv`
       link.click()
       URL.revokeObjectURL(url)
     } catch (error) {
@@ -85,6 +86,7 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
   }
 
   const isSyncing = syncStatus === "syncing"
+  const instName = institution.toUpperCase()
 
   return (
     <>
@@ -124,10 +126,10 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-xl font-extrabold text-navy">
-                  Sincronização Completa AVA EaD
+                  Sincronização Completa AVA {instName}
                 </AlertDialogTitle>
                 <AlertDialogDescription className="text-gray-4 text-[14px]">
-                  Deseja sincronizar tanto o <strong>Progresso das Atividades</strong> quanto as <strong>Notas das Fases</strong> com o Moodle EaD?
+                  Deseja sincronizar tanto o <strong>Progresso das Atividades</strong> quanto as <strong>Notas das Fases</strong> com o Moodle {instName}?
                   <br/><br/>
                   Os dados do relatório consolidado serão atualizados instantaneamente.
                 </AlertDialogDescription>

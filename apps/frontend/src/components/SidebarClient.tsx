@@ -18,6 +18,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isReportsOpen, setIsReportsOpen] = useState(false)
+  const [isConsolidatedOpen, setIsConsolidatedOpen] = useState(false)
   const [isProgressOpen, setIsProgressOpen] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [isSchedulingOpen, setIsSchedulingOpen] = useState(false)
@@ -37,6 +38,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
     }
     if (pathname.startsWith('/relatorios')) {
       setIsReportsOpen(true)
+      if (pathname.startsWith('/relatorios/consolidado')) {
+        setIsConsolidatedOpen(true)
+      }
       if (pathname.startsWith('/relatorios/progresso')) {
         setIsProgressOpen(true)
       }
@@ -61,6 +65,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
     if (nextState) {
       // Recolhendo: fecha submenu imediatamente para evitar ghost hover
       setIsReportsOpen(false)
+      setIsConsolidatedOpen(false)
+      setIsProgressOpen(false)
+      setIsNotesOpen(false)
       setIsSchedulingOpen(false)
       setIsAcademicOpen(false)
       setJustCollapsed(true)
@@ -210,47 +217,59 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                     </div>
                     <div className="px-2 py-1 space-y-1">
                       <div className="px-3 py-1 text-[9px] font-bold text-green-brand uppercase tracking-widest mt-1">
-                        Unificado (Progresso + Notas)
+                        Consolidado (Unificado)
                       </div>
-                      <Link href="/relatorios/consolidado/ead" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/consolidado/ead' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
-                        ⭐ Consolidado EaD
+                      <Link href="/relatorios/consolidado/ead" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/consolidado/ead' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        EaD
+                      </Link>
+                      <Link href="/relatorios/consolidado/uni" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/consolidado/uni' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        Online Uni
+                      </Link>
+                      <Link href="/relatorios/consolidado/uniego" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/consolidado/uniego' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        Online UNIEGO
+                      </Link>
+                      <Link href="/relatorios/consolidado/raizes" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/consolidado/raizes' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        Online Raízes
+                      </Link>
+                      <Link href="/relatorios/consolidado/eefn" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/consolidado/eefn' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        Online EEFN
                       </Link>
 
                       <div className="px-3 py-1 text-[9px] font-bold text-white/30 uppercase tracking-widest mt-2">
                         Progresso
                       </div>
-                      <Link href="/relatorios/progresso" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/progresso" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/progresso' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         EaD
                       </Link>
-                      <Link href="/relatorios/progresso/uni" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/uni' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/progresso/uni" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/progresso/uni' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online Uni
                       </Link>
-                      <Link href="/relatorios/progresso/uniego" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/uniego' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/progresso/uniego" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/progresso/uniego' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online UNIEGO
                       </Link>
-                      <Link href="/relatorios/progresso/raizes" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/raizes' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/progresso/raizes" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/progresso/raizes' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online Raízes
                       </Link>
-                      <Link href="/relatorios/progresso/eefn" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/progresso/eefn' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/progresso/eefn" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/progresso/eefn' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online EEFN
                       </Link>
                       
                       <div className="px-3 py-1 text-[9px] font-bold text-white/30 uppercase tracking-widest mt-2">
                         Notas
                       </div>
-                      <Link href="/relatorios/notas" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/notas' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/notas" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/notas' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         EaD
                       </Link>
-                      <Link href="/relatorios/notas/uni" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/notas/uni' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/notas/uni" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/notas/uni' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online Uni
                       </Link>
-                      <Link href="/relatorios/notas/uniego" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/notas/uniego' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/notas/uniego" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/notas/uniego' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online UNIEGO
                       </Link>
-                      <Link href="/relatorios/notas/raizes" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/notas/raizes' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/notas/raizes" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/notas/raizes' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online Raízes
                       </Link>
-                      <Link href="/relatorios/notas/eefn" className={`block text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/relatorios/notas/eefn' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                      <Link href="/relatorios/notas/eefn" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/notas/eefn' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Online EEFN
                       </Link>
                     </div>
@@ -259,18 +278,33 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                   /* Expanded state: Accordion sub-list with smooth height/opacity transition */
                   <div 
                     className={`pl-11 pr-3 space-y-1 relative before:content-[''] before:absolute before:left-5 before:top-0 before:bottom-2 before:w-[1px] before:bg-white/10 overflow-hidden transition-all duration-300 ease-in-out ${
-                      isReportsOpen && !isTransitioning ? "max-h-[550px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
+                      isReportsOpen && !isTransitioning ? "max-h-[750px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
                     }`}
                   >
-                    {/* Link Destaque Consolidado EaD */}
-                    <Link 
-                      href="/relatorios/consolidado/ead" 
-                      className={`flex items-center gap-1.5 text-[11px] hover:text-white py-1.5 px-2 rounded-md transition-colors font-medium mb-1 ${
-                        pathname === '/relatorios/consolidado/ead' ? 'text-green-brand bg-navy-light font-bold' : 'text-green-brand/80 hover:bg-white/5'
-                      }`}
-                    >
-                      <span>⭐ Consolidado EaD</span>
-                    </Link>
+                    {/* Grupo: Consolidado */}
+                    <div className="group/consolidated relative w-full mb-1">
+                      <button 
+                        onClick={(e) => { e.preventDefault(); setIsConsolidatedOpen(!isConsolidatedOpen); }}
+                        className={`flex items-center justify-between rounded-md transition-all duration-300 ease-in-out cursor-pointer w-full h-8 px-2 focus:outline-none ${
+                          pathname.startsWith('/relatorios/consolidado')
+                            ? 'text-white font-medium bg-white/5'
+                            : 'text-white/60 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <span className="text-[11px] text-green-brand font-bold">⭐ Consolidado</span>
+                        <ChevronRight className={`w-3.5 h-3.5 transition-all duration-300 opacity-50 ${isConsolidatedOpen ? "rotate-90" : ""}`} />
+                      </button>
+                      
+                      <div className={`pl-4 space-y-0.5 relative before:content-[''] before:absolute before:left-3 before:top-1 before:bottom-2 before:w-[1px] before:bg-white/5 overflow-hidden transition-all duration-300 ease-in-out ${
+                        isConsolidatedOpen ? "max-h-60 opacity-100 py-1" : "max-h-0 opacity-0 py-0 pointer-events-none"
+                      }`}>
+                        <Link href="/relatorios/consolidado/ead" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/consolidado/ead' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/60 hover:bg-navy-light/40'}`}>EaD</Link>
+                        <Link href="/relatorios/consolidado/uni" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/consolidado/uni' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/60 hover:bg-navy-light/40'}`}>Online Uni</Link>
+                        <Link href="/relatorios/consolidado/uniego" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/consolidado/uniego' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/60 hover:bg-navy-light/40'}`}>Online UNIEGO</Link>
+                        <Link href="/relatorios/consolidado/raizes" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/consolidado/raizes' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/60 hover:bg-navy-light/40'}`}>Online Raízes</Link>
+                        <Link href="/relatorios/consolidado/eefn" className={`block text-[10px] hover:text-white py-1.5 px-2 rounded-md transition-colors ${pathname === '/relatorios/consolidado/eefn' ? 'text-green-brand font-medium bg-navy-light' : 'text-white/60 hover:bg-navy-light/40'}`}>Online EEFN</Link>
+                      </div>
+                    </div>
 
                     {/* Grupo: Progresso */}
                     <div className="group/progress relative w-full">

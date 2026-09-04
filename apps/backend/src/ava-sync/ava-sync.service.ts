@@ -185,7 +185,12 @@ export class AvaSyncService implements OnModuleInit {
         LEFT JOIN ava_grades_report g
           ON p."sourceInstitution" = g."sourceInstitution"
          AND (p.aluno_id = g.user_id OR p.matricula = g.user_identification)
-         AND (p.curso = g.course_fullname OR p.curso = g.course_shortname)
+         AND (
+           p.curso = g.course_fullname 
+           OR p.curso = g.course_shortname
+           OR regexp_replace(p.curso, '[^a-zA-Z0-9]', '', 'g') = regexp_replace(g.course_fullname, '[^a-zA-Z0-9]', '', 'g')
+           OR regexp_replace(p.curso, '[^a-zA-Z0-9]', '', 'g') = regexp_replace(g.course_shortname, '[^a-zA-Z0-9]', '', 'g')
+         )
         WHERE 1=1 ${instFilter}
         ON CONFLICT ("sourceInstitution", aluno_id, curso) DO UPDATE SET
           "matricula" = EXCLUDED."matricula",
