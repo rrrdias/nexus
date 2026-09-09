@@ -150,9 +150,12 @@ export function GradeDetailDialog({
       map.set(key, act)
     } else {
       const existing = map.get(key)!
+      const isActDone = act.status && !act.status.toLowerCase().includes("pend") && !act.status.toLowerCase().includes("sem")
+      const isExistingDone = existing.status && !existing.status.toLowerCase().includes("pend") && !existing.status.toLowerCase().includes("sem")
+
       map.set(key, {
         nome: existing.nome || act.nome,
-        status: (act.status && act.status !== "Pendente") ? act.status : existing.status,
+        status: isActDone ? act.status : (isExistingDone ? existing.status : act.status || existing.status),
         nota: act.nota || existing.nota,
         notaMax: act.notaMax || existing.notaMax,
         data: (act.data && act.data !== "-") ? act.data : existing.data,

@@ -181,25 +181,25 @@ export function DashboardAva({ data, session, greeting }: { data: any, session: 
               Monitore o progresso dos alunos e a distribuição das notas por fases e cursos em tempo real para ações pedagógicas proativas.
             </p>
             
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <Link 
-                href="/relatorios/progresso"
+                href="/relatorios/consolidado/ead"
                 className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <Users className="w-4 h-4 text-[#1976D2]" />
-                  <span className="text-xs font-bold text-navy group-hover:text-indigo-600 transition-colors">Relatório de Progresso</span>
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-bold text-navy group-hover:text-indigo-600 transition-colors">Relatório Acadêmico — EaD</span>
                 </div>
                 <ArrowUpRight className="w-3.5 h-3.5 text-[#9AA0AC] group-hover:text-indigo-600 transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>
 
               <Link 
-                href="/relatorios/notas"
+                href="/relatorios/consolidado/uni"
                 className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-green-200 hover:bg-green-50/20 transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <BookOpen className="w-4 h-4 text-[#27AE60]" />
-                  <span className="text-xs font-bold text-navy group-hover:text-green-700 transition-colors">Relatório de Notas</span>
+                  <Users className="w-4 h-4 text-[#27AE60]" />
+                  <span className="text-xs font-bold text-navy group-hover:text-green-700 transition-colors">Relatório Acadêmico — Online Uni</span>
                 </div>
                 <ArrowUpRight className="w-3.5 h-3.5 text-[#9AA0AC] group-hover:text-green-700 transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>

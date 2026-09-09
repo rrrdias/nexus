@@ -115,6 +115,18 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     faseLabel: string
     listaRaw: string | null
     fasePercent: string | null
+    studentName?: string
+    matricula?: string
+    curso?: string
+    polo?: string
+    lastaccess?: string
+    diasSemAcesso?: string
+    listaFase1?: string | null
+    listaFase2?: string | null
+    listaFase3?: string | null
+    progFase1?: string | null
+    progFase2?: string | null
+    progFase3?: string | null
   }>({
     open: false,
     fase: "",
@@ -173,13 +185,31 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const openActivityDialog = (fase: string, label: string, listaRaw: string | null, percent: string | null) => {
+  const openActivityDialog = (
+    row: ConsolidatedRecord,
+    fase: "fase1" | "fase2" | "fase3" | "all",
+    label: string,
+    listaRaw: string | null,
+    percent: string | null
+  ) => {
     setDialogState({
       open: true,
       fase,
       faseLabel: label,
       listaRaw,
-      fasePercent: percent,
+      fasePercent: percent || "0",
+      studentName: row.aluno,
+      matricula: row.matricula || row.usuario || "-",
+      curso: row.curso,
+      polo: row.unidadeFisica || "Polo Principal",
+      lastaccess: row.lastaccess,
+      diasSemAcesso: row.diasSemAcesso,
+      listaFase1: row.progressoListaFase1 || row.listaFase1,
+      listaFase2: row.progressoListaFase2 || row.listaFase2,
+      listaFase3: row.progressoListaFase3 || row.listaFase3,
+      progFase1: row.progressoFase1 || "0",
+      progFase2: row.progressoFase2 || "0",
+      progFase3: row.progressoFase3 || "0",
     })
   }
 
@@ -383,7 +413,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     <td className="py-3.5 px-3 text-center align-middle bg-blue-50/20 border-x border-slate-200/60">
                       <div className="inline-flex items-center rounded-xl bg-white border border-slate-200 p-1 shadow-2xs gap-1.5">
                         <button
-                          onClick={() => openActivityDialog("fase1", "Progresso das Atividades - Fase 1", row.progressoListaFase1 || row.listaFase1, row.progressoFase1)}
+                          onClick={() => openActivityDialog(row, "fase1", "Progresso das Atividades — Fase 1", row.progressoListaFase1 || row.listaFase1, row.progressoFase1)}
                           className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF1)}`}
                           title="Clique para ver as atividades da Fase 1"
                         >
@@ -393,7 +423,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                         <button
                           onClick={() => openGradeDialog(row, "fase1")}
                           className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF1)}`}
-                          title="Clique para ver o extrato de notas da Fase 1"
+                          title="Clique para ver o extrato de notas e avaliações da Fase 1"
                         >
                           {row.notaFase1 || '-'}
                         </button>
@@ -404,7 +434,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     <td className="py-3.5 px-3 text-center align-middle bg-indigo-50/20 border-r border-slate-200/60">
                       <div className="inline-flex items-center rounded-xl bg-white border border-slate-200 p-1 shadow-2xs gap-1.5">
                         <button
-                          onClick={() => openActivityDialog("fase2", "Progresso das Atividades - Fase 2", row.progressoListaFase2 || row.listaFase2, row.progressoFase2)}
+                          onClick={() => openActivityDialog(row, "fase2", "Progresso das Atividades — Fase 2", row.progressoListaFase2 || row.listaFase2, row.progressoFase2)}
                           className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF2)}`}
                           title="Clique para ver as atividades da Fase 2"
                         >
@@ -414,7 +444,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                         <button
                           onClick={() => openGradeDialog(row, "fase2")}
                           className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF2)}`}
-                          title="Clique para ver o extrato de notas da Fase 2"
+                          title="Clique para ver o extrato de notas e avaliações da Fase 2"
                         >
                           {row.notaFase2 || '-'}
                         </button>
@@ -425,7 +455,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     <td className="py-3.5 px-3 text-center align-middle bg-purple-50/20 border-r border-slate-200/60">
                       <div className="inline-flex items-center rounded-xl bg-white border border-slate-200 p-1 shadow-2xs gap-1.5">
                         <button
-                          onClick={() => openActivityDialog("fase3", "Progresso das Atividades - Fase 3", row.progressoListaFase3 || row.listaFase3, row.progressoFase3)}
+                          onClick={() => openActivityDialog(row, "fase3", "Progresso das Atividades — Fase 3", row.progressoListaFase3 || row.listaFase3, row.progressoFase3)}
                           className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progF3)}`}
                           title="Clique para ver as atividades da Fase 3"
                         >
@@ -435,7 +465,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                         <button
                           onClick={() => openGradeDialog(row, "fase3")}
                           className={`px-2 py-0.5 rounded-lg border text-[11px] font-mono font-bold cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(notaF3)}`}
-                          title="Clique para ver o extrato de notas da Fase 3"
+                          title="Clique para ver o extrato de notas e avaliações da Fase 3"
                         >
                           {row.notaFase3 || '-'}
                         </button>
@@ -445,14 +475,18 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     {/* Consolidado: Progresso Total + Média Final (Pill Destacada) */}
                     <td className="py-3.5 px-3 text-center align-middle bg-emerald-50/30 border-r border-slate-200/60">
                       <div className="inline-flex items-center rounded-xl bg-white border border-emerald-200 p-1 shadow-2xs gap-1.5">
-                        <div className={`px-2.5 py-0.5 rounded-lg border text-xs font-black ${getProgressBadgeStyle(progTot)}`}>
+                        <button
+                          onClick={() => openActivityDialog(row, "all", "Progresso Geral Consolidado (Todas as Fases)", [row.progressoListaFase1 || row.listaFase1, row.progressoListaFase2 || row.listaFase2, row.progressoListaFase3 || row.listaFase3].filter(Boolean).join("|"), row.progressoTotal)}
+                          className={`px-2.5 py-0.5 rounded-lg border text-xs font-black cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getProgressBadgeStyle(progTot)}`}
+                          title="Clique para ver o extrato consolidado de progresso das atividades"
+                        >
                           {row.progressoTotal || '0'}%
-                        </div>
+                        </button>
                         <span className="w-px h-3.5 bg-emerald-200" />
                         <button
                           onClick={() => openGradeDialog(row, "media")}
                           className={`px-2.5 py-0.5 rounded-lg border text-xs font-mono font-black cursor-pointer transition-all shadow-2xs hover:scale-105 active:scale-95 ${getGradeBadgeStyle(mediaTot)}`}
-                          title="Clique para ver o extrato completo de notas e atividades"
+                          title="Clique para ver o extrato completo de notas e avaliações"
                         >
                           {row.mediaFinal || '-'}
                         </button>
@@ -483,13 +517,26 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
         </div>
       </div>
 
-      {/* Modal de Detalhamento de Atividades */}
+      {/* Modal de Detalhamento de Progresso e Atividades */}
       <ActivityListDialog
         open={dialogState.open}
-        onClose={() => setDialogState({ open: false, fase: "", faseLabel: "", listaRaw: null, fasePercent: null })}
+        onClose={() => setDialogState(prev => ({ ...prev, open: false }))}
+        studentName={dialogState.studentName}
+        matricula={dialogState.matricula}
+        curso={dialogState.curso}
+        polo={dialogState.polo}
+        lastaccess={dialogState.lastaccess}
+        diasSemAcesso={dialogState.diasSemAcesso}
+        fase={dialogState.fase}
         faseLabel={dialogState.faseLabel}
         listaRaw={dialogState.listaRaw}
         fasePercent={dialogState.fasePercent}
+        listaFase1={dialogState.listaFase1}
+        listaFase2={dialogState.listaFase2}
+        listaFase3={dialogState.listaFase3}
+        progFase1={dialogState.progFase1}
+        progFase2={dialogState.progFase2}
+        progFase3={dialogState.progFase3}
       />
 
       {/* Modal de Detalhamento de Notas e Extrato Completo */}

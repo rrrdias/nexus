@@ -205,7 +205,7 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
             <span className="text-xs text-gray-4 font-semibold">{instConfig.lmsLabel}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-navy mt-1 tracking-tight">
-            Relatório Unificado: Progresso & Notas — {instConfig.title}
+            Relatório Acadêmico AVA — {instConfig.title}
           </h1>
           <p className="text-xs text-gray-5 mt-0.5">
             Acompanhamento 360° de engajamento, tarefas concluídas e desempenho acadêmico em tempo real.

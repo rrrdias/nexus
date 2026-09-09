@@ -170,7 +170,7 @@ export function ConsolidatedEadDashboard({ reportData, filters }: ConsolidatedEa
             <span className="text-xs text-gray-4 font-semibold">Moodle OpenLMS</span>
           </div>
           <h1 className="text-2xl font-extrabold text-navy mt-1 tracking-tight">
-            Relatório Unificado: Progresso & Notas
+            Relatório Acadêmico AVA — EaD
           </h1>
           <p className="text-xs text-gray-5 mt-0.5">
             Acompanhamento 360° de engajamento, tarefas concluídas e desempenho acadêmico em tempo real.
