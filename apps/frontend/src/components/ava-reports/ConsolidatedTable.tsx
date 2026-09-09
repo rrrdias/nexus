@@ -200,6 +200,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
       fase1Prog: row.progressoFase1,
       fase2Prog: row.progressoFase2,
       fase3Prog: row.progressoFase3,
+      progTotal: row.progressoTotal,
       listaFase1: [row.progressoListaFase1, row.notasListaFase1, row.listaFase1].filter(Boolean).join("|"),
       listaFase2: [row.progressoListaFase2, row.notasListaFase2, row.listaFase2].filter(Boolean).join("|"),
       listaFase3: [row.progressoListaFase3, row.notasListaFase3, row.listaFase3].filter(Boolean).join("|"),

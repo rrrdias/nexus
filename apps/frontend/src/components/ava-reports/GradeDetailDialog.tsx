@@ -160,20 +160,30 @@ export function GradeDetailDialog({
     }
   }
 
-  // 1. Coleta todas as atividades de todas as fontes disponíveis
-  const combinedRaw = [
-    ...rawF1,
-    ...rawF2,
-    ...rawF3,
-    ...allGradedActivities,
-  ]
+  // 1. Popula cada fase com as atividades estruturadas pelo Moodle para aquela fase
+  // Filtrando para manter apenas atividades avaliativas / com nota
+  rawF1.filter(a => isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== "-")).forEach(act => addOrMergeToMap(f1Map, act))
+  rawF2.filter(a => isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== "-")).forEach(act => addOrMergeToMap(f2Map, act))
+  rawF3.filter(a => isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== "-")).forEach(act => addOrMergeToMap(f3Map, act))
 
-  // 2. Classifica cada atividade estritamente na sua fase correta (eliminando qualquer duplicação entre fases)
-  combinedRaw.forEach(act => {
-    const phase = classifyActivityPhase(act.nome)
-    if (phase === 1) addOrMergeToMap(f1Map, act)
-    else if (phase === 2) addOrMergeToMap(f2Map, act)
-    else addOrMergeToMap(f3Map, act)
+  // 2. Reconcilia as notas detalhadas vindas de listaNotas nas fases onde cada atividade já está alocada
+  allGradedActivities.forEach(act => {
+    if (!isEvaluativeActivity(act.nome) && (act.nota === null || act.nota === "-")) return
+
+    const key = normalizeName(act.nome)
+    if (f1Map.has(key)) {
+      addOrMergeToMap(f1Map, act)
+    } else if (f2Map.has(key)) {
+      addOrMergeToMap(f2Map, act)
+    } else if (f3Map.has(key)) {
+      addOrMergeToMap(f3Map, act)
+    } else {
+      // Fallback somente para atividades que não estavam em nenhuma lista de fase específica
+      const phase = classifyActivityPhase(act.nome)
+      if (phase === 1) addOrMergeToMap(f1Map, act)
+      else if (phase === 2) addOrMergeToMap(f2Map, act)
+      else addOrMergeToMap(f3Map, act)
+    }
   })
 
   // Ordena atividades de forma cronológica / numérica dentro de cada fase

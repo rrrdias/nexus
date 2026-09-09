@@ -164,6 +164,19 @@ export function classifyActivityPhase(name: string): 1 | 2 | 3 {
 
 export function isEvaluativeActivity(name: string): boolean {
   const norm = normalizeName(name)
+
+  // Materiais de estudo / leitura puros que NÃO compõem nota
+  if (
+    (norm.startsWith("unidade tematica") || norm.startsWith("unidade ") || norm.startsWith("ut ")) &&
+    !norm.includes("fixacao") &&
+    !norm.includes("atividade")
+  ) {
+    return false
+  }
+  if (norm.includes("guia de estudo") || norm.includes("apresentacao") || norm.includes("plano de ensino") || norm.includes("material")) {
+    return false
+  }
+
   return (
     norm.includes("verificacao") ||
     norm.includes("avaliacao") ||
@@ -172,6 +185,14 @@ export function isEvaluativeActivity(name: string): boolean {
     norm.includes("fase") ||
     norm.includes("exame") ||
     norm.includes("entrega") ||
-    norm.includes("aps")
+    norm.includes("aps") ||
+    norm.includes("fixacao") ||
+    norm.includes("revisando") ||
+    norm.includes("arp") ||
+    norm.includes("aprendi hoje") ||
+    norm.includes("questionario") ||
+    norm.includes("quiz") ||
+    norm.includes("trabalho") ||
+    norm.includes("aulas ao vivo")
   )
 }
