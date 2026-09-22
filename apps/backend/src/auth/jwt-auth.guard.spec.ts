@@ -43,26 +43,16 @@ describe('JwtAuthGuard (Security Test)', () => {
     } as any;
   };
 
-  it('should ALLOW access to public /api/auth/login without token', async () => {
+  it('should ALLOW access when @Public() decorator is present', async () => {
+    reflector.getAllAndOverride.mockReturnValue(true);
     const ctx = mockContext('/api/auth/login');
     const result = await guard.canActivate(ctx);
     expect(result).toBe(true);
   });
 
-  it('should ALLOW access when @Public() decorator is present', async () => {
-    reflector.getAllAndOverride.mockReturnValue(true);
-    const ctx = mockContext('/api/any-custom-public-route');
-    const result = await guard.canActivate(ctx);
-    expect(result).toBe(true);
-  });
-
-  it('should BLOCK bypass attempt via query parameters (e.g. /api/users?bypass=/api/auth/login)', async () => {
-    const ctx = mockContext('/api/users?bypass=/api/auth/login', '/api/users');
-    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
-  });
-
-  it('should BLOCK bypass attempt via query parameters for ava-sync', async () => {
-    const ctx = mockContext('/api/users?fake=/api/ava-sync', '/api/users');
+  it('should REJECT unauthenticated requests when @Public() is not present', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    const ctx = mockContext('/api/users');
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
   });
 
@@ -84,9 +74,23 @@ describe('JwtAuthGuard (Security Test)', () => {
 
   it('should REJECT token when user is deactivated in database', async () => {
     const ctx = mockContext('/api/users', '/api/users', 'Bearer valid.jwt.token');
-    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-123', email: 'test@nexus.com', isSuperAdmin: false });
+    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-deactivated-456', email: 'test@nexus.com', isSuperAdmin: false });
     db.limit.mockResolvedValue([{ isActive: false }]);
 
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
   });
+
+  it('should verify token with secret from configuration', async () => {
+    const ctx = mockContext('/api/users', '/api/users', 'Bearer valid.jwt.token');
+    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-123', email: 'test@nexus.com', isSuperAdmin: true });
+    db.limit.mockResolvedValue([{ isActive: true }]);
+
+    const result = await guard.canActivate(ctx);
+    expect(result).toBe(true);
+    expect(jwtService.verifyAsync).toHaveBeenCalledWith(
+      'valid.jwt.token',
+      expect.objectContaining({ secret: expect.any(String) }),
+    );
+  });
 });
+

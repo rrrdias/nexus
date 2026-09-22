@@ -10,6 +10,7 @@ import { ProgressoTable } from "./ProgressoTable"
 import { ProgressoActions, exportProgressData } from "./ProgressoActions"
 import { ProgressoFilters } from "./ProgressoFilters"
 import { ProgressoPagination } from "./ProgressoPagination"
+import { DEFAULT_PERIOD } from "@/lib/academic-config"
 
 function DonutChart({ percent, color, label }: { percent: number, color: string, label: string }) {
   const radius = 24
@@ -105,7 +106,7 @@ export function DashboardProgresso({ title, metrics, institution }: { title: str
     curso_perfil: searchParams.get("curso_perfil") || "",
     periodo_perfil: searchParams.get("periodo_perfil") || "",
     enrolment_status: searchParams.get("enrolment_status") || "",
-    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-2",
+    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : DEFAULT_PERIOD,
   }
 
 

@@ -17,6 +17,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: nexus_core_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - nexus_core_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: .
@@ -26,6 +40,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${BACKEND_PORT:-3004}:3004"
     env_file:
@@ -33,10 +49,16 @@ services:
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://admin:1213122@db:5432/core_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       PORT: 3004
       JWT_SECRET: super_secret_key_nexus_2026_dev_environment
       SEED_ADMIN_PASSWORD: admin
       CRON_SECRET: gerar-uma-chave-aleatoria-para-o-cron-job
+      FRONTEND_URL: http://localhost:3002
+      CORS_ALLOWED_ORIGINS: http://localhost:3002,http://127.0.0.1:3002
+      NEXUS_DEFAULT_PERIOD: 2026-2
+      LYCEUM_ACTIVE_PERIODS: 2026-2
     command: sh -c "cd apps/backend && npx drizzle-kit push --force && node dist/main.js"
 
 
@@ -46,6 +68,13 @@ services:
       dockerfile: apps/frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: http://localhost:3004
+        NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD: 2026-2
+        NEXT_PUBLIC_NEXUS_FASE1_START: 2026-02-13
+        NEXT_PUBLIC_NEXUS_FASE1_END: 2026-03-29
+        NEXT_PUBLIC_NEXUS_FASE2_START: 2026-03-30
+        NEXT_PUBLIC_NEXUS_FASE2_END: 2026-05-11
+        NEXT_PUBLIC_NEXUS_FASE3_START: 2026-05-12
+        NEXT_PUBLIC_NEXUS_FASE3_END: 2026-06-19
     container_name: nexus_core_frontend
     restart: always
     depends_on:
@@ -56,9 +85,17 @@ services:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: http://localhost:3004
       NEXT_API_URL: http://backend:3004
+      NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD: 2026-2
+      NEXT_PUBLIC_NEXUS_FASE1_START: 2026-02-13
+      NEXT_PUBLIC_NEXUS_FASE1_END: 2026-03-29
+      NEXT_PUBLIC_NEXUS_FASE2_START: 2026-03-30
+      NEXT_PUBLIC_NEXUS_FASE2_END: 2026-05-11
+      NEXT_PUBLIC_NEXUS_FASE3_START: 2026-05-12
+      NEXT_PUBLIC_NEXUS_FASE3_END: 2026-06-19
       AUTH_SECRET: minha-super-secret-1234567890
       AUTH_TRUST_HOST: "true"
       AUTH_URL: http://localhost:3002/api/auth
 
 volumes:
   nexus_core_db:
+  nexus_core_redis:

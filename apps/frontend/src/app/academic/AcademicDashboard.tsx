@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getStudents, getStudentDisciplines, getTeachers, getTeacherDisciplines, getClasses, getMatriculas, syncAcademicData } from "@/app/actions/academic"
+import { getJobStatus } from "@/app/actions/jobs"
 
 type TabType = "discentes" | "docentes" | "turmas" | "matriculas"
 
@@ -33,6 +34,8 @@ export function AcademicDashboard() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | null }>({ message: "", type: null })
   const [hasSearched, setHasSearched] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<number | null>(null)
+  const [syncStep, setSyncStep] = useState<string | null>(null)
 
   // Data states
   const [listData, setListData] = useState<any[]>([])
@@ -61,23 +64,25 @@ export function AcademicDashboard() {
         res = await getTeachers({ search, page, size: 15 })
       } else if (activeTab === "turmas") {
         res = await getClasses({ search, page, size: 15 })
-      } else {
+      } else if (activeTab === "matriculas") {
         res = await getMatriculas({ search, page, size: 15 })
       }
 
-      if (res.success && res.data) {
+      if (res && res.success && res.data) {
         setListData(res.data.data || [])
-        setMeta({
-          total: res.data.total || 0,
-          page: res.data.page || 1,
-          size: res.data.size || 15,
-          totalPages: res.data.totalPages || 1
+        setMeta(res.data.meta || { 
+          total: res.data.total || 0, 
+          page: res.data.page || 1, 
+          size: res.data.size || 15, 
+          totalPages: res.data.totalPages || 1 
         })
       } else {
-        showToast(res.error || "Falha ao buscar registros do Lyceum.", "error")
+        showToast(res?.error || "Erro ao carregar dados.", "error")
+        setListData([])
       }
-    } catch (err: any) {
-      showToast("Ocorreu um erro na requisição.", "error")
+    } catch (err) {
+      showToast("Falha na comunicação com a API.", "error")
+      setListData([])
     } finally {
       setLoading(false)
     }
@@ -92,31 +97,64 @@ export function AcademicDashboard() {
     }
   }, [activeTab, page])
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    setPage(1)
     setHasSearched(true)
-    if (page !== 1) {
-      setPage(1)
+    if (activeTab === "matriculas" && !search.trim()) {
+      showToast("Digite um termo para pesquisar nas matrículas.", "error")
     } else {
       fetchData()
     }
   }
 
+  const handleSearchSubmit = handleSearch
+
   const handleSync = async () => {
     setSyncing(true)
-    showToast("Sincronização iniciada. Isso pode levar alguns minutos...", "success")
+    setSyncProgress(0)
+    setSyncStep("Iniciando fila de sincronização...")
+    showToast("Sincronização iniciada...", "success")
     try {
       const res = await syncAcademicData()
-      if (res.success) {
-        showToast(`Sincronização concluída! ${res.data.usersSync || 0} usuários e ${res.data.turmas || 0} turmas.`, "success")
-        if (hasSearched) fetchData()
-      } else {
-        showToast(res.error || "Erro ao sincronizar base.", "error")
+      if (!res.success) {
+        throw new Error(res.error || "Erro ao disparar sincronização.")
       }
-    } catch (err) {
-      showToast("Falha ao comunicar com servidor de sincronização.", "error")
+
+      if (res.data?.queued && res.data?.jobId) {
+        const jobId = res.data.jobId
+        const queue = res.data.queue || 'academic-sync'
+        
+        let isDone = false
+        while (!isDone) {
+          await new Promise(r => setTimeout(r, 1500))
+          const statusRes = await getJobStatus(queue, jobId)
+          if (statusRes.success && statusRes.data) {
+            const job = statusRes.data
+            setSyncProgress(job.progress || 0)
+            if (job.step) setSyncStep(job.step)
+
+            if (job.state === 'completed') {
+              isDone = true
+              const result = job.result || {}
+              showToast(`Sincronização concluída! ${result.usersSync || 0} usuários e ${result.turmas || 0} turmas.`, "success")
+              if (hasSearched) fetchData()
+            } else if (job.state === 'failed') {
+              isDone = true
+              throw new Error(job.failedReason || "Falha durante o processamento do job.")
+            }
+          }
+        }
+      } else {
+        showToast(`Sincronização concluída! ${res.data?.usersSync || 0} usuários e ${res.data?.turmas || 0} turmas.`, "success")
+        if (hasSearched) fetchData()
+      }
+    } catch (err: any) {
+      showToast(err.message || "Falha ao comunicar com servidor de sincronização.", "error")
     } finally {
       setSyncing(false)
+      setSyncProgress(null)
+      setSyncStep(null)
     }
   }
 
@@ -260,7 +298,7 @@ export function AcademicDashboard() {
             className="h-7 text-[11px] font-bold rounded-lg text-[#5E35B1] border-[#5E35B1]/20 hover:bg-[#5E35B1]/10 gap-1.5 shadow-sm"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Sincronizando...' : 'Forçar Sincronização'}
+            {syncing ? `${syncStep || 'Sincronizando...'} ${syncProgress !== null ? `(${syncProgress}%)` : ''}` : 'Forçar Sincronização'}
           </Button>
           <Badge className="bg-[#E8F5E9] text-[#2E7D32] border border-[#A5D6A7] hover:bg-[#C8E6C9] py-1 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm">
             <CheckCircle2 className="w-3.5 h-3.5" /> Lyceum Online
@@ -479,7 +517,7 @@ export function AcademicDashboard() {
                           <p className="font-semibold text-navy text-xs">{teacher.email}</p>
                           <span className="text-[10px] text-[#9AA0AC] block font-mono">{teacher.telefone}</span>
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell">{teacher.localidade || teacher.local}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell">{teacher.local}</TableCell>
                         <TableCell className="px-5 py-3.5 text-xs text-[#5F6775] hidden lg:table-cell font-mono">{teacher.cpf}</TableCell>
                         <TableCell className="px-5 py-3.5 text-right">
                           <Button 
@@ -594,10 +632,10 @@ export function AcademicDashboard() {
       <div className={`fixed inset-0 z-50 flex justify-end transition-opacity duration-300 ease-in-out ${
         isDrawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
       }`}>
-        {/* Backdrop Backdrop-blur */}
+        {/* Backdrop */}
         <div 
           onClick={() => setIsDrawerOpen(false)}
-          className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+          className="absolute inset-0 bg-black/40 transition-opacity"
         />
 
         {/* Right side slide-over panel */}

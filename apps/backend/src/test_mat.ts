@@ -2,9 +2,9 @@ import * as sql from 'mssql';
 
 async function run() {
   const config = {
-    user: 'PortAeeConsult',
-    password: 'Port4eeC0nsult@Tudo.',
-    server: '172.29.44.90',
+    user: process.env.LYCEUM_DB_USERNAME || '',
+    password: process.env.LYCEUM_DB_PASSWORD || '',
+    server: process.env.LYCEUM_DB_HOST || '',
     port: 1433,
     database: 'Lyceum',
     options: { encrypt: false, trustServerCertificate: true },

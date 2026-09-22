@@ -24,6 +24,7 @@ import {
 
 interface ConsolidatedRecord {
   id: string
+  sourceInstitution?: string
   alunoId: string
   matricula: string
   usuario: string

@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and, or, inArray, ilike, sql, isNull, desc } from 'drizzle-orm';
@@ -74,7 +74,7 @@ export class SchedulingService {
       .limit(1);
 
     if (groupAccess.length === 0) {
-      throw new UnauthorizedException('Acesso restrito a administradores.');
+      throw new ForbiddenException('Acesso restrito a administradores do módulo de agendamento.');
     }
   }
 
@@ -159,6 +159,10 @@ export class SchedulingService {
 
     if (endMin <= startMin || (endMin - startMin) < 30) {
       throw new BadRequestException('Horário final deve ser maior que o horário inicial em pelo menos 30 minutos.');
+    }
+
+    if ((endMin - startMin) % 30 !== 0) {
+      throw new BadRequestException('O intervalo total entre horário inicial e final deve ser múltiplo exato de 30 minutos.');
     }
 
     const parsedDate = new Date(data.data);

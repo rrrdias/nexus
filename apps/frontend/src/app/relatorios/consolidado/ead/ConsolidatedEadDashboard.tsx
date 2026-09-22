@@ -16,6 +16,7 @@ import {
   AlertCircle,
   BookOpen
 } from "lucide-react"
+import { DEFAULT_PERIOD } from "@/lib/academic-config"
 
 function DonutChart({ 
   percent, 
@@ -133,7 +134,7 @@ export function ConsolidatedEadDashboard({ reportData, filters }: ConsolidatedEa
     no_access_count = 0,
     total_alunos_unicos = 0,
     total_disciplinas = 0,
-    unique_periodos = ["2026-2", "2026-1", "2025-2"],
+    unique_periodos = [DEFAULT_PERIOD, "2026-1", "2025-2"],
     unique_polos = [],
     unique_cursos = [],
   } = reportData || {}

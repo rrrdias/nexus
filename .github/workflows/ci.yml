@@ -1,0 +1,60 @@
+name: Nexus Core CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-test:
+    name: Test & Build (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-test-secret-key-32-chars-long-123456
+      PORT: 3001
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/nexus_test
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Lint Monorepo
+        run: npm run lint
+
+      - name: 🧪 Run Backend Unit Tests
+        run: npm run test --workspace=@nexus-core/backend
+
+      - name: 🚀 Run Backend E2E Tests
+        run: npm run test:e2e --workspace=@nexus-core/backend
+
+      - name: 🏗️ Build All Monorepo Workspaces (Backend & Frontend)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          AUTH_SECRET: ci-auth-secret-key-for-nextjs-32-bytes

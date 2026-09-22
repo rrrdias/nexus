@@ -1,8 +1,10 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject, Optional, UnauthorizedException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { groups, groupSystemAccess, systemModules } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
+import { CacheService } from '../cache/cache.service';
+import { RbacGuard } from '../auth/rbac.guard';
 
 type SessionUser = {
   id?: string;
@@ -14,6 +16,7 @@ type SessionUser = {
 export class GroupsService {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
+    @Optional() private readonly cacheService?: CacheService,
   ) {}
 
   private assertSuperAdmin(user?: SessionUser) {
@@ -73,6 +76,11 @@ export class GroupsService {
       }
     });
 
+    if (this.cacheService) {
+      await this.cacheService.delByPattern('rbac:user:*');
+    }
+    RbacGuard.clearCache();
+
     return { success: true };
   }
 
@@ -91,12 +99,23 @@ export class GroupsService {
       }
     });
 
+    if (this.cacheService) {
+      await this.cacheService.delByPattern('rbac:user:*');
+    }
+    RbacGuard.clearCache();
+
     return { success: true };
   }
 
   async deleteGroup(user: SessionUser, groupId: string) {
     this.assertSuperAdmin(user);
     await this.db.delete(groups).where(eq(groups.id, groupId));
+
+    if (this.cacheService) {
+      await this.cacheService.delByPattern('rbac:user:*');
+    }
+    RbacGuard.clearCache();
+
     return { success: true };
   }
 }

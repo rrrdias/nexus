@@ -1,24 +1,30 @@
-import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, Optional, OnModuleInit } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { eq, and, or, sql } from 'drizzle-orm';
 import { avaProgressReport, avaGradesReport } from '../db/schema';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { CacheService } from '../cache/cache.service';
 
 async function processInChunks<T>(
   label: string,
   items: T[],
   chunkSize: number,
-  processor: (chunk: T[]) => Promise<void>
+  processor: (chunk: T[]) => Promise<void>,
+  onChunkProgress?: (chunkNum: number, totalChunks: number, processedItems: number, totalItems: number) => Promise<void> | void
 ) {
   const totalChunks = Math.ceil(items.length / chunkSize);
   console.log(`[SYNC] ${label}: total de ${items.length} registros para processar em ${totalChunks} lotes...`);
   for (let i = 0; i < items.length; i += chunkSize) {
     const chunk = items.slice(i, i + chunkSize);
     const chunkNum = Math.floor(i / chunkSize) + 1;
+    const processedItems = Math.min(i + chunkSize, items.length);
     if (chunkNum === 1 || chunkNum % 10 === 0 || chunkNum === totalChunks) {
-      console.log(`[SYNC] ${label}: gravando lote ${chunkNum}/${totalChunks} (${Math.min(i + chunkSize, items.length)}/${items.length} registros)...`);
+      console.log(`[SYNC] ${label}: gravando lote ${chunkNum}/${totalChunks} (${processedItems}/${items.length} registros)...`);
     }
     await processor(chunk);
+    if (onChunkProgress) {
+      await onChunkProgress(chunkNum, totalChunks, processedItems, items.length);
+    }
   }
 }
 
@@ -27,6 +33,7 @@ async function processInChunks<T>(
 export class AvaSyncService implements OnModuleInit {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
+    @Optional() private readonly cacheService?: CacheService,
   ) {}
 
   async onModuleInit() {
@@ -225,6 +232,10 @@ export class AvaSyncService implements OnModuleInit {
       `);
 
       console.log(`[AvaSyncService] Snapshot consolidado atualizado com sucesso em ${Date.now() - t0}ms.`);
+
+      if (this.cacheService) {
+        await this.cacheService.delByPattern('ava:dropdowns:*');
+      }
     } catch (err: any) {
       console.error('[AvaSyncService] Erro ao atualizar snapshot consolidado:', err.message);
     }
@@ -232,10 +243,28 @@ export class AvaSyncService implements OnModuleInit {
 
 
 
-  async syncGrades(institution: string, getUrl: string | undefined, attUrl: string | undefined) {
+  async triggerMoodleUpdate(institution: string, attUrl: string | undefined, label: string): Promise<boolean> {
+    if (!attUrl) return false;
+    try {
+      console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (${label}): ${attUrl}`);
+      const r = await fetch(attUrl, { cache: 'no-store' });
+      console.log(`[MOODLE] Atualização de SQL Adiado disparada para ${institution} (${label}) - HTTP ${r.status}`);
+      return r.ok;
+    } catch (e: any) {
+      console.error(`[MOODLE] Erro ao disparar atualização para ${institution} (${label}):`, e.message);
+      return false;
+    }
+  }
 
+  async syncGrades(
+    institution: string,
+    getUrl: string | undefined,
+    attUrl: string | undefined,
+    onProgress?: (progress: number, step: string) => Promise<void>
+  ) {
     if (!getUrl) return { source: `${institution}_grades`, status: 'skipped', reason: 'URL missing' };
     console.log(`[SYNC] Iniciando Notas ${institution}...`);
+    if (onProgress) await onProgress(5, `Buscando relatório de notas (${institution.toUpperCase()}) no Moodle...`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
@@ -245,46 +274,52 @@ export class AvaSyncService implements OnModuleInit {
       try {
         res = await fetch(getUrl, { cache: 'no-store', signal: controller.signal });
       } catch (fetchError: any) {
+        await this.triggerMoodleUpdate(institution, attUrl, 'Notas');
         if (fetchError.name === 'AbortError') {
-          return { source: `${institution}_grades`, status: 'skipped', reason: 'Timeout na resposta do Moodle (120s)' };
+          return { source: `${institution}_grades`, status: 'queued', reason: 'Timeout na resposta do Moodle (120s). Disparada solicitação de atualização do SQL Adiado.' };
         }
-        return { source: `${institution}_grades`, status: 'skipped', reason: `Erro de conexão: ${fetchError.message}` };
+        return { source: `${institution}_grades`, status: 'queued', reason: `Erro de conexão com Moodle: ${fetchError.message}. Disparada solicitação de atualização do SQL Adiado.` };
       } finally {
         clearTimeout(timeoutId);
       }
 
-
       if (!res.ok) {
+        await this.triggerMoodleUpdate(institution, attUrl, 'Notas');
         if (res.status === 404) {
-          return { source: `${institution}_grades`, status: 'skipped', reason: 'Relatório de notas em fila no Moodle (aguardando geração)' };
+          return { source: `${institution}_grades`, status: 'queued', reason: 'Relatório de notas em fila no Moodle (aguardando geração). Disparada a execução do SQL Adiado no Moodle.' };
         }
-        return { source: `${institution}_grades`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` };
+        return { source: `${institution}_grades`, status: 'queued', reason: `Link indisponível no Moodle (HTTP ${res.status}). Disparada atualização do SQL Adiado.` };
       }
-
 
       const textContent = await res.text();
       if (!textContent || textContent.trim() === '') {
-        return { source: `${institution}_grades`, status: 'skipped', reason: 'Arquivo de relatório vazio (Moodle gerando)' };
+        await this.triggerMoodleUpdate(institution, attUrl, 'Notas');
+        return { source: `${institution}_grades`, status: 'queued', reason: 'Arquivo de relatório vazio (Moodle gerando). Disparada atualização do SQL Adiado.' };
       }
 
       const cleanText = textContent.trim();
       if (cleanText.startsWith('<!DOCTYPE') || cleanText.startsWith('<html') || cleanText.startsWith('<xml')) {
-        return { source: `${institution}_grades`, status: 'skipped', reason: 'Moodle retornou HTML/Erro (Relatório sendo gerado ou não autorizado)' };
+        await this.triggerMoodleUpdate(institution, attUrl, 'Notas');
+        return { source: `${institution}_grades`, status: 'queued', reason: 'Moodle retornou HTML/Processamento. Disparada atualização do SQL Adiado.' };
       }
 
       let data;
       try {
         data = JSON.parse(cleanText);
       } catch (parseError: any) {
+        await this.triggerMoodleUpdate(institution, attUrl, 'Notas');
         return { source: `${institution}_grades`, status: 'skipped', reason: `JSON inválido retornado pelo Moodle: ${parseError.message.substring(0, 50)}` };
       }
 
       if (!Array.isArray(data)) {
         if (data && typeof data === 'object' && ('exception' in data || 'error' in data || 'message' in data)) {
+          this.triggerMoodleUpdate(institution, attUrl, 'Notas').catch(() => {});
           return { source: `${institution}_grades`, status: 'skipped', reason: `Erro no Moodle: ${(data as any).message || (data as any).exception || 'Desconhecido'}` };
         }
         return { source: `${institution}_grades`, status: 'skipped', reason: 'Formato de dados inválido (esperado array)' };
       }
+
+      if (onProgress) await onProgress(15, `Processando ${data.length} notas (${institution.toUpperCase()})...`);
 
       let inserted = 0;
       let updated = 0;
@@ -368,24 +403,24 @@ export class AvaSyncService implements OnModuleInit {
             }
           });
 
-
         inserted += inserts.length;
+      }, async (chunkNum, totalChunks, processedItems, totalItems) => {
+        if (onProgress) {
+          const chunkPct = Math.round(15 + (chunkNum / totalChunks) * 70);
+          await onProgress(chunkPct, `Gravando notas (${institution.toUpperCase()}): lote ${chunkNum}/${totalChunks} (${processedItems}/${totalItems})`);
+        }
       });
 
       console.log(`[SYNC] Notas ${institution} concluído: ${inserted} registros salvos no banco.`);
 
       // Atualizar Snapshot Consolidado automaticamente
+      if (onProgress) await onProgress(88, `Atualizando consolidado de ${institution.toUpperCase()}...`);
       await this.refreshConsolidatedSnapshot(institution);
 
-      if (attUrl) {
-        console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Notas)...`);
-        setTimeout(() => {
-          fetch(attUrl, { cache: 'no-store' })
-            .then(r => console.log(`[MOODLE] Atualização de SQL Adiado disparada para ${institution} (Notas) - HTTP ${r.status}`))
-            .catch(e => console.error(`[MOODLE] Erro ao disparar atualização para ${institution} (Notas):`, e.message));
-        }, 1500);
-      }
+      // Disparar atualização do SQL Adiado para o próximo ciclo
+      this.triggerMoodleUpdate(institution, attUrl, 'Notas').catch(() => {});
 
+      if (onProgress) await onProgress(100, `Notas de ${institution.toUpperCase()} sincronizadas com sucesso!`);
       return { source: `${institution}_grades`, status: 'success', inserted, updated };
 
     } catch (error: any) {
@@ -397,9 +432,15 @@ export class AvaSyncService implements OnModuleInit {
     }
   }
 
-  async syncProgress(institution: string, getUrl: string | undefined, attUrl: string | undefined) {
+  async syncProgress(
+    institution: string,
+    getUrl: string | undefined,
+    attUrl: string | undefined,
+    onProgress?: (progress: number, step: string) => Promise<void>
+  ) {
     if (!getUrl) return { source: `${institution}_progress`, status: 'skipped', reason: 'URL missing' };
     console.log(`[SYNC] Iniciando Progresso ${institution}...`);
+    if (onProgress) await onProgress(5, `Buscando relatório de progresso (${institution.toUpperCase()}) no Moodle...`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
@@ -409,46 +450,52 @@ export class AvaSyncService implements OnModuleInit {
       try {
         res = await fetch(getUrl, { cache: 'no-store', signal: controller.signal });
       } catch (fetchError: any) {
+        await this.triggerMoodleUpdate(institution, attUrl, 'Progresso');
         if (fetchError.name === 'AbortError') {
-          return { source: `${institution}_progress`, status: 'skipped', reason: 'Timeout na resposta do Moodle (120s)' };
+          return { source: `${institution}_progress`, status: 'queued', reason: 'Timeout na resposta do Moodle (120s). Disparada solicitação de atualização do SQL Adiado.' };
         }
-        return { source: `${institution}_progress`, status: 'skipped', reason: `Erro de conexão: ${fetchError.message}` };
+        return { source: `${institution}_progress`, status: 'queued', reason: `Erro de conexão: ${fetchError.message}. Disparada solicitação de atualização do SQL Adiado.` };
       } finally {
         clearTimeout(timeoutId);
       }
 
-
       if (!res.ok) {
+        await this.triggerMoodleUpdate(institution, attUrl, 'Progresso');
         if (res.status === 404) {
-          return { source: `${institution}_progress`, status: 'skipped', reason: 'Relatório de progresso em fila no Moodle (aguardando geração pelo cron)' };
+          return { source: `${institution}_progress`, status: 'queued', reason: 'Relatório de progresso em fila no Moodle (aguardando geração). Disparada a execução do SQL Adiado no Moodle.' };
         }
-        return { source: `${institution}_progress`, status: 'skipped', reason: `Link indisponível no Moodle (HTTP ${res.status})` };
+        return { source: `${institution}_progress`, status: 'queued', reason: `Link indisponível no Moodle (HTTP ${res.status}). Disparada atualização do SQL Adiado.` };
       }
-
 
       const textContent = await res.text();
       if (!textContent || textContent.trim() === '') {
-        return { source: `${institution}_progress`, status: 'skipped', reason: 'Arquivo de relatório vazio (Moodle gerando)' };
+        await this.triggerMoodleUpdate(institution, attUrl, 'Progresso');
+        return { source: `${institution}_progress`, status: 'queued', reason: 'Arquivo de relatório vazio (Moodle gerando). Disparada atualização do SQL Adiado.' };
       }
 
       const cleanText = textContent.trim();
       if (cleanText.startsWith('<!DOCTYPE') || cleanText.startsWith('<html') || cleanText.startsWith('<xml')) {
-        return { source: `${institution}_progress`, status: 'skipped', reason: 'Moodle retornou HTML/Erro (Relatório sendo gerado ou não autorizado)' };
+        await this.triggerMoodleUpdate(institution, attUrl, 'Progresso');
+        return { source: `${institution}_progress`, status: 'queued', reason: 'Moodle retornou HTML/Processamento. Disparada atualização do SQL Adiado.' };
       }
 
       let data;
       try {
         data = JSON.parse(cleanText);
       } catch (parseError: any) {
+        await this.triggerMoodleUpdate(institution, attUrl, 'Progresso');
         return { source: `${institution}_progress`, status: 'skipped', reason: `JSON inválido retornado pelo Moodle: ${parseError.message.substring(0, 50)}` };
       }
 
       if (!Array.isArray(data)) {
         if (data && typeof data === 'object' && ('exception' in data || 'error' in data || 'message' in data)) {
+          this.triggerMoodleUpdate(institution, attUrl, 'Progresso').catch(() => {});
           return { source: `${institution}_progress`, status: 'skipped', reason: `Erro no Moodle: ${(data as any).message || (data as any).exception || 'Desconhecido'}` };
         }
         return { source: `${institution}_progress`, status: 'skipped', reason: 'Formato de dados inválido (esperado array)' };
       }
+
+      if (onProgress) await onProgress(15, `Processando ${data.length} registros de progresso (${institution.toUpperCase()})...`);
 
       let inserted = 0;
       let updated = 0;
@@ -499,7 +546,6 @@ export class AvaSyncService implements OnModuleInit {
         }
         const uniqueInserts = Array.from(uniqueInsertsMap.values());
 
-
         await this.db.insert(avaProgressReport)
           .values(uniqueInserts)
           .onConflictDoUpdate({
@@ -528,22 +574,23 @@ export class AvaSyncService implements OnModuleInit {
           });
 
         inserted += inserts.length;
+      }, async (chunkNum, totalChunks, processedItems, totalItems) => {
+        if (onProgress) {
+          const chunkPct = Math.round(15 + (chunkNum / totalChunks) * 70);
+          await onProgress(chunkPct, `Gravando progresso (${institution.toUpperCase()}): lote ${chunkNum}/${totalChunks} (${processedItems}/${totalItems})`);
+        }
       });
 
       console.log(`[SYNC] Progresso ${institution} concluído: ${inserted} registros salvos no banco.`);
 
       // Atualizar Snapshot Consolidado automaticamente
+      if (onProgress) await onProgress(88, `Atualizando consolidado de ${institution.toUpperCase()}...`);
       await this.refreshConsolidatedSnapshot(institution);
 
-      if (attUrl) {
-        console.log(`[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (Progresso)...`);
-        setTimeout(() => {
-          fetch(attUrl, { cache: 'no-store' })
-            .then(r => console.log(`[MOODLE] Atualização de SQL Adiado disparada para ${institution} (Progresso) - HTTP ${r.status}`))
-            .catch(e => console.error(`[MOODLE] Erro ao disparar atualização para ${institution} (Progresso):`, e.message));
-        }, 1500);
-      }
+      // Disparar atualização do SQL Adiado para o próximo ciclo
+      this.triggerMoodleUpdate(institution, attUrl, 'Progresso').catch(() => {});
 
+      if (onProgress) await onProgress(100, `Progresso de ${institution.toUpperCase()} sincronizado com sucesso!`);
       return { source: `${institution}_progress`, status: 'success', inserted, updated };
 
     } catch (error: any) {

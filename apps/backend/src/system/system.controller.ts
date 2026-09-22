@@ -1,5 +1,6 @@
 import { Controller, Get, Req } from '@nestjs/common';
 import { SystemService } from './system.service';
+import { RequireAdmin } from '../auth/rbac.decorators';
 
 @Controller('api/system')
 export class SystemController {
@@ -16,6 +17,7 @@ export class SystemController {
     return this.systemService.getSidebarModules(req.user.id);
   }
 
+  @RequireAdmin()
   @Get('admin-dashboard')
   getAdminDashboardStats(@Req() req: any) {
     this.systemService.recordUserActivity(req.user.id);

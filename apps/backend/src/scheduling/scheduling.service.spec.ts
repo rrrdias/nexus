@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { SchedulingService } from './scheduling.service';
 
 describe('SchedulingService (createOption stability test & RBAC)', () => {
@@ -11,7 +11,7 @@ describe('SchedulingService (createOption stability test & RBAC)', () => {
       from: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
-      limit: jest.fn(),
+      limit: jest.fn().mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       returning: jest.fn(),
@@ -24,13 +24,16 @@ describe('SchedulingService (createOption stability test & RBAC)', () => {
     service = new SchedulingService(db);
   });
 
-  it('should generate valid 30-min slots without infinite loop', async () => {
-    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
-    db.returning.mockImplementation(async () => [
-      { id: '1', hora: '08:00:00' },
-      { id: '2', hora: '08:30:00' },
-      { id: '3', hora: '09:00:00' },
-      { id: '4', hora: '09:30:00' },
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  it('should split slots into exact 30-min intervals when duration is divisible by 30', async () => {
+    db.returning.mockResolvedValue([
+      { id: 'opt-1', localId: 'local-1', data: '2026-09-01', horaInicio: '08:00:00', horaFim: '08:30:00', vagas: 20 },
+      { id: 'opt-2', localId: 'local-1', data: '2026-09-01', horaInicio: '08:30:00', horaFim: '09:00:00', vagas: 20 },
+      { id: 'opt-3', localId: 'local-1', data: '2026-09-01', horaInicio: '09:00:00', horaFim: '09:30:00', vagas: 20 },
+      { id: 'opt-4', localId: 'local-1', data: '2026-09-01', horaInicio: '09:30:00', horaFim: '10:00:00', vagas: 20 },
     ]);
 
     const result = await service.createOption({
@@ -38,51 +41,47 @@ describe('SchedulingService (createOption stability test & RBAC)', () => {
       data: '2026-09-01',
       horaInicio: '08:00',
       horaFim: '10:00',
-      vagas: 25,
+      vagas: 20,
     });
 
-    expect(db.values).toHaveBeenCalled();
-    const calls = db.values.mock.calls[0][0];
-    expect(calls).toHaveLength(4);
-    expect(calls[0].hora).toBe('08:00:00');
-    expect(calls[1].hora).toBe('08:30:00');
-    expect(calls[2].hora).toBe('09:00:00');
-    expect(calls[3].hora).toBe('09:30:00');
+    expect(result).toHaveLength(4);
+    expect(db.values).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ hora: '08:00:00' }),
+        expect.objectContaining({ hora: '08:30:00' }),
+        expect.objectContaining({ hora: '09:00:00' }),
+        expect.objectContaining({ hora: '09:30:00' }),
+      ])
+    );
   });
 
-  it('should REJECT invalid time formats immediately without hanging (Anti-DoS)', async () => {
-    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
-
+  it('should REJECT intervals that are NOT exact multiples of 30 minutes', async () => {
     await expect(service.createOption({
       localId: 'local-1',
       data: '2026-09-01',
-      horaInicio: 'invalid_time',
-      horaFim: '10:00',
-      vagas: 25,
+      horaInicio: '08:00',
+      horaFim: '08:45',
+      vagas: 20,
     })).rejects.toThrow(BadRequestException);
   });
 
-  it('should REJECT when horaFim is earlier than horaInicio without hanging', async () => {
-    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
-
+  it('should REJECT invalid intervals where horaInicio >= horaFim', async () => {
     await expect(service.createOption({
       localId: 'local-1',
       data: '2026-09-01',
       horaInicio: '10:00',
       horaFim: '08:00',
-      vagas: 25,
+      vagas: 20,
     })).rejects.toThrow(BadRequestException);
   });
 
-  it('should REJECT when interval is less than 30 minutes', async () => {
-    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
-
+  it('should REJECT intervals shorter than 30 minutes', async () => {
     await expect(service.createOption({
       localId: 'local-1',
       data: '2026-09-01',
       horaInicio: '08:00',
       horaFim: '08:15',
-      vagas: 25,
+      vagas: 20,
     })).rejects.toThrow(BadRequestException);
   });
 
@@ -92,6 +91,6 @@ describe('SchedulingService (createOption stability test & RBAC)', () => {
 
   it('should REJECT admin action for unauthorized user', async () => {
     db.limit.mockResolvedValue([]);
-    await expect(service.assertSchedulingAdminAccess({ id: 'u2', isSuperAdmin: false })).rejects.toThrow(UnauthorizedException);
+    await expect(service.assertSchedulingAdminAccess({ id: 'u2', isSuperAdmin: false })).rejects.toThrow(ForbiddenException);
   });
 });

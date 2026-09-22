@@ -1,6 +1,10 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Req } from '@nestjs/common';
 import { GroupsService } from './groups.service';
+import { RequireAdmin } from '../auth/rbac.decorators';
+import { CreateGroupDto } from './dto/create-group.dto';
+import { UpdateGroupDto } from './dto/update-group.dto';
 
+@RequireAdmin()
 @Controller('api/groups')
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
@@ -16,24 +20,13 @@ export class GroupsController {
   }
 
   @Post()
-  createGroup(
-    @Req() req: any,
-    @Body('name') name: string,
-    @Body('description') description: string,
-    @Body('moduleIds') moduleIds: string[]
-  ) {
-    return this.groupsService.createGroup(req.user, name, description, moduleIds);
+  createGroup(@Req() req: any, @Body() data: CreateGroupDto) {
+    return this.groupsService.createGroup(req.user, data.name, data.description || '', data.moduleIds || []);
   }
 
   @Put(':id')
-  updateGroup(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Body('name') name: string,
-    @Body('description') description: string,
-    @Body('moduleIds') moduleIds: string[]
-  ) {
-    return this.groupsService.updateGroup(req.user, id, name, description, moduleIds);
+  updateGroup(@Req() req: any, @Param('id') id: string, @Body() data: UpdateGroupDto) {
+    return this.groupsService.updateGroup(req.user, id, data.name, data.description || '', data.moduleIds || []);
   }
 
   @Delete(':id')

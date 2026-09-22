@@ -4,9 +4,9 @@ dotenv.config();
 
 async function run() {
   const config = {
-    user: process.env.LYCEUM_DB_USERNAME || 'PortAeeConsult',
-    password: process.env.LYCEUM_DB_PASSWORD || 'Port4eeC0nsult@Tudo.',
-    server: process.env.LYCEUM_DB_HOST || '172.29.44.90',
+    user: process.env.LYCEUM_DB_USERNAME || '',
+    password: process.env.LYCEUM_DB_PASSWORD || '',
+    server: process.env.LYCEUM_DB_HOST || '',
     port: parseInt(process.env.LYCEUM_DB_PORT || '1433'),
     database: process.env.LYCEUM_DB_DATABASE || 'Lyceum',
     options: {

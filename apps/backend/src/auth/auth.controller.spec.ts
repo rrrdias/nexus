@@ -36,4 +36,10 @@ describe('AuthController', () => {
     expect(authService.login).toHaveBeenCalledWith('user@test.com', 'password123');
     expect(result.access_token).toBe('fake_jwt_token');
   });
+
+  it('should support login with username/userid instead of email format', async () => {
+    const result = await controller.signIn({ login: 'admin', password: 'admin' });
+    expect(authService.login).toHaveBeenCalledWith('admin', 'admin');
+    expect(result.access_token).toBe('fake_jwt_token');
+  });
 });

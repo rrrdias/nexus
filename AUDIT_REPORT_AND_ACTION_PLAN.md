@@ -55,7 +55,7 @@ pie title Distribuição de Apontamentos por Severidade
   * [`.env.example`](.env.example#L16-L21)
 * **Descrição do Problema:**
   * Tokens de produção e sandbox das instâncias do Moodle (`UniEVANGÉLICA`, `EaD`, `FAEGO`, `RAÍZES`, `EEFN`) estão hardcoded no arquivo de seed.
-  * Usuário (`PortAeeConsult`), senha (`Port4eeC0nsult@Tudo.`) e IP interno (`172.29.44.90`) do banco SQL Server (Lyceum) estão commitados no repositório.
+  * Usuário (`PortAeeConsult`), senha institucional (`[REDACTED_LYCEUM_PASS]`) e IP interno (`172.29.44.90`) do banco SQL Server (Lyceum) foram identificados no repositório.
 * **Correção:** Mover todas as credenciais sensíveis exclusivamente para variáveis de ambiente `.env` no servidor e rotacionar os tokens/senhas expostos.
 
 ---

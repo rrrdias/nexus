@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AvaReportsController } from './ava-reports.controller';
 import { AvaReportsService } from './ava-reports.service';
+import { JobsService } from '../jobs/jobs.service';
 
 describe('AvaReportsController', () => {
   let controller: AvaReportsController;
   let avaReportsService: any;
+  let jobsService: any;
 
   beforeEach(async () => {
     avaReportsService = {
@@ -13,12 +15,20 @@ describe('AvaReportsController', () => {
       getAvaDashboardStats: jest.fn().mockResolvedValue({ totalStudents: 10 }),
     };
 
+    jobsService = {
+      addAvaSyncJob: jest.fn().mockResolvedValue({ jobId: 'job-123', queue: 'ava-sync' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AvaReportsController],
       providers: [
         {
           provide: AvaReportsService,
           useValue: avaReportsService,
+        },
+        {
+          provide: JobsService,
+          useValue: jobsService,
         },
       ],
     }).compile();
@@ -32,7 +42,7 @@ describe('AvaReportsController', () => {
 
   it('should call getProgressData', async () => {
     const req = { user: { id: '1', isSuperAdmin: true } };
-    const res = await controller.getProgressData(req, 1, 15, {});
+    const res = await controller.getProgressData(req, { page: 1, size: 15, filters: {} });
     expect(avaReportsService.getProgressData).toHaveBeenCalledWith(req.user, 1, 15, {});
     expect(res).toEqual({ total_records: 10, data: [] });
   });

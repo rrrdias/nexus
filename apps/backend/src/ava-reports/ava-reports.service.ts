@@ -1,4 +1,4 @@
-import { Injectable, Inject, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, Optional, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 
 import { eq, ilike, and, inArray, or, isNull, isNotNull, not, sql, desc, asc } from 'drizzle-orm';
@@ -7,6 +7,8 @@ import { avaProgressReport, avaGradesReport, avaConsolidatedReport, systemModule
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { AvaSyncService } from '../ava-sync/ava-sync.service';
+import { getAcademicPhaseDates, getDefaultPeriod } from '../config/app-config';
+import { CacheService } from '../cache/cache.service';
 
 type SessionUser = {
   id?: string;
@@ -21,6 +23,7 @@ export class AvaReportsService {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
     private readonly avaSyncService: AvaSyncService,
+    @Optional() private readonly cacheService?: CacheService,
   ) {}
 
 
@@ -37,7 +40,7 @@ export class AvaReportsService {
     const now = Date.now();
     const cached = AvaReportsService.avaAccessCache.get(user.id);
     if (cached && (now - cached.timestamp < AvaReportsService.ACCESS_CACHE_TTL_MS)) {
-      if (!cached.hasAccess) throw new UnauthorizedException("Acesso negado.");
+      if (!cached.hasAccess) throw new ForbiddenException("Acesso negado ao módulo AVA.");
       return;
     }
 
@@ -69,7 +72,7 @@ export class AvaReportsService {
 
     if (groupAccess.length === 0) {
       AvaReportsService.avaAccessCache.set(user.id, { hasAccess: false, timestamp: now });
-      throw new UnauthorizedException("Acesso negado.");
+      throw new ForbiddenException("Acesso negado ao módulo AVA.");
     }
 
     AvaReportsService.avaAccessCache.set(user.id, { hasAccess: true, timestamp: now });
@@ -122,7 +125,7 @@ export class AvaReportsService {
     if (filters.usuario) conditions.push(ilike(avaProgressReport.usuario, `%${filters.usuario}%`));
     if (filters.matricula) conditions.push(ilike(avaProgressReport.matricula, `%${filters.matricula}%`));
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-2";
+    const periodoFilter = filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
     if (periodoFilter) conditions.push(ilike(avaProgressReport.periodo, `%${periodoFilter}%`));
 
 
@@ -175,7 +178,7 @@ export class AvaReportsService {
     if (filters.usuario) conditions.push(ilike(avaGradesReport.userUsername, `%${filters.usuario}%`));
     if (filters.matricula) conditions.push(ilike(avaGradesReport.userIdentification, `%${filters.matricula}%`));
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-2";
+    const periodoFilter = filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
     if (periodoFilter) conditions.push(ilike(avaGradesReport.periodo, `%${periodoFilter}%`));
 
 
@@ -264,12 +267,13 @@ export class AvaReportsService {
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
-      const inicio_f1 = new Date(2026, 1, 13);
-      const fim_f1 = new Date(2026, 2, 29);
-      const inicio_f2 = new Date(2026, 2, 30);
-      const fim_f2 = new Date(2026, 4, 11);
-      const inicio_f3 = new Date(2026, 4, 12);
-      const fim_f3 = new Date(2026, 5, 19);
+      const phaseDates = getAcademicPhaseDates();
+      const inicio_f1 = phaseDates.fase1.inicio;
+      const fim_f1 = phaseDates.fase1.fim;
+      const inicio_f2 = phaseDates.fase2.inicio;
+      const fim_f2 = phaseDates.fase2.fim;
+      const inicio_f3 = phaseDates.fase3.inicio;
+      const fim_f3 = phaseDates.fase3.fim;
 
       const avg_total = statsRes?.avgTotal ? Math.round(Number(statsRes.avgTotal)) : 0;
       const avg_f1 = statsRes?.avgF1 ? Math.round(Number(statsRes.avgF1)) : 0;
@@ -370,13 +374,30 @@ export class AvaReportsService {
         results.push(res);
       }
 
-      const skippedOrErrors = results.filter(r => r.status === 'skipped' || r.status === 'error');
-      if (skippedOrErrors.length === results.length && results.length > 0) {
+      const onlyErrors = results.filter(r => r.status === 'error');
+      const onlySkipped = results.filter(r => r.status === 'skipped');
+      const onlyQueued = results.filter(r => r.status === 'queued');
+      const onlySuccess = results.filter(r => r.status === 'success');
+
+      if (onlySkipped.length === results.length && results.length > 0) {
         const reasons = results.map(r => `${r.source}: ${r.reason || r.status}`).join('; ');
         throw new BadRequestException(`Sincronização não executada: ${reasons}`);
       }
 
-      return { success: true, results };
+      if (onlyErrors.length === results.length && results.length > 0) {
+        const reasons = results.map(r => `${r.source}: ${r.reason || r.status}`).join('; ');
+        throw new BadRequestException(`Falha na sincronização: ${reasons}`);
+      }
+
+      const hasQueued = onlyQueued.length > 0;
+      let message = 'Sincronização concluída com sucesso.';
+      if (hasQueued && onlySuccess.length === 0) {
+        message = 'Solicitação de geração enviada ao Moodle com sucesso. O relatório está sendo processado na fila do Moodle e estará pronto em instantes.';
+      } else if (hasQueued && onlySuccess.length > 0) {
+        message = 'Dados disponíveis sincronizados com sucesso. Os relatórios pendentes foram solicitados ao Moodle e estão sendo gerados.';
+      }
+
+      return { success: true, queued: hasQueued, message, results };
     } catch (error: any) {
       console.error("Erro na action de sync:", error);
       if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
@@ -628,7 +649,7 @@ export class AvaReportsService {
     if (filters.unidade_fisica) conditions.push(ilike(avaConsolidatedReport.unidadeFisica, `%${filters.unidade_fisica}%`));
     if (filters.enrolment_status) conditions.push(ilike(avaConsolidatedReport.enrolmentStatus, `%${filters.enrolment_status}%`));
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : "2026-2";
+    const periodoFilter = filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
     if (periodoFilter) conditions.push(ilike(avaConsolidatedReport.periodo, `%${periodoFilter}%`));
 
     if (filters.search) {
@@ -753,22 +774,9 @@ export class AvaReportsService {
       .from(avaConsolidatedReport)
       .where(whereClause);
 
-      // 4. Dropdowns de filtros únicos diretamente no snapshot
+      // 4. Dropdowns de filtros únicos diretamente do snapshot com cache
       const sourceInstitution = filters.sourceInstitution || 'ead';
-      const [uniquePeriodos, uniqueCursos, uniquePolos] = await Promise.all([
-        this.db.selectDistinct({ value: avaConsolidatedReport.periodo })
-          .from(avaConsolidatedReport)
-          .where(and(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution), isNotNull(avaConsolidatedReport.periodo)))
-          .orderBy(desc(avaConsolidatedReport.periodo)),
-        this.db.selectDistinct({ value: avaConsolidatedReport.curso })
-          .from(avaConsolidatedReport)
-          .where(and(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution), isNotNull(avaConsolidatedReport.curso)))
-          .orderBy(avaConsolidatedReport.curso),
-        this.db.selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
-          .from(avaConsolidatedReport)
-          .where(and(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution), isNotNull(avaConsolidatedReport.unidadeFisica)))
-          .orderBy(avaConsolidatedReport.unidadeFisica),
-      ]);
+      const dropdowns = await this.getCachedDropdownOptions(sourceInstitution);
 
       return {
         page,
@@ -790,9 +798,9 @@ export class AvaReportsService {
         no_access_count: Number(statsRes?.noAccessCount || 0),
         total_alunos_unicos: Number(statsRes?.uniqueStudents || 0),
         total_disciplinas: Number(statsRes?.uniqueDisciplines || 0),
-        unique_periodos: uniquePeriodos.map(p => p.value).filter(Boolean),
-        unique_cursos: uniqueCursos.map(c => c.value).filter(Boolean),
-        unique_polos: uniquePolos.map(u => u.value).filter(Boolean),
+        unique_periodos: dropdowns.periodos,
+        unique_cursos: dropdowns.cursos,
+        unique_polos: dropdowns.polos,
       };
     } catch (error) {
       console.error("Erro em getConsolidatedData:", error);
@@ -963,5 +971,63 @@ export class AvaReportsService {
         ],
       };
     }
+  }
+
+  async getCachedDropdownOptions(institution: string): Promise<{ periodos: string[]; cursos: string[]; polos: string[] }> {
+    if (this.cacheService) {
+      return this.cacheService.wrap(
+        `ava:dropdowns:${institution}`,
+        async () => {
+          const [uniquePeriodos, uniqueCursos, uniquePolos] = await Promise.all([
+            this.db
+              .selectDistinct({ value: avaConsolidatedReport.periodo })
+              .from(avaConsolidatedReport)
+              .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.periodo)))
+              .orderBy(desc(avaConsolidatedReport.periodo)),
+            this.db
+              .selectDistinct({ value: avaConsolidatedReport.curso })
+              .from(avaConsolidatedReport)
+              .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.curso)))
+              .orderBy(avaConsolidatedReport.curso),
+            this.db
+              .selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
+              .from(avaConsolidatedReport)
+              .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.unidadeFisica)))
+              .orderBy(avaConsolidatedReport.unidadeFisica),
+          ]);
+
+          return {
+            periodos: uniquePeriodos.map((p) => p.value).filter(Boolean) as string[],
+            cursos: uniqueCursos.map((c) => c.value).filter(Boolean) as string[],
+            polos: uniquePolos.map((u) => u.value).filter(Boolean) as string[],
+          };
+        },
+        600, // 10 minutos
+      );
+    }
+
+    const [uniquePeriodos, uniqueCursos, uniquePolos] = await Promise.all([
+      this.db
+        .selectDistinct({ value: avaConsolidatedReport.periodo })
+        .from(avaConsolidatedReport)
+        .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.periodo)))
+        .orderBy(desc(avaConsolidatedReport.periodo)),
+      this.db
+        .selectDistinct({ value: avaConsolidatedReport.curso })
+        .from(avaConsolidatedReport)
+        .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.curso)))
+        .orderBy(avaConsolidatedReport.curso),
+      this.db
+        .selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
+        .from(avaConsolidatedReport)
+        .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.unidadeFisica)))
+        .orderBy(avaConsolidatedReport.unidadeFisica),
+    ]);
+
+    return {
+      periodos: uniquePeriodos.map((p) => p.value).filter(Boolean) as string[],
+      cursos: uniqueCursos.map((c) => c.value).filter(Boolean) as string[],
+      polos: uniquePolos.map((u) => u.value).filter(Boolean) as string[],
+    };
   }
 }

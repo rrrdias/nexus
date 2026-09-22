@@ -6,6 +6,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import compression from 'compression';
 import { json, urlencoded } from 'express';
+import { getAllowedCorsOrigins, isOriginAllowed } from './config/app-config';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -27,18 +28,24 @@ async function bootstrap() {
   app.use(urlencoded({ limit: '50mb', extended: true }));
 
   // 4. CORS configuration
+  const allowedCorsOrigins = getAllowedCorsOrigins();
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow server-to-server / curl or matching frontend
-      if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.includes('unievangelica.edu.br')) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permissive default while respecting headers
-      }
+      callback(null, isOriginAllowed(origin, allowedCorsOrigins));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-secret', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-cron-secret',
+      'x-request-id',
+      'x-correlation-id',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+    ],
+    exposedHeaders: ['X-Request-Id'],
   });
 
   // 5. Global Validation Pipe with automatic transformation and sanitization
@@ -58,6 +65,7 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port);
+  logger.log(`CORS allowed origins: ${allowedCorsOrigins.length > 0 ? allowedCorsOrigins.join(', ') : 'server-to-server only'}`);
   logger.log(`Nexus Core Backend initialized on port ${port} (PID: ${process.pid})`);
 }
 bootstrap();

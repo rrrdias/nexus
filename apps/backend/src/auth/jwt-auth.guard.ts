@@ -35,30 +35,13 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    
-    // Normalizar pathname removendo query strings e barras finais para evitar bypass por query params
-    const rawPath = request.path || (request.url ? request.url.split('?')[0] : '');
-    const normalizedPath = rawPath.replace(/\/+$/, '') || '/';
-
-    // Rotas públicas estritas: login e ava-sync (que possui validação própria de CRON_SECRET no controller)
-    if (
-      normalizedPath === '/api/auth/login' ||
-      normalizedPath === '/auth/login' ||
-      normalizedPath === '/api/ava-sync' ||
-      normalizedPath.startsWith('/api/ava-sync/') ||
-      normalizedPath === '/ava-sync' ||
-      normalizedPath.startsWith('/ava-sync/')
-    ) {
-      return true;
-    }
-
     const token = this.extractTokenFromHeader(request);
     if (!token) {
       throw new UnauthorizedException();
     }
     try {
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || 'nexus-secret-key-2026'
+        secret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_SECRET is required in production'); })() : 'nexus-dev-jwt-secret-not-for-production-min32chars')
       });
 
       const userId = payload.sub;

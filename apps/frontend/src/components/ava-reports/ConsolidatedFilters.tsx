@@ -5,6 +5,7 @@ import { useState, useTransition, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, X, Filter, RotateCcw } from "lucide-react"
+import { DEFAULT_PERIOD } from "@/lib/academic-config"
 
 interface ConsolidatedFiltersProps {
   uniquePeriodos?: string[]
@@ -13,7 +14,7 @@ interface ConsolidatedFiltersProps {
 }
 
 export function ConsolidatedFilters({ 
-  uniquePeriodos = ["2026-2", "2026-1", "2025-2", "2025-1"], 
+  uniquePeriodos = [DEFAULT_PERIOD, "2026-1", "2025-2", "2025-1"], 
   uniquePolos = [], 
   uniqueCursos = [] 
 }: ConsolidatedFiltersProps) {
@@ -26,7 +27,7 @@ export function ConsolidatedFilters({
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
-    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : "2026-2",
+    periodo: searchParams.get("periodo") !== null ? searchParams.get("periodo")! : DEFAULT_PERIOD,
     unidade_fisica: searchParams.get("unidade_fisica") || "",
     curso: searchParams.get("curso") || "",
     enrolment_status: searchParams.get("enrolment_status") || "",
@@ -75,7 +76,7 @@ export function ConsolidatedFilters({
   const handleClear = () => {
     setFilters({
       search: "",
-      periodo: "2026-2",
+      periodo: DEFAULT_PERIOD,
       unidade_fisica: "",
       curso: "",
       enrolment_status: "",
@@ -92,7 +93,7 @@ export function ConsolidatedFilters({
     filters.curso,
     filters.enrolment_status,
     filters.lastaccess,
-    filters.periodo && filters.periodo !== "2026-2" ? filters.periodo : null,
+    filters.periodo && filters.periodo !== DEFAULT_PERIOD ? filters.periodo : null,
   ].filter(Boolean).length
 
 

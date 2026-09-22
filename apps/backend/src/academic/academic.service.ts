@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Inject } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Inject, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import * as sql from 'mssql';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -16,6 +16,9 @@ import { academicDiscente, academicDocente, academicTurma, academicMatricula } f
 
 @Injectable()
 export class AcademicService implements OnModuleInit, OnModuleDestroy {
+  private static academicAccessCache = new Map<string, { hasAccess: boolean; timestamp: number }>();
+  private static readonly ACCESS_CACHE_TTL_MS = 60_000;
+
   private pool: sql.ConnectionPool | null = null;
   private dbPrefix: string = '';
   
@@ -30,6 +33,54 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
   ) {}
+
+  async assertAcademicAccess(user?: { id?: string; isSuperAdmin?: boolean; isDisabled?: boolean }) {
+    if (!user?.id || user.isDisabled) {
+      throw new UnauthorizedException('Acesso negado.');
+    }
+
+    if (user.isSuperAdmin) return;
+
+    const now = Date.now();
+    const cached = AcademicService.academicAccessCache.get(user.id);
+    if (cached && now - cached.timestamp < AcademicService.ACCESS_CACHE_TTL_MS) {
+      if (!cached.hasAccess) throw new ForbiddenException('Acesso negado ao módulo acadêmico.');
+      return;
+    }
+
+    const directAccess = await this.db.select({ id: systemModules.id })
+      .from(usersSystemAccess)
+      .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
+      .where(and(
+        eq(usersSystemAccess.userId, user.id),
+        eq(systemModules.slug, 'academic'),
+        eq(systemModules.isActive, true),
+      ))
+      .limit(1);
+
+    if (directAccess.length > 0) {
+      AcademicService.academicAccessCache.set(user.id, { hasAccess: true, timestamp: now });
+      return;
+    }
+
+    const groupAccess = await this.db.select({ id: systemModules.id })
+      .from(userGroups)
+      .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
+      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+      .where(and(
+        eq(userGroups.userId, user.id),
+        eq(systemModules.slug, 'academic'),
+        eq(systemModules.isActive, true),
+      ))
+      .limit(1);
+
+    if (groupAccess.length === 0) {
+      AcademicService.academicAccessCache.set(user.id, { hasAccess: false, timestamp: now });
+      throw new ForbiddenException('Acesso negado ao módulo acadêmico.');
+    }
+
+    AcademicService.academicAccessCache.set(user.id, { hasAccess: true, timestamp: now });
+  }
 
   async onModuleInit() {
     // Load Prefix for Linked Server if configured
@@ -510,5 +561,18 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
   getDbPrefix() {
     return this.dbPrefix;
+  }
+
+  async checkLyceumHealth(): Promise<{ status: 'up' | 'down'; latencyMs?: number; message?: string }> {
+    if (!this.pool || !this.pool.connected) {
+      return { status: 'down', message: 'Conexão MSSQL Lyceum inativa ou não configurada.' };
+    }
+    const start = Date.now();
+    try {
+      await this.pool.request().query('SELECT 1 AS health');
+      return { status: 'up', latencyMs: Date.now() - start };
+    } catch (err: any) {
+      return { status: 'down', message: err.message };
+    }
   }
 }

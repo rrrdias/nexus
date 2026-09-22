@@ -1,9 +1,11 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject, Optional, UnauthorizedException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { users, userGroups, usersSystemAccess, groups, systemModules } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { hashPassword } from './password.util'; // We will create this
+import { hashPassword } from './password.util';
+import { CacheService } from '../cache/cache.service';
+import { RbacGuard } from '../auth/rbac.guard';
 
 type SessionUser = {
   id?: string;
@@ -15,6 +17,7 @@ type SessionUser = {
 export class UsersService {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
+    @Optional() private readonly cacheService?: CacheService,
   ) {}
 
   private assertSuperAdmin(user?: SessionUser) {
@@ -144,18 +147,35 @@ export class UsersService {
       }
     });
 
+    if (this.cacheService) {
+      await this.cacheService.del(`rbac:user:${userId}:modules`);
+    }
+    RbacGuard.clearCache(userId);
+
     return { success: true };
   }
 
   async toggleUserActive(userSession: SessionUser, userId: string, isActive: boolean) {
     this.assertSuperAdmin(userSession);
     await this.db.update(users).set({ isActive }).where(eq(users.id, userId));
+
+    if (this.cacheService) {
+      await this.cacheService.del(`rbac:user:${userId}:modules`);
+    }
+    RbacGuard.clearCache(userId);
+
     return { success: true };
   }
 
   async deleteUser(userSession: SessionUser, userId: string) {
     this.assertSuperAdmin(userSession);
     await this.db.delete(users).where(eq(users.id, userId));
+
+    if (this.cacheService) {
+      await this.cacheService.del(`rbac:user:${userId}:modules`);
+    }
+    RbacGuard.clearCache(userId);
+
     return { success: true };
   }
 }

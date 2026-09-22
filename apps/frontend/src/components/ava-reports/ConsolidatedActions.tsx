@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Download, CheckCircle2, AlertCircle } from "lucide-react"
 import { syncMoodleData, exportConsolidatedAvaData } from "@/app/actions/ava-reports"
+import { getJobStatus } from "@/app/actions/jobs"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,26 +18,71 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export function ConsolidatedActions({ filters, institution = "ead" }: { filters: any, institution?: string }) {
+  const router = useRouter()
   const [syncStatus, setSyncStatus] = useState<"idle" | "confirming" | "syncing" | "success" | "error">("idle")
+  const [syncProgress, setSyncProgress] = useState<number | null>(null)
+  const [syncStep, setSyncStep] = useState<string | null>(null)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
 
+  const pollJobUntilDone = async (queue: string, jobId: string) => {
+    let isDone = false
+    while (!isDone) {
+      await new Promise(r => setTimeout(r, 1500))
+      const res = await getJobStatus(queue, jobId)
+      if (res.success && res.data) {
+        setSyncProgress(res.data.progress || 0)
+        if (res.data.step) setSyncStep(res.data.step)
+
+        if (res.data.state === 'completed') {
+          isDone = true
+          return res.data.result
+        } else if (res.data.state === 'failed') {
+          isDone = true
+          throw new Error(res.data.failedReason || 'Falha no processamento do job no servidor.')
+        }
+      }
+    }
+  }
+
   const confirmSync = async () => {
     setSyncStatus("syncing")
+    setSyncProgress(0)
+    setSyncStep("Iniciando fila de sincronização...")
     try {
       const resProgress = await syncMoodleData(institution, "progress")
       if (!resProgress.success) {
         throw new Error(resProgress.error || "Falha na sincronização de progresso")
       }
+
+      if (resProgress.data?.jobId) {
+        await pollJobUntilDone(resProgress.data.queue || 'ava-sync', resProgress.data.jobId)
+      }
+
       const resGrades = await syncMoodleData(institution, "grades")
       if (!resGrades.success) {
         throw new Error(resGrades.error || "Falha na sincronização de notas")
+      }
+
+      if (resGrades.data?.jobId) {
+        await pollJobUntilDone(resGrades.data.queue || 'ava-sync', resGrades.data.jobId)
+      }
+
+      const isQueued = resProgress.data?.queued || resGrades.data?.queued
+      if (isQueued) {
+        setSyncMessage(resGrades.data?.message || resProgress.data?.message || "Solicitação de geração enviada ao Moodle. Os dados serão atualizados assim que o processamento for concluído.")
+      } else {
+        setSyncMessage("Os dados de progresso e notas foram atualizados com sucesso no Nexus.")
       }
       setSyncStatus("success")
     } catch (error: any) {
       console.error(error)
       setSyncError(error.message || "Falha na sincronização")
       setSyncStatus("error")
+    } finally {
+      setSyncProgress(null)
+      setSyncStep(null)
     }
   }
 
@@ -156,10 +203,10 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
                 </div>
               </div>
               <AlertDialogTitle className="text-lg font-extrabold text-navy mb-1">
-                Sincronizando Progresso e Notas...
+                Sincronizando {syncProgress !== null ? `(${syncProgress}%)` : '...'}
               </AlertDialogTitle>
               <AlertDialogDescription className="text-xs text-gray-5">
-                Buscando os dados em tempo real no Moodle. Por favor, aguarde alguns instantes.
+                {syncStep || "Buscando os dados em tempo real no Moodle. Por favor, aguarde alguns instantes."}
               </AlertDialogDescription>
             </div>
           )}
@@ -168,15 +215,16 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
             <div className="flex flex-col items-center text-center py-4">
               <CheckCircle2 className="w-12 h-12 text-green-brand mb-3" />
               <AlertDialogTitle className="text-lg font-extrabold text-navy mb-1">
-                Sincronização Concluída!
+                Sincronização Solicitada!
               </AlertDialogTitle>
               <AlertDialogDescription className="text-xs text-gray-5 mb-4">
-                Os dados de progresso e notas foram atualizados com sucesso no Nexus.
+                {syncMessage || "Os dados de progresso e notas foram processados."}
               </AlertDialogDescription>
               <AlertDialogAction 
+                type="button"
                 onClick={() => {
                   setSyncStatus("idle")
-                  window.location.reload()
+                  router.refresh()
                 }}
                 className="w-full bg-green-dark hover:bg-green-brand text-white font-semibold rounded-lg h-10"
               >
@@ -195,6 +243,7 @@ export function ConsolidatedActions({ filters, institution = "ead" }: { filters:
                 {syncError || "Não foi possível sincronizar com o AVA."}
               </AlertDialogDescription>
               <AlertDialogAction 
+                type="button"
                 onClick={() => setSyncStatus("idle")}
                 className="w-full bg-navy text-white font-semibold rounded-lg h-10"
               >

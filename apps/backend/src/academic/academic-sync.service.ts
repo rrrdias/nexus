@@ -3,13 +3,14 @@ import { Cron } from '@nestjs/schedule';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { AcademicService } from './academic.service';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, inArray } from 'drizzle-orm';
 import { 
   academicTurma, 
   academicDiscente, 
   academicDocente, 
   academicMatricula 
 } from '../db/schema';
+import { getLyceumActivePeriods } from '../config/app-config';
 
 @Injectable()
 export class AcademicSyncService {
@@ -27,8 +28,8 @@ export class AcademicSyncService {
     await this.syncActivePeriods();
   }
 
-  // Permite chamada manual via controller se necessario
-  async syncActivePeriods() {
+  // Permite chamada manual via controller ou job worker
+  async syncActivePeriods(onProgress?: (progress: number, step: string) => Promise<void>) {
     if (this.isSyncing) {
       this.logger.warn('A sync process is already running. Skipping new trigger.');
       return { status: 'already_running' };
@@ -38,8 +39,8 @@ export class AcademicSyncService {
     const startTime = Date.now();
 
     try {
-      const activePeriodsEnv = process.env.LYCEUM_ACTIVE_PERIODS || '2024-0,2024-1,2024-2,2025-0,2025-1,2025-2,2026-0,2026-1,2026-2,2027-1,2027-2';
-      const activePeriods = activePeriodsEnv.split(',').map(p => p.trim()).filter(Boolean);
+      if (onProgress) await onProgress(5, 'Verificando períodos ativos no Lyceum');
+      const activePeriods = getLyceumActivePeriods();
       
       if (activePeriods.length === 0) {
         this.logger.warn('No LYCEUM_ACTIVE_PERIODS configured. Skipping sync to prevent syncing all historical data.');
@@ -52,6 +53,7 @@ export class AcademicSyncService {
       const prefix = this.academicService.getDbPrefix();
       
       // 1. Sync Turmas
+      if (onProgress) await onProgress(15, 'Sincronizando Turmas');
       this.logger.log('Step 1: Syncing Turmas...');
       const periodsInStr = activePeriods.map(p => `'${p}'`).join(',');
       const turmasRes = await lyceumPool.request().query(`
@@ -114,6 +116,7 @@ export class AcademicSyncService {
       }
 
       // 2. Sync Matriculas
+      if (onProgress) await onProgress(40, 'Sincronizando Matrículas');
       this.logger.log('Step 2: Syncing Matriculas for active Turmas...');
       // Mssql IN limits to 2100 params usually, so we batch if needed. But let's build dynamic IN or use a subquery if both views are in Lyceum.
       // Better: Query MATRICULA joining TURMA on period
@@ -127,9 +130,15 @@ export class AcademicSyncService {
       const matriculas = matriculasRes.recordset;
       this.logger.log(`Found ${matriculas.length} active matriculas.`);
 
-      // Limpar matrículas antigas antes de inserir as novas em uma transação atômica
+      // Limpar matrículas antigas das turmas ativas antes de inserir as novas em uma transação atômica
       await this.db.transaction(async (tx) => {
-        await tx.delete(academicMatricula);
+        if (activeTurmaIds.length > 0) {
+          const deleteChunkSize = 1000;
+          for (let i = 0; i < activeTurmaIds.length; i += deleteChunkSize) {
+            const chunk = activeTurmaIds.slice(i, i + deleteChunkSize);
+            await tx.delete(academicMatricula).where(inArray(academicMatricula.turmaId, chunk));
+          }
+        }
 
         if (matriculas.length > 0) {
           // Chunk inserts for matriculas
@@ -155,6 +164,7 @@ export class AcademicSyncService {
       this.logger.log(`Identified ${activeUserIds.size} unique active users.`);
 
       if (activeUserIds.size > 0) {
+        if (onProgress) await onProgress(60, 'Sincronizando Discentes e Docentes');
         const usersArray = Array.from(activeUserIds);
         const userChunks: string[][] = [];
         for (let i = 0; i < usersArray.length; i += 1000) {
@@ -165,6 +175,8 @@ export class AcademicSyncService {
         let syncedDocentes = 0;
 
         for (let i = 0; i < userChunks.length; i++) {
+          const chunkProgress = Math.round(60 + ((i + 1) / userChunks.length) * 35);
+          if (onProgress) await onProgress(chunkProgress, `Sincronizando Usuários (Lote ${i + 1}/${userChunks.length})`);
           const chunk = userChunks[i];
           const inParams = chunk
 

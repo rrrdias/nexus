@@ -20,6 +20,22 @@ services:
       - nexus_network
       - nginx_network
 
+  redis:
+    image: redis:7-alpine
+    container_name: nexus_core_redis_prod
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - nexus_core_redis_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexus_network
+
   backend:
     build:
       context: .
@@ -29,18 +45,31 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "${BACKEND_PORT:-3004}:3004"
     env_file:
       - .env
     environment:
       NODE_ENV: production
-
       DATABASE_URL: postgresql://admin:${DB_PASSWORD}@db:5432/core_db
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       PORT: 3004
       JWT_SECRET: ${JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      NEXUS_DEFAULT_PERIOD: ${NEXUS_DEFAULT_PERIOD}
+      NEXUS_FASE1_START: ${NEXUS_FASE1_START}
+      NEXUS_FASE1_END: ${NEXUS_FASE1_END}
+      NEXUS_FASE2_START: ${NEXUS_FASE2_START}
+      NEXUS_FASE2_END: ${NEXUS_FASE2_END}
+      NEXUS_FASE3_START: ${NEXUS_FASE3_START}
+      NEXUS_FASE3_END: ${NEXUS_FASE3_END}
       # Moodle Sync - EaD
       MOODLE_EAD_GRADES_GET_URL: ${MOODLE_EAD_GRADES_GET_URL}
       MOODLE_EAD_GRADES_ATT_URL: ${MOODLE_EAD_GRADES_ATT_URL}
@@ -76,6 +105,7 @@ services:
       LYCEUM_DB_USERNAME: ${LYCEUM_DB_USERNAME}
       LYCEUM_DB_PASSWORD: ${LYCEUM_DB_PASSWORD}
       LYCEUM_DB_PREFIX: ${LYCEUM_DB_PREFIX}
+      LYCEUM_ACTIVE_PERIODS: ${LYCEUM_ACTIVE_PERIODS}
     command: sh -c "cd apps/backend && npx drizzle-kit push --force && node dist/main.js"
 
     networks:
@@ -90,6 +120,13 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_BASE_PATH: "/nexus"
+        NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD: ${NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD}
+        NEXT_PUBLIC_NEXUS_FASE1_START: ${NEXT_PUBLIC_NEXUS_FASE1_START}
+        NEXT_PUBLIC_NEXUS_FASE1_END: ${NEXT_PUBLIC_NEXUS_FASE1_END}
+        NEXT_PUBLIC_NEXUS_FASE2_START: ${NEXT_PUBLIC_NEXUS_FASE2_START}
+        NEXT_PUBLIC_NEXUS_FASE2_END: ${NEXT_PUBLIC_NEXUS_FASE2_END}
+        NEXT_PUBLIC_NEXUS_FASE3_START: ${NEXT_PUBLIC_NEXUS_FASE3_START}
+        NEXT_PUBLIC_NEXUS_FASE3_END: ${NEXT_PUBLIC_NEXUS_FASE3_END}
     container_name: nexus_core_frontend_prod
     restart: always
     depends_on:
@@ -101,6 +138,13 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_API_URL: http://backend:3004
       NEXT_BASE_PATH: "/nexus"
+      NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD: ${NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD}
+      NEXT_PUBLIC_NEXUS_FASE1_START: ${NEXT_PUBLIC_NEXUS_FASE1_START}
+      NEXT_PUBLIC_NEXUS_FASE1_END: ${NEXT_PUBLIC_NEXUS_FASE1_END}
+      NEXT_PUBLIC_NEXUS_FASE2_START: ${NEXT_PUBLIC_NEXUS_FASE2_START}
+      NEXT_PUBLIC_NEXUS_FASE2_END: ${NEXT_PUBLIC_NEXUS_FASE2_END}
+      NEXT_PUBLIC_NEXUS_FASE3_START: ${NEXT_PUBLIC_NEXUS_FASE3_START}
+      NEXT_PUBLIC_NEXUS_FASE3_END: ${NEXT_PUBLIC_NEXUS_FASE3_END}
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_TRUST_HOST: "true"
       AUTH_URL: ${AUTH_URL}
@@ -110,6 +154,7 @@ services:
 
 volumes:
   nexus_core_db_prod:
+  nexus_core_redis_prod:
 
 networks:
   nexus_network:

@@ -53,9 +53,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   experimental: {
     cpus: 2,
   },

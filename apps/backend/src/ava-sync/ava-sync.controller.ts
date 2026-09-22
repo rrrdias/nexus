@@ -2,7 +2,9 @@ import { Controller, Get, Query, Req, Res, HttpStatus } from '@nestjs/common';
 import { AvaSyncService } from './ava-sync.service';
 import type { Request, Response } from 'express';
 import { timingSafeEqual } from 'node:crypto';
+import { Public } from '../auth/public.decorator';
 
+@Public()
 @Controller('api/ava-sync')
 export class AvaSyncController {
   constructor(private readonly avaSyncService: AvaSyncService) {}

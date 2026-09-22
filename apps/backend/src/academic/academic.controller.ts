@@ -1,93 +1,66 @@
-import { Controller, Get, Post, Query, Param, BadRequestException, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, BadRequestException } from '@nestjs/common';
 import { AcademicService } from './academic.service';
 import { AcademicSyncService } from './academic-sync.service';
+import { JobsService } from '../jobs/jobs.service';
+import { RequireAdmin, RequireModule } from '../auth/rbac.decorators';
+import { AcademicQueryDto } from './dto/academic-query.dto';
 
+@RequireModule('academic')
 @Controller('api/academic')
 export class AcademicController {
   constructor(
     private readonly academicService: AcademicService,
-    private readonly syncService: AcademicSyncService
+    private readonly syncService: AcademicSyncService,
+    private readonly jobsService: JobsService,
   ) {}
 
+  @RequireAdmin()
   @Post('sync')
-  async triggerSync(@Req() req: any) {
-    if (!req.user?.isSuperAdmin) {
-      throw new ForbiddenException('Apenas administradores podem iniciar a sincronização acadêmica.');
+  async triggerSync(@Query('async') isAsync?: string) {
+    if (isAsync === 'false') {
+      return this.syncService.syncActivePeriods();
     }
-    return this.syncService.syncActivePeriods();
+    const { jobId, queue } = await this.jobsService.addAcademicSyncJob();
+    return {
+      success: true,
+      queued: true,
+      jobId,
+      queue,
+      message: 'Sincronização do Lyceum enfileirada com sucesso.',
+    };
   }
 
   @Get('discentes')
-  async getStudents(
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('size') size?: string,
-  ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const sizeNum = size ? parseInt(size) : 15;
-    
-    if (isNaN(pageNum) || pageNum < 1) throw new BadRequestException('Página inválida.');
-    if (isNaN(sizeNum) || sizeNum < 1) throw new BadRequestException('Tamanho de página inválido.');
-
-    return this.academicService.getStudents(search, pageNum, sizeNum);
+  async getStudents(@Query() query: AcademicQueryDto) {
+    return this.academicService.getStudents(query.search, query.page, query.size);
   }
 
   @Get('discentes/:matricula/disciplinas')
   async getStudentDisciplines(@Param('matricula') matricula: string) {
-    if (!matricula) throw new BadRequestException('Matrícula é obrigatória.');
-    const data = await this.academicService.getStudentDisciplines(matricula);
+    if (!matricula?.trim()) throw new BadRequestException('Matrícula é obrigatória.');
+    const data = await this.academicService.getStudentDisciplines(matricula.trim());
     return { success: true, data };
   }
 
   @Get('docentes')
-  async getTeachers(
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('size') size?: string,
-  ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const sizeNum = size ? parseInt(size) : 15;
-
-    if (isNaN(pageNum) || pageNum < 1) throw new BadRequestException('Página inválida.');
-    if (isNaN(sizeNum) || sizeNum < 1) throw new BadRequestException('Tamanho de página inválido.');
-
-    return this.academicService.getTeachers(search, pageNum, sizeNum);
+  async getTeachers(@Query() query: AcademicQueryDto) {
+    return this.academicService.getTeachers(query.search, query.page, query.size);
   }
 
   @Get('docentes/:docenteId/disciplinas')
   async getTeacherDisciplines(@Param('docenteId') docenteId: string) {
-    if (!docenteId) throw new BadRequestException('Identificador do docente é obrigatório.');
-    const data = await this.academicService.getTeacherDisciplines(docenteId);
+    if (!docenteId?.trim()) throw new BadRequestException('Identificador do docente é obrigatório.');
+    const data = await this.academicService.getTeacherDisciplines(docenteId.trim());
     return { success: true, data };
   }
 
   @Get('turmas')
-  async getClasses(
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('size') size?: string,
-  ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const sizeNum = size ? parseInt(size) : 15;
-
-    if (isNaN(pageNum) || pageNum < 1) throw new BadRequestException('Página inválida.');
-    if (isNaN(sizeNum) || sizeNum < 1) throw new BadRequestException('Tamanho de página inválido.');
-
-    return this.academicService.getClasses(search, pageNum, sizeNum);
+  async getClasses(@Query() query: AcademicQueryDto) {
+    return this.academicService.getClasses(query.search, query.page, query.size);
   }
 
   @Get('matriculas')
-  async getMatriculas(
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('size') size?: string,
-  ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const sizeNum = size ? parseInt(size) : 15;
-
-    if (isNaN(pageNum) || pageNum < 1) throw new BadRequestException('Página inválida.');
-    if (isNaN(sizeNum) || sizeNum < 1) throw new BadRequestException('Tamanho de página inválido.');
-
-    return this.academicService.getMatriculas(search, pageNum, sizeNum);
+  async getMatriculas(@Query() query: AcademicQueryDto) {
+    return this.academicService.getMatriculas(query.search, query.page, query.size);
   }
 }

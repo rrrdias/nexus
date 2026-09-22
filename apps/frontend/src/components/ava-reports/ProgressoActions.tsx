@@ -1,10 +1,23 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Download, CheckCircle2, AlertCircle } from "lucide-react"
 
-import { syncMoodleData, getProgressExportData } from "@/app/actions/ava-reports"
+import { syncMoodleData, getProgressExportData as getProgressExportDataFn } from "@/app/actions/ava-reports"
+import { getJobStatus } from "@/app/actions/jobs"
+import { getAcademicPhaseDates } from "@/lib/academic-config"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // Helper functions for math and filtering
 function parseProgressNum(value: any): number | null {
@@ -18,12 +31,13 @@ function isBelowExpectedOnPhase(row: any, phase: 1 | 2 | 3, hoje: Date): boolean
   const f2 = parseProgressNum(row.fase2) || 0
   const f3 = parseProgressNum(row.fase3) || 0
 
-  const inicio_f1 = new Date(2026, 1, 13) // Feb 13
-  const fim_f1 = new Date(2026, 2, 29)    // Mar 29
-  const inicio_f2 = new Date(2026, 2, 30)  // Mar 30
-  const fim_f2 = new Date(2026, 4, 11)    // May 11
-  const inicio_f3 = new Date(2026, 4, 12)  // May 12
-  const fim_f3 = new Date(2026, 5, 19)    // Jun 19
+  const phaseDates = getAcademicPhaseDates()
+  const inicio_f1 = phaseDates.fase1.inicio
+  const fim_f1 = phaseDates.fase1.fim
+  const inicio_f2 = phaseDates.fase2.inicio
+  const fim_f2 = phaseDates.fase2.fim
+  const inicio_f3 = phaseDates.fase3.inicio
+  const fim_f3 = phaseDates.fase3.fim
 
   if (phase === 1) {
     return (hoje > fim_f1 && f1 < 100) || (hoje >= inicio_f1 && hoje <= fim_f1 && f1 < 40)
@@ -53,12 +67,13 @@ function getCriticalCourses(allData: any[], hoje: Date): Set<string> {
   })
 
   const criticalCourses = new Set<string>()
-  const inicio_f1 = new Date(2026, 1, 13)
-  const fim_f1 = new Date(2026, 2, 29)
-  const inicio_f2 = new Date(2026, 2, 30)
-  const fim_f2 = new Date(2026, 4, 11)
-  const inicio_f3 = new Date(2026, 4, 12)
-  const fim_f3 = new Date(2026, 5, 19)
+  const phaseDates = getAcademicPhaseDates()
+  const inicio_f1 = phaseDates.fase1.inicio
+  const fim_f1 = phaseDates.fase1.fim
+  const inicio_f2 = phaseDates.fase2.inicio
+  const fim_f2 = phaseDates.fase2.fim
+  const inicio_f3 = phaseDates.fase3.inicio
+  const fim_f3 = phaseDates.fase3.fim
 
   Object.entries(courseMap).forEach(([curso, rows]) => {
     const f1Vals = rows.map(r => parseProgressNum(r.fase1) || 0)
@@ -92,12 +107,13 @@ function getCriticalCoursesForPhase(allData: any[], phase: 1 | 2 | 3, hoje: Date
   })
 
   const criticalCourses = new Set<string>()
-  const inicio_f1 = new Date(2026, 1, 13)
-  const fim_f1 = new Date(2026, 2, 29)
-  const inicio_f2 = new Date(2026, 2, 30)
-  const fim_f2 = new Date(2026, 4, 11)
-  const inicio_f3 = new Date(2026, 4, 12)
-  const fim_f3 = new Date(2026, 5, 19)
+  const phaseDates = getAcademicPhaseDates()
+  const inicio_f1 = phaseDates.fase1.inicio
+  const fim_f1 = phaseDates.fase1.fim
+  const inicio_f2 = phaseDates.fase2.inicio
+  const fim_f2 = phaseDates.fase2.fim
+  const inicio_f3 = phaseDates.fase3.inicio
+  const fim_f3 = phaseDates.fase3.fim
 
   Object.entries(courseMap).forEach(([curso, rows]) => {
     if (phase === 1) {
@@ -130,7 +146,7 @@ export async function exportProgressData({
   title: string
 }) {
   try {
-    const rawData = await getProgressExportData(filters)
+    const rawData = await getProgressExportDataFn(filters)
     if (!rawData || rawData.length === 0) {
       alert("Nenhum dado encontrado para exportação.")
       return
@@ -174,9 +190,9 @@ export async function exportProgressData({
       "Último Acesso": item.lastaccess || "-",
       "Dias Sem Acesso": item.diasSemAcesso || "-",
       Status: item.enrolmentStatus || "-",
-      "Fase 1 (%)": item.fase1 || "-",
-      "Fase 2 (%)": item.fase2 || "-",
-      "Fase 3 (%)": item.fase3 || "-",
+      "Progresso Fase 1 (%)": item.fase1 || "-",
+      "Progresso Fase 2 (%)": item.fase2 || "-",
+      "Progresso Fase 3 (%)": item.fase3 || "-",
       "Progresso Total (%)": item.progressoTotal || "-"
     }))
 
@@ -215,37 +231,65 @@ function safeFilename(value: string) {
   return value.replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "") || "relatorio"
 }
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-
 export function ProgressoActions({ filters, institution }: { filters: any, institution?: string }) {
+  const router = useRouter()
   const [syncStatus, setSyncStatus] = useState<"idle" | "confirming" | "syncing" | "success" | "error">("idle")
+  const [syncProgress, setSyncProgress] = useState<number | null>(null)
+  const [syncStep, setSyncStep] = useState<string | null>(null)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
 
+  const pollJobUntilDone = async (queue: string, jobId: string) => {
+    let isDone = false
+    while (!isDone) {
+      await new Promise(r => setTimeout(r, 1500))
+      const res = await getJobStatus(queue, jobId)
+      if (res.success && res.data) {
+        setSyncProgress(res.data.progress || 0)
+        if (res.data.step) setSyncStep(res.data.step)
+
+        if (res.data.state === 'completed') {
+          isDone = true
+          return res.data.result
+        } else if (res.data.state === 'failed') {
+          isDone = true
+          throw new Error(res.data.failedReason || 'Falha no processamento do job no servidor.')
+        }
+      }
+    }
+  }
+
   const confirmSync = async () => {
     setSyncStatus("syncing")
+    setSyncProgress(0)
+    setSyncStep("Iniciando fila de sincronização de progresso...")
     try {
       const res = await syncMoodleData(institution, "progress")
       if (!res.success) {
         throw new Error(res.error || "Falha na sincronização")
+      }
+
+      let jobResult = res.data
+      if (res.data?.jobId) {
+        jobResult = await pollJobUntilDone(res.data.queue || 'ava-sync', res.data.jobId)
+      }
+
+      if (jobResult?.queued || res.data?.queued) {
+        setSyncMessage(jobResult?.message || res.data?.message || "Solicitação de geração de progresso enviada ao Moodle com sucesso. O relatório está sendo processado na fila do Moodle.")
+      } else {
+        setSyncMessage("Os dados de progresso e conclusão das fases foram sincronizados e atualizados com sucesso no sistema Nexus.")
       }
       setSyncStatus("success")
     } catch (error: any) {
       console.error(error)
       setSyncError(error.message || "Falha na sincronização")
       setSyncStatus("error")
+    } finally {
+      setSyncProgress(null)
+      setSyncStep(null)
     }
   }
-
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -331,10 +375,10 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
                 </div>
               </div>
               <AlertDialogTitle className="text-xl font-extrabold text-navy mb-2">
-                Sincronizando Dados...
+                Sincronizando {syncProgress !== null ? `(${syncProgress}%)` : '...'}
               </AlertDialogTitle>
               <AlertDialogDescription className="text-gray-4 text-[14px] leading-relaxed max-w-sm">
-                Buscando os dados em tempo real no AVA. Este processo pode levar alguns minutos.
+                {syncStep || "Buscando os dados em tempo real no AVA. Este processo pode levar alguns minutos."}
                 <br />
                 <strong className="text-navy font-bold mt-2 block">Por favor, não feche ou atualize esta página.</strong>
               </AlertDialogDescription>
@@ -350,15 +394,16 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
                 </div>
               </div>
               <AlertDialogTitle className="text-xl font-extrabold text-navy mb-2">
-                Sincronização Concluída!
+                Sincronização Solicitada!
               </AlertDialogTitle>
               <AlertDialogDescription className="text-gray-4 text-[14px] leading-relaxed max-w-sm mb-6">
-                Os dados de progresso e conclusão das fases foram sincronizados e atualizados com sucesso no sistema Nexus.
+                {syncMessage || "Os dados de progresso e conclusão das fases foram sincronizados e atualizados com sucesso no sistema Nexus."}
               </AlertDialogDescription>
               <AlertDialogAction 
+                type="button"
                 onClick={() => {
                   setSyncStatus("idle")
-                  window.location.reload()
+                  router.refresh()
                 }}
                 className="w-full bg-green-dark hover:bg-green-brand text-white font-semibold rounded-lg h-11 px-6 transition-colors border border-transparent font-sans"
               >
@@ -387,6 +432,7 @@ export function ProgressoActions({ filters, institution }: { filters: any, insti
                 )}
               </AlertDialogDescription>
               <AlertDialogAction 
+                type="button"
                 onClick={() => setSyncStatus("idle")}
                 className="w-full bg-navy hover:bg-navy-light text-white font-semibold rounded-lg h-11 px-6 transition-colors border border-transparent font-sans"
               >

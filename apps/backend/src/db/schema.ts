@@ -18,7 +18,9 @@ export const users = pgTable("user", {
   password: text("password"),
   isActive: boolean("isActive").default(true),
   userid: text("userid").unique(), // Ex: u2501234
-})
+}, (t) => [
+  index("idx_user_is_active").on(t.isActive),
+])
 
 export const systemModules = pgTable("system_module", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -30,7 +32,9 @@ export const systemModules = pgTable("system_module", {
   pathUrl: text("pathUrl").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-})
+}, (t) => [
+  index("idx_system_module_is_active").on(t.isActive),
+])
 
 export const usersSystemAccess = pgTable("users_system_access", {
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -239,6 +243,7 @@ export const opcaos = pgTable("opcao", {
 }, (t) => [
   index("idx_opcao_local").on(t.localId),
   index("idx_opcao_data").on(t.data),
+  index("idx_opcao_local_status_data").on(t.localId, t.status, t.data),
 ])
 
 export const agendamentosMatricula = pgTable("agendamentos_matricula", {
@@ -256,6 +261,7 @@ export const agendamentosMatricula = pgTable("agendamentos_matricula", {
   unique("unq_agendamento_matricula_periodo").on(t.matricula, t.periodo),
   index("idx_agendamento_opcao").on(t.opcaoId),
   index("idx_agendamento_matricula").on(t.matricula),
+  index("idx_agendamento_periodo_status").on(t.periodo, t.status),
 ])
 
 // ==========================================
@@ -329,6 +335,7 @@ export const academicTurma = pgTable("academic_turma", {
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 }, (t) => [
   index("idx_ac_turma_periodo").on(t.periodo),
+  index("idx_ac_turma_periodo_disc").on(t.periodo, t.disciplina),
   index("idx_ac_turma_trgm").using("gin", t.turma.op("gin_trgm_ops")),
   index("idx_ac_turma_cod_trgm").using("gin", t.codTurma.op("gin_trgm_ops")),
   index("idx_ac_turma_disc_trgm").using("gin", t.disciplina.op("gin_trgm_ops")),
@@ -357,6 +364,8 @@ export const academicDiscente = pgTable("academic_discente", {
   usuario: text("usuario"),
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 }, (t) => [
+  index("idx_ac_discente_mat").on(t.matricula),
+  index("idx_ac_discente_curso_polo").on(t.curso, t.unidadeFisica),
   index("idx_ac_discente_nome_trgm").using("gin", t.nome.op("gin_trgm_ops")),
   index("idx_ac_discente_sobrenome_trgm").using("gin", t.sobrenome.op("gin_trgm_ops")),
   index("idx_ac_discente_cpf_trgm").using("gin", t.cpf.op("gin_trgm_ops")),
@@ -394,4 +403,5 @@ export const academicMatricula = pgTable("academic_matricula", {
   unique("unq_ac_matricula").on(t.usuarioId, t.turmaId, t.nivel),
   index("idx_ac_matricula_usuario").on(t.usuarioId),
   index("idx_ac_matricula_turma").on(t.turmaId),
+  index("idx_ac_mat_turma_nivel_ativo").on(t.turmaId, t.nivel, t.ativo),
 ])
