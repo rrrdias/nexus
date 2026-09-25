@@ -197,8 +197,34 @@ export function AcademicDashboard() {
     const instituicao = row.cursoInstituicao || row.CURSO_INSTITUICAO || "---"
     const periodo = row.periodo || row.PERIODO || row.Periodo || "---"
     const serie = row.serie || row.SERIE || row.Serie || "---"
-    const modelagem = row.modelagem || row.MODELAGEM || row.Modelagem || "---"
-    return { id, codigo, disciplina, disciplinaCod, curso, instituicao, periodo, serie, modelagem }
+    const rawModelagem = row.modelagem || row.MODELAGEM || row.Modelagem || ""
+    const modelagem = rawModelagem && String(rawModelagem).trim() !== "" ? String(rawModelagem).trim() : "Sem Modelagem"
+
+    // Data Início da Turma
+    const rawInicio = row.dataInicioTurma || row.data_inicio_turma || row.DATA_INICIO_TURMA || row.dt_inicio_turma || null
+    let dataInicio = "---"
+    if (rawInicio) {
+      try {
+        const d = new Date(rawInicio)
+        if (!isNaN(d.getTime())) {
+          dataInicio = d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+        }
+      } catch {}
+    }
+
+    // Data Atualização
+    const rawAtualizacao = row.dataAtualizacao || row.data_atualizacao || row.DATA_ATUALIZACAO || row.dt_atualizacao || null
+    let dataAtualizacao = "---"
+    if (rawAtualizacao) {
+      try {
+        const d = new Date(rawAtualizacao)
+        if (!isNaN(d.getTime())) {
+          dataAtualizacao = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        }
+      } catch {}
+    }
+
+    return { id, codigo, disciplina, disciplinaCod, curso, instituicao, periodo, serie, modelagem, dataInicio, dataAtualizacao }
   }
 
 
@@ -406,6 +432,8 @@ export function AcademicDashboard() {
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left">Disciplina Vinculada</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-left hidden md:table-cell">Curso / Unidade Ens.</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">Período / Série</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center hidden lg:table-cell">Início da Turma</TableHead>
+                    <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center hidden lg:table-cell">Data Atualização</TableHead>
                     <TableHead className="px-5 py-3.5 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">Modelagem</TableHead>
                   </>
                 )}
@@ -553,7 +581,32 @@ export function AcademicDashboard() {
                           <p className="font-bold text-navy text-xs">{cRow.periodo}</p>
                           <span className="text-[10px] text-[#9AA0AC] block font-mono">Série: {cRow.serie}</span>
                         </TableCell>
-                        <TableCell className="px-5 py-3.5 text-xs text-right font-medium text-[#5F6775]">{cRow.modelagem}</TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-center font-mono text-[#5F6775] hidden lg:table-cell">
+                          {cRow.dataInicio !== "---" ? (
+                            <span className="inline-flex items-center gap-1 font-semibold text-navy">
+                              <Calendar className="w-3.5 h-3.5 text-[#5E35B1]" />
+                              {cRow.dataInicio}
+                            </span>
+                          ) : (
+                            <span className="text-[#9AA0AC]">---</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-center font-mono text-[#5F6775] hidden lg:table-cell">
+                          {cRow.dataAtualizacao !== "---" ? (
+                            <span className="text-xs text-[#5F6775]">
+                              {cRow.dataAtualizacao}
+                            </span>
+                          ) : (
+                            <span className="text-[#9AA0AC]">---</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-5 py-3.5 text-xs text-right font-medium text-[#5F6775]">
+                          {cRow.modelagem === "Sem Modelagem" ? (
+                            <span className="text-[#9AA0AC] italic">Sem Modelagem</span>
+                          ) : (
+                            <span className="font-semibold text-navy">{cRow.modelagem}</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     )
 
@@ -683,7 +736,17 @@ export function AcademicDashboard() {
                 const nomeDisc = item.NOME_DISCIPLINA || item.NomeDisciplina || item.nome_disciplina || item.DISCIPLINA || "Disciplina Não Nomeada"
                 const codTurma = item.TURMA || item.Turma || item.turma || item.COD_TURMA || "---"
                 const periodo = item.PERIODO || item.Periodo || item.periodo || item.SEMESTRE || "---"
-                
+                const rawInicio = item.DATA_INICIO_TURMA || item.dataInicioTurma || item.data_inicio_turma || null
+                let dataInicio = null
+                if (rawInicio) {
+                  try {
+                    const d = new Date(rawInicio)
+                    if (!isNaN(d.getTime())) {
+                      dataInicio = d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+                    }
+                  } catch {}
+                }
+
                 return (
                   <div 
                     key={idx} 
@@ -700,6 +763,12 @@ export function AcademicDashboard() {
                         <span>Turma: <strong className="text-navy">{codTurma}</strong></span>
                         <span>•</span>
                         <span>Período: <strong className="text-navy">{periodo}</strong></span>
+                        {dataInicio && (
+                          <>
+                            <span>•</span>
+                            <span>Início: <strong className="text-navy">{dataInicio}</strong></span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -332,6 +332,9 @@ export const academicTurma = pgTable("academic_turma", {
   modelagem: text("modelagem"),
   cursoNome: text("curso_nome"),
   cursoInstituicao: text("curso_instituicao"),
+  dataAtualizacao: timestamp("data_atualizacao", { mode: "date" }),
+  dataInicioTurma: timestamp("data_inicio_turma", { mode: "date" }),
+  dataFimTurma: timestamp("data_fim_turma", { mode: "date" }),
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 }, (t) => [
   index("idx_ac_turma_periodo").on(t.periodo),

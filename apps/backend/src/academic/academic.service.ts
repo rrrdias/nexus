@@ -127,7 +127,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
       this.turmaColumns = await this.getViewColumns('VW_AVA_TURMA');
       if (this.turmaColumns.length === 0) {
-        this.turmaColumns = ['ID', 'TURMA', 'COD_TURMA', 'DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO', 'PERIODO', 'SERIE', 'MODELAGEM'];
+        this.turmaColumns = ['ID', 'TURMA', 'COD_TURMA', 'DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO', 'PERIODO', 'SERIE', 'MODELAGEM', 'DATA_ATUALIZACAO', 'DATA_INICIO_TURMA', 'DATA_FIM_TURMA'];
       }
 
       console.log('[Lyceum DB] VW_AVA_DISCENTE columns:', this.discenteColumns);
@@ -137,7 +137,19 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       console.error('[Lyceum DB] Connection or metadata initialization failed:', err);
     }
 
-    // 2. Auto-Seeder: Check and register 'Módulo Acadêmico' in Postgres
+    // 2. PostgreSQL Schema Auto-Migration for academic_turma date columns
+    try {
+      await this.db.execute(drizzleSql`
+        ALTER TABLE academic_turma 
+        ADD COLUMN IF NOT EXISTS data_atualizacao TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS data_inicio_turma TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS data_fim_turma TIMESTAMP;
+      `);
+    } catch (err) {
+      console.error('[Postgres Schema] Auto-migration of academic_turma date columns failed:', err);
+    }
+
+    // 3. Auto-Seeder: Check and register 'Módulo Acadêmico' in Postgres
     try {
       await this.autoSeedModule();
     } catch (err) {
@@ -366,8 +378,13 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       .limit(size)
       .offset(offset);
 
+    const formattedData = data.map(item => ({
+      ...item,
+      modelagem: item.modelagem && item.modelagem.trim() ? item.modelagem.trim() : 'Sem Modelagem',
+    }));
+
     return {
-      data,
+      data: formattedData,
       total,
       page,
       size,
@@ -490,6 +507,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       SITUACAO: academicMatricula.situacao,
       ATIVO: academicMatricula.ativo,
       NIVEL: academicMatricula.nivel,
+      DATA_ATUALIZACAO: academicTurma.dataAtualizacao,
+      DATA_INICIO_TURMA: academicTurma.dataInicioTurma,
     })
     .from(academicMatricula)
     .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
@@ -535,6 +554,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       SITUACAO: academicMatricula.situacao,
       ATIVO: academicMatricula.ativo,
       NIVEL: academicMatricula.nivel,
+      DATA_ATUALIZACAO: academicTurma.dataAtualizacao,
+      DATA_INICIO_TURMA: academicTurma.dataInicioTurma,
     })
     .from(academicMatricula)
     .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))

@@ -60,6 +60,7 @@ export class AcademicSyncService {
         SELECT 
           T.ID, T.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, 
           T.CURSO, T.PERIODO, T.SERIE, T.MODELAGEM,
+          T.DATA_ATUALIZACAO, T.DATA_INICIO_TURMA, T.DATA_FIM_TURMA,
           C.NOME AS CURSO_NOME, C.UNIDADE_ENS AS CURSO_INSTITUICAO
         FROM ${prefix}VW_AVA_TURMA T
         LEFT JOIN ${prefix}VW_AVA_CURSO C ON T.CURSO = C.ID
@@ -84,9 +85,12 @@ export class AcademicSyncService {
               curso: t.CURSO,
               periodo: t.PERIODO,
               serie: t.SERIE,
-              modelagem: t.MODELAGEM,
+              modelagem: t.MODELAGEM && t.MODELAGEM.toString().trim() ? t.MODELAGEM.toString().trim() : 'Sem Modelagem',
               cursoNome: t.CURSO_NOME,
               cursoInstituicao: t.CURSO_INSTITUICAO,
+              dataAtualizacao: t.DATA_ATUALIZACAO ? new Date(t.DATA_ATUALIZACAO) : null,
+              dataInicioTurma: t.DATA_INICIO_TURMA ? new Date(t.DATA_INICIO_TURMA) : null,
+              dataFimTurma: t.DATA_FIM_TURMA ? new Date(t.DATA_FIM_TURMA) : null,
               updatedAt: new Date(),
             })))
             .onConflictDoUpdate({
@@ -103,6 +107,9 @@ export class AcademicSyncService {
                 modelagem: drizzleSql`EXCLUDED.modelagem`,
                 cursoNome: drizzleSql`EXCLUDED.curso_nome`,
                 cursoInstituicao: drizzleSql`EXCLUDED.curso_instituicao`,
+                dataAtualizacao: drizzleSql`EXCLUDED.data_atualizacao`,
+                dataInicioTurma: drizzleSql`EXCLUDED.data_inicio_turma`,
+                dataFimTurma: drizzleSql`EXCLUDED.data_fim_turma`,
                 updatedAt: drizzleSql`EXCLUDED."updatedAt"`,
               }
             });
