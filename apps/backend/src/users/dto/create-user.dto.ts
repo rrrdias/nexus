@@ -1,4 +1,12 @@
-import { IsArray, IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateUserDto {
@@ -20,7 +28,10 @@ export class CreateUserDto {
   userid?: string;
 
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true' || value === 'on' || value === 1)
+  @Transform(
+    ({ value }) =>
+      value === true || value === 'true' || value === 'on' || value === 1,
+  )
   @IsBoolean()
   isActive?: boolean;
 

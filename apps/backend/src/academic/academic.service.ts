@@ -1,32 +1,55 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Inject, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Inject,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import * as sql from 'mssql';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { 
-  systemModules, 
-  groups, 
-  groupSystemAccess, 
-  users, 
+import {
+  systemModules,
+  groups,
+  groupSystemAccess,
   usersSystemAccess,
-  userGroups 
+  userGroups,
 } from '../db/schema';
-import { eq, ilike, or, and, sql as drizzleSql, desc, asc, inArray, isNull } from 'drizzle-orm';
-import { academicDiscente, academicDocente, academicTurma, academicMatricula } from '../db/schema';
-
+import {
+  eq,
+  ilike,
+  or,
+  and,
+  sql as drizzleSql,
+  desc,
+  asc,
+  inArray,
+  isNull,
+} from 'drizzle-orm';
+import {
+  academicDiscente,
+  academicDocente,
+  academicTurma,
+  academicMatricula,
+} from '../db/schema';
 
 @Injectable()
 export class AcademicService implements OnModuleInit, OnModuleDestroy {
-  private static academicAccessCache = new Map<string, { hasAccess: boolean; timestamp: number }>();
+  private static academicAccessCache = new Map<
+    string,
+    { hasAccess: boolean; timestamp: number }
+  >();
   private static readonly ACCESS_CACHE_TTL_MS = 60_000;
 
   private pool: sql.ConnectionPool | null = null;
   private dbPrefix: string = '';
-  
+
   // Track schema columns for dynamic search building
   private discenteColumns: string[] = [];
   private docenteColumns: string[] = [];
   private turmaColumns: string[] = [];
-  
+
   // Track available views in Lyceum containing "AVA"
   private avaViews: string[] = [];
 
@@ -34,7 +57,11 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
   ) {}
 
-  async assertAcademicAccess(user?: { id?: string; isSuperAdmin?: boolean; isDisabled?: boolean }) {
+  async assertAcademicAccess(user?: {
+    id?: string;
+    isSuperAdmin?: boolean;
+    isDisabled?: boolean;
+  }) {
     if (!user?.id || user.isDisabled) {
       throw new UnauthorizedException('Acesso negado.');
     }
@@ -43,50 +70,80 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     const now = Date.now();
     const cached = AcademicService.academicAccessCache.get(user.id);
-    if (cached && now - cached.timestamp < AcademicService.ACCESS_CACHE_TTL_MS) {
-      if (!cached.hasAccess) throw new ForbiddenException('Acesso negado ao módulo acadêmico.');
+    if (
+      cached &&
+      now - cached.timestamp < AcademicService.ACCESS_CACHE_TTL_MS
+    ) {
+      if (!cached.hasAccess)
+        throw new ForbiddenException('Acesso negado ao módulo acadêmico.');
       return;
     }
 
-    const directAccess = await this.db.select({ id: systemModules.id })
+    const directAccess = await this.db
+      .select({ id: systemModules.id })
       .from(usersSystemAccess)
-      .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
-      .where(and(
-        eq(usersSystemAccess.userId, user.id),
-        eq(systemModules.slug, 'academic'),
-        eq(systemModules.isActive, true),
-      ))
+      .innerJoin(
+        systemModules,
+        eq(usersSystemAccess.systemModuleId, systemModules.id),
+      )
+      .where(
+        and(
+          eq(usersSystemAccess.userId, user.id),
+          eq(systemModules.slug, 'academic'),
+          eq(systemModules.isActive, true),
+        ),
+      )
       .limit(1);
 
     if (directAccess.length > 0) {
-      AcademicService.academicAccessCache.set(user.id, { hasAccess: true, timestamp: now });
+      AcademicService.academicAccessCache.set(user.id, {
+        hasAccess: true,
+        timestamp: now,
+      });
       return;
     }
 
-    const groupAccess = await this.db.select({ id: systemModules.id })
+    const groupAccess = await this.db
+      .select({ id: systemModules.id })
       .from(userGroups)
-      .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
-      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
-      .where(and(
-        eq(userGroups.userId, user.id),
-        eq(systemModules.slug, 'academic'),
-        eq(systemModules.isActive, true),
-      ))
+      .innerJoin(
+        groupSystemAccess,
+        eq(userGroups.groupId, groupSystemAccess.groupId),
+      )
+      .innerJoin(
+        systemModules,
+        eq(groupSystemAccess.systemModuleId, systemModules.id),
+      )
+      .where(
+        and(
+          eq(userGroups.userId, user.id),
+          eq(systemModules.slug, 'academic'),
+          eq(systemModules.isActive, true),
+        ),
+      )
       .limit(1);
 
     if (groupAccess.length === 0) {
-      AcademicService.academicAccessCache.set(user.id, { hasAccess: false, timestamp: now });
+      AcademicService.academicAccessCache.set(user.id, {
+        hasAccess: false,
+        timestamp: now,
+      });
       throw new ForbiddenException('Acesso negado ao módulo acadêmico.');
     }
 
-    AcademicService.academicAccessCache.set(user.id, { hasAccess: true, timestamp: now });
+    AcademicService.academicAccessCache.set(user.id, {
+      hasAccess: true,
+      timestamp: now,
+    });
   }
 
   async onModuleInit() {
     // Load Prefix for Linked Server if configured
     this.dbPrefix = process.env.LYCEUM_DB_PREFIX || '';
     if (this.dbPrefix) {
-      console.log(`[Lyceum DB] Using database prefix (Linked Server): "${this.dbPrefix}"`);
+      console.log(
+        `[Lyceum DB] Using database prefix (Linked Server): "${this.dbPrefix}"`,
+      );
     }
 
     // 1. Connect to Lyceum SQL Server
@@ -117,24 +174,62 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
       this.discenteColumns = await this.getViewColumns('VW_AVA_DISCENTE');
       if (this.discenteColumns.length === 0) {
-        this.discenteColumns = ['ID', 'NOME', 'SOBRENOME', 'NOME_SOCIAL', 'SOBRENOME_SOCIAL', 'MATRICULA', 'CPF', 'USUARIO', 'EMAIL', 'TELEFONE', 'CURSO', 'UNIDADE_FISICA', 'SERIE'];
+        this.discenteColumns = [
+          'ID',
+          'NOME',
+          'SOBRENOME',
+          'NOME_SOCIAL',
+          'SOBRENOME_SOCIAL',
+          'MATRICULA',
+          'CPF',
+          'USUARIO',
+          'EMAIL',
+          'TELEFONE',
+          'CURSO',
+          'UNIDADE_FISICA',
+          'SERIE',
+        ];
       }
 
       this.docenteColumns = await this.getViewColumns('VW_AVA_DOCENTE');
       if (this.docenteColumns.length === 0) {
-        this.docenteColumns = ['ID', 'NOME', 'SOBRENOME', 'CPF', 'EMAIL', 'TELEFONE'];
+        this.docenteColumns = [
+          'ID',
+          'NOME',
+          'SOBRENOME',
+          'CPF',
+          'EMAIL',
+          'TELEFONE',
+        ];
       }
 
       this.turmaColumns = await this.getViewColumns('VW_AVA_TURMA');
       if (this.turmaColumns.length === 0) {
-        this.turmaColumns = ['ID', 'TURMA', 'COD_TURMA', 'DISCIPLINA', 'NOME_DISCIPLINA', 'COD_DISCIPLINA', 'CURSO', 'PERIODO', 'SERIE', 'MODELAGEM', 'DATA_ATUALIZACAO', 'DATA_INICIO_TURMA', 'DATA_FIM_TURMA'];
+        this.turmaColumns = [
+          'ID',
+          'TURMA',
+          'COD_TURMA',
+          'DISCIPLINA',
+          'NOME_DISCIPLINA',
+          'COD_DISCIPLINA',
+          'CURSO',
+          'PERIODO',
+          'SERIE',
+          'MODELAGEM',
+          'DATA_ATUALIZACAO',
+          'DATA_INICIO_TURMA',
+          'DATA_FIM_TURMA',
+        ];
       }
 
       console.log('[Lyceum DB] VW_AVA_DISCENTE columns:', this.discenteColumns);
       console.log('[Lyceum DB] VW_AVA_DOCENTE columns:', this.docenteColumns);
       console.log('[Lyceum DB] VW_AVA_TURMA columns:', this.turmaColumns);
     } catch (err) {
-      console.error('[Lyceum DB] Connection or metadata initialization failed:', err);
+      console.error(
+        '[Lyceum DB] Connection or metadata initialization failed:',
+        err,
+      );
     }
 
     // 2. PostgreSQL Schema Auto-Migration for academic_turma date columns
@@ -146,14 +241,20 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
         ADD COLUMN IF NOT EXISTS data_fim_turma TIMESTAMP;
       `);
     } catch (err) {
-      console.error('[Postgres Schema] Auto-migration of academic_turma date columns failed:', err);
+      console.error(
+        '[Postgres Schema] Auto-migration of academic_turma date columns failed:',
+        err,
+      );
     }
 
     // 3. Auto-Seeder: Check and register 'Módulo Acadêmico' in Postgres
     try {
       await this.autoSeedModule();
     } catch (err) {
-      console.error('[Postgres Seeder] Auto-seeding Academic Module failed:', err);
+      console.error(
+        '[Postgres Seeder] Auto-seeding Academic Module failed:',
+        err,
+      );
     }
   }
 
@@ -168,11 +269,15 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   private async getAvaViews(): Promise<string[]> {
     if (!this.pool) return [];
     try {
-      const schemaPrefix = this.dbPrefix ? this.dbPrefix.replace('dbo.', '') : '';
-      const res = await this.pool.request().query(
-        `SELECT TABLE_NAME FROM ${schemaPrefix}INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME LIKE '%AVA%'`
-      );
-      return res.recordset.map(row => row.TABLE_NAME);
+      const schemaPrefix = this.dbPrefix
+        ? this.dbPrefix.replace('dbo.', '')
+        : '';
+      const res = await this.pool
+        .request()
+        .query(
+          `SELECT TABLE_NAME FROM ${schemaPrefix}INFORMATION_SCHEMA.VIEWS WHERE TABLE_NAME LIKE '%AVA%'`,
+        );
+      return res.recordset.map((row) => row.TABLE_NAME);
     } catch (err) {
       console.error('[Lyceum DB] Failed to list AVA views:', err);
       return [];
@@ -182,11 +287,15 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   private async getViewColumns(viewName: string): Promise<string[]> {
     if (!this.pool) return [];
     try {
-      const schemaPrefix = this.dbPrefix ? this.dbPrefix.replace('dbo.', '') : '';
-      const res = await this.pool.request().query(
-        `SELECT COLUMN_NAME FROM ${schemaPrefix}INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '${viewName}'`
-      );
-      return res.recordset.map(row => row.COLUMN_NAME);
+      const schemaPrefix = this.dbPrefix
+        ? this.dbPrefix.replace('dbo.', '')
+        : '';
+      const res = await this.pool
+        .request()
+        .query(
+          `SELECT COLUMN_NAME FROM ${schemaPrefix}INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '${viewName}'`,
+        );
+      return res.recordset.map((row) => row.COLUMN_NAME);
     } catch (err) {
       console.error(`[Lyceum DB] Failed to get columns for ${viewName}:`, err);
       return [];
@@ -196,7 +305,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   // --- Auto Seeding in PostgreSQL ---
   private async autoSeedModule() {
     // Check if the 'academic' slug already exists
-    const [existing] = await this.db.select()
+    const [existing] = await this.db
+      .select()
       .from(systemModules)
       .where(eq(systemModules.slug, 'academic'))
       .limit(1);
@@ -207,11 +317,13 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     }
 
     console.log('[Postgres Seeder] Seeding Academic Module...');
-    const [newModule] = await this.db.insert(systemModules)
+    const [newModule] = await this.db
+      .insert(systemModules)
       .values({
         name: 'Módulo Acadêmico',
         slug: 'academic',
-        description: 'Consulta de Alunos, Docentes, Matrículas e Turmas no Lyceum',
+        description:
+          'Consulta de Alunos, Docentes, Matrículas e Turmas no Lyceum',
         colorCode: '#5E35B1',
         iconClass: 'ti-school',
         pathUrl: '/academic',
@@ -219,7 +331,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       .returning();
 
     // Find the 'Super Admin' group to grant permissions
-    const [superAdminGroup] = await this.db.select()
+    const [superAdminGroup] = await this.db
+      .select()
       .from(groups)
       .where(eq(groups.name, 'Super Admin'))
       .limit(1);
@@ -232,25 +345,27 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       });
 
       // 2. Grant direct access to all users belonging to Super Admin group
-      const adminUsers = await this.db.select({ userId: userGroups.userId })
+      const adminUsers = await this.db
+        .select({ userId: userGroups.userId })
         .from(userGroups)
         .where(eq(userGroups.groupId, superAdminGroup.id));
 
       if (adminUsers.length > 0) {
         await this.db.insert(usersSystemAccess).values(
-          adminUsers.map(admin => ({
+          adminUsers.map((admin) => ({
             userId: admin.userId,
             systemModuleId: newModule.id,
-          }))
+          })),
         );
       }
-      console.log('[Postgres Seeder] Academic Module accesses granted successfully.');
+      console.log(
+        '[Postgres Seeder] Academic Module accesses granted successfully.',
+      );
     }
   }
 
   // --- Academic Consultations (Lyceum Views) ---
 
-  
   async getStudents(search?: string, page = 1, size = 15) {
     const offset = (page - 1) * size;
     let whereClause: any = undefined;
@@ -264,26 +379,30 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
           ilike(academicDiscente.matricula, `%${trimmedSearch}%`),
           ilike(academicDiscente.cpf, `%${trimmedSearch}%`),
           ilike(academicDiscente.usuario, `%${trimmedSearch}%`),
-          ilike(academicDiscente.id, `%${trimmedSearch}%`)
+          ilike(academicDiscente.id, `%${trimmedSearch}%`),
         );
       } else {
-        const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-        const textConditions = words.map(word => or(
-          ilike(academicDiscente.nome, `%${word}%`),
-          ilike(academicDiscente.sobrenome, `%${word}%`),
-          ilike(academicDiscente.nomeSocial, `%${word}%`),
-          ilike(academicDiscente.sobrenomeSocial, `%${word}%`)
-        ));
+        const words = trimmedSearch.split(/\s+/).filter((w) => w.length > 0);
+        const textConditions = words.map((word) =>
+          or(
+            ilike(academicDiscente.nome, `%${word}%`),
+            ilike(academicDiscente.sobrenome, `%${word}%`),
+            ilike(academicDiscente.nomeSocial, `%${word}%`),
+            ilike(academicDiscente.sobrenomeSocial, `%${word}%`),
+          ),
+        );
         whereClause = and(...textConditions);
       }
     }
 
-    const countRes = await this.db.select({ count: drizzleSql<number>`count(*)` })
+    const countRes = await this.db
+      .select({ count: drizzleSql<number>`count(*)` })
       .from(academicDiscente)
       .where(whereClause);
     const total = Number(countRes[0]?.count || 0);
 
-    const data = await this.db.select()
+    const data = await this.db
+      .select()
       .from(academicDiscente)
       .where(whereClause)
       .orderBy(asc(academicDiscente.nome))
@@ -295,7 +414,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       total,
       page,
       size,
-      totalPages: Math.ceil(total / size)
+      totalPages: Math.ceil(total / size),
     };
   }
 
@@ -310,26 +429,30 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       if (isCodeSearch) {
         whereClause = or(
           ilike(academicDocente.cpf, `%${trimmedSearch}%`),
-          ilike(academicDocente.id, `%${trimmedSearch}%`)
+          ilike(academicDocente.id, `%${trimmedSearch}%`),
         );
       } else {
-        const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-        const textConditions = words.map(word => or(
-          ilike(academicDocente.nome, `%${word}%`),
-          ilike(academicDocente.sobrenome, `%${word}%`),
-          ilike(academicDocente.nomeSocial, `%${word}%`),
-          ilike(academicDocente.sobrenomeSocial, `%${word}%`)
-        ));
+        const words = trimmedSearch.split(/\s+/).filter((w) => w.length > 0);
+        const textConditions = words.map((word) =>
+          or(
+            ilike(academicDocente.nome, `%${word}%`),
+            ilike(academicDocente.sobrenome, `%${word}%`),
+            ilike(academicDocente.nomeSocial, `%${word}%`),
+            ilike(academicDocente.sobrenomeSocial, `%${word}%`),
+          ),
+        );
         whereClause = and(...textConditions);
       }
     }
 
-    const countRes = await this.db.select({ count: drizzleSql<number>`count(*)` })
+    const countRes = await this.db
+      .select({ count: drizzleSql<number>`count(*)` })
       .from(academicDocente)
       .where(whereClause);
     const total = Number(countRes[0]?.count || 0);
 
-    const data = await this.db.select()
+    const data = await this.db
+      .select()
       .from(academicDocente)
       .where(whereClause)
       .orderBy(asc(academicDocente.nome))
@@ -341,7 +464,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       total,
       page,
       size,
-      totalPages: Math.ceil(total / size)
+      totalPages: Math.ceil(total / size),
     };
   }
 
@@ -351,36 +474,47 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     if (search) {
       const trimmedSearch = search.trim();
-      const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-      
-      const textConditions = words.map(word => or(
-        ilike(academicTurma.id, `%${word}%`),
-        ilike(academicTurma.turma, `%${word}%`),
-        ilike(academicTurma.codTurma, `%${word}%`),
-        ilike(academicTurma.disciplina, `%${word}%`),
-        ilike(academicTurma.nomeDisciplina, `%${word}%`),
-        ilike(academicTurma.codDisciplina, `%${word}%`),
-        ilike(academicTurma.cursoNome, `%${word}%`),
-        ilike(academicTurma.periodo, `%${word}%`)
-      ));
+      const words = trimmedSearch.split(/\s+/).filter((w) => w.length > 0);
+
+      const textConditions = words.map((word) =>
+        or(
+          ilike(academicTurma.id, `%${word}%`),
+          ilike(academicTurma.turma, `%${word}%`),
+          ilike(academicTurma.codTurma, `%${word}%`),
+          ilike(academicTurma.disciplina, `%${word}%`),
+          ilike(academicTurma.nomeDisciplina, `%${word}%`),
+          ilike(academicTurma.codDisciplina, `%${word}%`),
+          ilike(academicTurma.cursoNome, `%${word}%`),
+          ilike(academicTurma.periodo, `%${word}%`),
+        ),
+      );
       whereClause = and(...textConditions);
     }
 
-    const countRes = await this.db.select({ count: drizzleSql<number>`count(*)` })
+    const countRes = await this.db
+      .select({ count: drizzleSql<number>`count(*)` })
       .from(academicTurma)
       .where(whereClause);
     const total = Number(countRes[0]?.count || 0);
 
-    const data = await this.db.select()
+    const data = await this.db
+      .select()
       .from(academicTurma)
       .where(whereClause)
-      .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina), asc(academicTurma.turma))
+      .orderBy(
+        desc(academicTurma.periodo),
+        asc(academicTurma.nomeDisciplina),
+        asc(academicTurma.turma),
+      )
       .limit(size)
       .offset(offset);
 
-    const formattedData = data.map(item => ({
+    const formattedData = data.map((item) => ({
       ...item,
-      modelagem: item.modelagem && item.modelagem.trim() ? item.modelagem.trim() : 'Sem Modelagem',
+      modelagem:
+        item.modelagem && item.modelagem.trim()
+          ? item.modelagem.trim()
+          : 'Sem Modelagem',
     }));
 
     return {
@@ -388,10 +522,9 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       total,
       page,
       size,
-      totalPages: Math.ceil(total / size)
+      totalPages: Math.ceil(total / size),
     };
   }
-
 
   async getMatriculas(search?: string, page = 1, size = 15) {
     const offset = (page - 1) * size;
@@ -399,58 +532,66 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     if (search) {
       const trimmedSearch = search.trim();
-      const words = trimmedSearch.split(/\s+/).filter(w => w.length > 0);
-      
-      const textConditions = words.map(word => or(
-        ilike(academicDiscente.nome, `%${word}%`),
-        ilike(academicDiscente.sobrenome, `%${word}%`),
-        ilike(academicDiscente.nomeSocial, `%${word}%`),
-        ilike(academicTurma.turma, `%${word}%`),
-        ilike(academicTurma.nomeDisciplina, `%${word}%`),
-        ilike(academicMatricula.usuarioId, `%${word}%`)
-      ));
+      const words = trimmedSearch.split(/\s+/).filter((w) => w.length > 0);
+
+      const textConditions = words.map((word) =>
+        or(
+          ilike(academicDiscente.nome, `%${word}%`),
+          ilike(academicDiscente.sobrenome, `%${word}%`),
+          ilike(academicDiscente.nomeSocial, `%${word}%`),
+          ilike(academicTurma.turma, `%${word}%`),
+          ilike(academicTurma.nomeDisciplina, `%${word}%`),
+          ilike(academicMatricula.usuarioId, `%${word}%`),
+        ),
+      );
       whereClause = and(...textConditions);
     }
 
-    const baseQuery = this.db.select({
-      id: academicMatricula.id,
-      usuario: academicMatricula.usuarioId,
-      turma: academicMatricula.turmaId,
-      nivel: academicMatricula.nivel,
-      ativo: academicMatricula.ativo,
-      situacao: academicMatricula.situacao,
-      nome: academicDiscente.nome,
-      sobrenome: academicDiscente.sobrenome,
-      nomeSocial: academicDiscente.nomeSocial,
-      sobrenomeSocial: academicDiscente.sobrenomeSocial,
-      nomeDisciplina: academicTurma.nomeDisciplina,
-      turmaNome: academicTurma.turma
-    })
-    .from(academicMatricula)
-    .leftJoin(academicDiscente, eq(academicMatricula.usuarioId, academicDiscente.id))
-    .leftJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id));
+    const baseQuery = this.db
+      .select({
+        id: academicMatricula.id,
+        usuario: academicMatricula.usuarioId,
+        turma: academicMatricula.turmaId,
+        nivel: academicMatricula.nivel,
+        ativo: academicMatricula.ativo,
+        situacao: academicMatricula.situacao,
+        nome: academicDiscente.nome,
+        sobrenome: academicDiscente.sobrenome,
+        nomeSocial: academicDiscente.nomeSocial,
+        sobrenomeSocial: academicDiscente.sobrenomeSocial,
+        nomeDisciplina: academicTurma.nomeDisciplina,
+        turmaNome: academicTurma.turma,
+      })
+      .from(academicMatricula)
+      .leftJoin(
+        academicDiscente,
+        eq(academicMatricula.usuarioId, academicDiscente.id),
+      )
+      .leftJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id));
 
     if (whereClause && search) {
       baseQuery.where(whereClause);
     }
 
     // Workaround for counting with joins in Drizzle
-    const countQuery = this.db.select({ count: drizzleSql<number>`count(*)` })
+    const countQuery = this.db
+      .select({ count: drizzleSql<number>`count(*)` })
       .from(academicMatricula)
-      .leftJoin(academicDiscente, eq(academicMatricula.usuarioId, academicDiscente.id))
+      .leftJoin(
+        academicDiscente,
+        eq(academicMatricula.usuarioId, academicDiscente.id),
+      )
       .leftJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id));
-      
+
     if (whereClause && search) countQuery.where(whereClause);
-    
+
     const countRes = await countQuery;
     const total = Number(countRes[0]?.count || 0);
 
-    const data = await baseQuery
-      .limit(size)
-      .offset(offset);
+    const data = await baseQuery.limit(size).offset(offset);
 
     // Format output to match old Lyceum response
-    const formattedData = data.map(m => ({
+    const formattedData = data.map((m) => ({
       ID: m.id,
       USUARIO: m.usuario,
       TURMA: m.turma,
@@ -459,7 +600,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       SITUACAO: m.situacao,
       NOME: m.nomeSocial || m.nome,
       SOBRENOME: m.sobrenomeSocial || m.sobrenome,
-      NOME_DISCIPLINA: m.nomeDisciplina || m.turmaNome
+      NOME_DISCIPLINA: m.nomeDisciplina || m.turmaNome,
     }));
 
     return {
@@ -467,7 +608,7 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       total,
       page,
       size,
-      totalPages: Math.ceil(total / size)
+      totalPages: Math.ceil(total / size),
     };
   }
 
@@ -476,20 +617,23 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     if (!trimmed) return [];
 
     // 1. Localiza o discente para capturar id, matrícula e usuário
-    const studentInfo = await this.db.select({
-      id: academicDiscente.id,
-      matricula: academicDiscente.matricula,
-      usuario: academicDiscente.usuario,
-      cpf: academicDiscente.cpf,
-    })
-    .from(academicDiscente)
-    .where(or(
-      eq(academicDiscente.id, trimmed),
-      eq(academicDiscente.matricula, trimmed),
-      eq(academicDiscente.usuario, trimmed),
-      eq(academicDiscente.cpf, trimmed)
-    ))
-    .limit(1);
+    const studentInfo = await this.db
+      .select({
+        id: academicDiscente.id,
+        matricula: academicDiscente.matricula,
+        usuario: academicDiscente.usuario,
+        cpf: academicDiscente.cpf,
+      })
+      .from(academicDiscente)
+      .where(
+        or(
+          eq(academicDiscente.id, trimmed),
+          eq(academicDiscente.matricula, trimmed),
+          eq(academicDiscente.usuario, trimmed),
+          eq(academicDiscente.cpf, trimmed),
+        ),
+      )
+      .limit(1);
 
     const userIds = new Set<string>([trimmed]);
     if (studentInfo[0]) {
@@ -498,31 +642,32 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       if (studentInfo[0].usuario) userIds.add(studentInfo[0].usuario);
     }
 
-    const data = await this.db.select({
-      TURMA: academicTurma.id,
-      DISCIPLINA: academicTurma.disciplina,
-      NOME_DISCIPLINA: academicTurma.nomeDisciplina,
-      PERIODO: academicTurma.periodo,
-      COD_TURMA: academicTurma.turma,
-      SITUACAO: academicMatricula.situacao,
-      ATIVO: academicMatricula.ativo,
-      NIVEL: academicMatricula.nivel,
-      DATA_ATUALIZACAO: academicTurma.dataAtualizacao,
-      DATA_INICIO_TURMA: academicTurma.dataInicioTurma,
-    })
-    .from(academicMatricula)
-    .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
-    .where(
-      and(
-        inArray(academicMatricula.usuarioId, Array.from(userIds)),
-        or(
-          eq(academicMatricula.nivel, '2'),
-          eq(academicMatricula.nivel, 'Aluno'),
-          isNull(academicMatricula.nivel)
-        )
+    const data = await this.db
+      .select({
+        TURMA: academicTurma.id,
+        DISCIPLINA: academicTurma.disciplina,
+        NOME_DISCIPLINA: academicTurma.nomeDisciplina,
+        PERIODO: academicTurma.periodo,
+        COD_TURMA: academicTurma.turma,
+        SITUACAO: academicMatricula.situacao,
+        ATIVO: academicMatricula.ativo,
+        NIVEL: academicMatricula.nivel,
+        DATA_ATUALIZACAO: academicTurma.dataAtualizacao,
+        DATA_INICIO_TURMA: academicTurma.dataInicioTurma,
+      })
+      .from(academicMatricula)
+      .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
+      .where(
+        and(
+          inArray(academicMatricula.usuarioId, Array.from(userIds)),
+          or(
+            eq(academicMatricula.nivel, '2'),
+            eq(academicMatricula.nivel, 'Aluno'),
+            isNull(academicMatricula.nivel),
+          ),
+        ),
       )
-    )
-    .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina));
+      .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina));
 
     return data;
   }
@@ -531,49 +676,49 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     const trimmed = (docenteId || '').trim();
     if (!trimmed) return [];
 
-    const teacherInfo = await this.db.select({
-      id: academicDocente.id,
-      cpf: academicDocente.cpf,
-    })
-    .from(academicDocente)
-    .where(or(
-      eq(academicDocente.id, trimmed),
-      eq(academicDocente.cpf, trimmed)
-    ))
-    .limit(1);
+    const teacherInfo = await this.db
+      .select({
+        id: academicDocente.id,
+        cpf: academicDocente.cpf,
+      })
+      .from(academicDocente)
+      .where(
+        or(eq(academicDocente.id, trimmed), eq(academicDocente.cpf, trimmed)),
+      )
+      .limit(1);
 
     const userIds = new Set<string>([trimmed]);
     if (teacherInfo[0]?.id) userIds.add(teacherInfo[0].id);
 
-    const data = await this.db.select({
-      TURMA: academicTurma.id,
-      DISCIPLINA: academicTurma.disciplina,
-      NOME_DISCIPLINA: academicTurma.nomeDisciplina,
-      PERIODO: academicTurma.periodo,
-      COD_TURMA: academicTurma.turma,
-      SITUACAO: academicMatricula.situacao,
-      ATIVO: academicMatricula.ativo,
-      NIVEL: academicMatricula.nivel,
-      DATA_ATUALIZACAO: academicTurma.dataAtualizacao,
-      DATA_INICIO_TURMA: academicTurma.dataInicioTurma,
-    })
-    .from(academicMatricula)
-    .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
-    .where(
-      and(
-        inArray(academicMatricula.usuarioId, Array.from(userIds)),
-        or(
-          eq(academicMatricula.nivel, '1'),
-          eq(academicMatricula.nivel, 'Docente'),
-          isNull(academicMatricula.nivel)
-        )
+    const data = await this.db
+      .select({
+        TURMA: academicTurma.id,
+        DISCIPLINA: academicTurma.disciplina,
+        NOME_DISCIPLINA: academicTurma.nomeDisciplina,
+        PERIODO: academicTurma.periodo,
+        COD_TURMA: academicTurma.turma,
+        SITUACAO: academicMatricula.situacao,
+        ATIVO: academicMatricula.ativo,
+        NIVEL: academicMatricula.nivel,
+        DATA_ATUALIZACAO: academicTurma.dataAtualizacao,
+        DATA_INICIO_TURMA: academicTurma.dataInicioTurma,
+      })
+      .from(academicMatricula)
+      .innerJoin(academicTurma, eq(academicMatricula.turmaId, academicTurma.id))
+      .where(
+        and(
+          inArray(academicMatricula.usuarioId, Array.from(userIds)),
+          or(
+            eq(academicMatricula.nivel, '1'),
+            eq(academicMatricula.nivel, 'Docente'),
+            isNull(academicMatricula.nivel),
+          ),
+        ),
       )
-    )
-    .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina));
+      .orderBy(desc(academicTurma.periodo), asc(academicTurma.nomeDisciplina));
 
     return data;
   }
-
 
   getSqlPool() {
     if (!this.pool) throw new Error('Lyceum database not connected.');
@@ -584,9 +729,16 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     return this.dbPrefix;
   }
 
-  async checkLyceumHealth(): Promise<{ status: 'up' | 'down'; latencyMs?: number; message?: string }> {
+  async checkLyceumHealth(): Promise<{
+    status: 'up' | 'down';
+    latencyMs?: number;
+    message?: string;
+  }> {
     if (!this.pool || !this.pool.connected) {
-      return { status: 'down', message: 'Conexão MSSQL Lyceum inativa ou não configurada.' };
+      return {
+        status: 'down',
+        message: 'Conexão MSSQL Lyceum inativa ou não configurada.',
+      };
     }
     const start = Date.now();
     try {

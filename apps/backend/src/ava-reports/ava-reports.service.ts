@@ -1,9 +1,35 @@
-import { Injectable, Inject, Optional, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Optional,
+  UnauthorizedException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 
-import { eq, ilike, and, inArray, or, isNull, isNotNull, not, sql, desc, asc } from 'drizzle-orm';
+import {
+  eq,
+  ilike,
+  and,
+  inArray,
+  or,
+  isNull,
+  isNotNull,
+  not,
+  sql,
+  desc,
+} from 'drizzle-orm';
 
-import { avaProgressReport, avaGradesReport, avaConsolidatedReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
+import {
+  avaProgressReport,
+  avaGradesReport,
+  avaConsolidatedReport,
+  systemModules,
+  usersSystemAccess,
+  userGroups,
+  groupSystemAccess,
+} from '../db/schema';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { AvaSyncService } from '../ava-sync/ava-sync.service';
@@ -18,7 +44,14 @@ type SessionUser = {
 
 @Injectable()
 export class AvaReportsService {
-  private readonly termosSemAcesso = ["nunca acessou", "sem acesso", "", "none", "nulo", "-"];
+  private readonly termosSemAcesso = [
+    'nunca acessou',
+    'sem acesso',
+    '',
+    'none',
+    'nulo',
+    '-',
+  ];
 
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
@@ -26,142 +59,224 @@ export class AvaReportsService {
     @Optional() private readonly cacheService?: CacheService,
   ) {}
 
-
-  private static avaAccessCache = new Map<string, { hasAccess: boolean; timestamp: number }>();
+  private static avaAccessCache = new Map<
+    string,
+    { hasAccess: boolean; timestamp: number }
+  >();
   private static readonly ACCESS_CACHE_TTL_MS = 60_000;
 
   async assertAvaAccess(user?: SessionUser) {
     if (!user?.id || user.isDisabled) {
-      throw new UnauthorizedException("Acesso negado.");
+      throw new UnauthorizedException('Acesso negado.');
     }
 
     if (user.isSuperAdmin) return;
 
     const now = Date.now();
     const cached = AvaReportsService.avaAccessCache.get(user.id);
-    if (cached && (now - cached.timestamp < AvaReportsService.ACCESS_CACHE_TTL_MS)) {
-      if (!cached.hasAccess) throw new ForbiddenException("Acesso negado ao módulo AVA.");
+    if (
+      cached &&
+      now - cached.timestamp < AvaReportsService.ACCESS_CACHE_TTL_MS
+    ) {
+      if (!cached.hasAccess)
+        throw new ForbiddenException('Acesso negado ao módulo AVA.');
       return;
     }
 
-    const directAccess = await this.db.select({ id: systemModules.id })
+    const directAccess = await this.db
+      .select({ id: systemModules.id })
       .from(usersSystemAccess)
-      .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
-      .where(and(
-        eq(usersSystemAccess.userId, user.id),
-        eq(systemModules.slug, "ava"),
-        eq(systemModules.isActive, true)
-      ))
+      .innerJoin(
+        systemModules,
+        eq(usersSystemAccess.systemModuleId, systemModules.id),
+      )
+      .where(
+        and(
+          eq(usersSystemAccess.userId, user.id),
+          eq(systemModules.slug, 'ava'),
+          eq(systemModules.isActive, true),
+        ),
+      )
       .limit(1);
 
     if (directAccess.length > 0) {
-      AvaReportsService.avaAccessCache.set(user.id, { hasAccess: true, timestamp: now });
+      AvaReportsService.avaAccessCache.set(user.id, {
+        hasAccess: true,
+        timestamp: now,
+      });
       return;
     }
 
-    const groupAccess = await this.db.select({ id: systemModules.id })
+    const groupAccess = await this.db
+      .select({ id: systemModules.id })
       .from(userGroups)
-      .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
-      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
-      .where(and(
-        eq(userGroups.userId, user.id),
-        eq(systemModules.slug, "ava"),
-        eq(systemModules.isActive, true)
-      ))
+      .innerJoin(
+        groupSystemAccess,
+        eq(userGroups.groupId, groupSystemAccess.groupId),
+      )
+      .innerJoin(
+        systemModules,
+        eq(groupSystemAccess.systemModuleId, systemModules.id),
+      )
+      .where(
+        and(
+          eq(userGroups.userId, user.id),
+          eq(systemModules.slug, 'ava'),
+          eq(systemModules.isActive, true),
+        ),
+      )
       .limit(1);
 
     if (groupAccess.length === 0) {
-      AvaReportsService.avaAccessCache.set(user.id, { hasAccess: false, timestamp: now });
-      throw new ForbiddenException("Acesso negado ao módulo AVA.");
+      AvaReportsService.avaAccessCache.set(user.id, {
+        hasAccess: false,
+        timestamp: now,
+      });
+      throw new ForbiddenException('Acesso negado ao módulo AVA.');
     }
 
-    AvaReportsService.avaAccessCache.set(user.id, { hasAccess: true, timestamp: now });
+    AvaReportsService.avaAccessCache.set(user.id, {
+      hasAccess: true,
+      timestamp: now,
+    });
   }
 
   private parseProgress(value: any) {
-    if (value === null || value === undefined || value === "" || value === "-") return null;
-    const parsed = parseFloat(String(value).replace("%", "").replace(",", "."));
+    if (value === null || value === undefined || value === '' || value === '-')
+      return null;
+    const parsed = parseFloat(String(value).replace('%', '').replace(',', '.'));
     return isNaN(parsed) ? null : parsed;
   }
 
-  private calculateFaseStatus(mediaFase: number, dataInicio: Date, dataFim: Date) {
+  private calculateFaseStatus(
+    mediaFase: number,
+    dataInicio: Date,
+    dataFim: Date,
+  ) {
     const hoje = new Date();
-    if (hoje < dataInicio) return "neutral";
-    if (mediaFase >= 100) return "success";
-    if (hoje > dataFim) return "danger";
-    if (mediaFase < 40) return "danger";
-    return "warning";
+    if (hoje < dataInicio) return 'neutral';
+    if (mediaFase >= 100) return 'success';
+    if (hoje > dataFim) return 'danger';
+    if (mediaFase < 40) return 'danger';
+    return 'warning';
   }
 
   private isSemAcesso(value: unknown) {
-    return this.termosSemAcesso.includes(String(value || "").trim().toLowerCase());
+    return this.termosSemAcesso.includes(
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    );
   }
 
   private calculateDiasSemAcesso(lastaccess: unknown) {
-    const acessoStr = String(lastaccess || "").trim();
-    if (!acessoStr || this.isSemAcesso(acessoStr)) return "-";
+    const acessoStr = String(lastaccess || '').trim();
+    if (!acessoStr || this.isSemAcesso(acessoStr)) return '-';
 
-    const parts = acessoStr.split("/");
-    if (parts.length !== 3) return "-";
+    const parts = acessoStr.split('/');
+    if (parts.length !== 3) return '-';
 
     const d = parseInt(parts[0]);
     const m = parseInt(parts[1]) - 1;
     const y = parseInt(parts[2]);
-    if (isNaN(d) || isNaN(m) || isNaN(y)) return "-";
+    if (isNaN(d) || isNaN(m) || isNaN(y)) return '-';
 
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const dt = new Date(y, m, d);
-    const diff = Math.floor((hoje.getTime() - dt.getTime()) / (1000 * 60 * 60 * 24));
+    const diff = Math.floor(
+      (hoje.getTime() - dt.getTime()) / (1000 * 60 * 60 * 24),
+    );
     return String(diff >= 0 ? diff : 0);
   }
 
   private buildProgressConditions(filters: any) {
     const conditions: any[] = [];
 
-    if (filters.sourceInstitution) conditions.push(eq(avaProgressReport.sourceInstitution, filters.sourceInstitution));
-    if (filters.aluno) conditions.push(ilike(avaProgressReport.aluno, `%${filters.aluno}%`));
-    if (filters.curso) conditions.push(ilike(avaProgressReport.curso, `%${filters.curso}%`));
-    if (filters.usuario) conditions.push(ilike(avaProgressReport.usuario, `%${filters.usuario}%`));
-    if (filters.matricula) conditions.push(ilike(avaProgressReport.matricula, `%${filters.matricula}%`));
+    if (filters.sourceInstitution)
+      conditions.push(
+        eq(avaProgressReport.sourceInstitution, filters.sourceInstitution),
+      );
+    if (filters.aluno)
+      conditions.push(ilike(avaProgressReport.aluno, `%${filters.aluno}%`));
+    if (filters.curso)
+      conditions.push(ilike(avaProgressReport.curso, `%${filters.curso}%`));
+    if (filters.usuario)
+      conditions.push(ilike(avaProgressReport.usuario, `%${filters.usuario}%`));
+    if (filters.matricula)
+      conditions.push(
+        ilike(avaProgressReport.matricula, `%${filters.matricula}%`),
+      );
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
-    if (periodoFilter) conditions.push(ilike(avaProgressReport.periodo, `%${periodoFilter}%`));
+    const periodoFilter =
+      filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
+    if (periodoFilter)
+      conditions.push(ilike(avaProgressReport.periodo, `%${periodoFilter}%`));
 
-
-    if (filters.curso_perfil) conditions.push(ilike(avaProgressReport.cursoPerfil, `%${filters.curso_perfil}%`));
-    if (filters.periodo_perfil) conditions.push(ilike(avaProgressReport.periodoPerfil, `%${filters.periodo_perfil}%`));
-    if (filters.unidade_fisica) conditions.push(ilike(avaProgressReport.unidadeFisica, `%${filters.unidade_fisica}%`));
-    if (filters.enrolment_status) conditions.push(ilike(avaProgressReport.enrolmentStatus, `%${filters.enrolment_status}%`));
+    if (filters.curso_perfil)
+      conditions.push(
+        ilike(avaProgressReport.cursoPerfil, `%${filters.curso_perfil}%`),
+      );
+    if (filters.periodo_perfil)
+      conditions.push(
+        ilike(avaProgressReport.periodoPerfil, `%${filters.periodo_perfil}%`),
+      );
+    if (filters.unidade_fisica)
+      conditions.push(
+        ilike(avaProgressReport.unidadeFisica, `%${filters.unidade_fisica}%`),
+      );
+    if (filters.enrolment_status)
+      conditions.push(
+        ilike(
+          avaProgressReport.enrolmentStatus,
+          `%${filters.enrolment_status}%`,
+        ),
+      );
 
     const acesso_value = filters.lastaccess;
     const filtro_inatividade = filters.dias_sem_acesso;
 
-    if (acesso_value === "sem_acesso") {
-      conditions.push(or(
-        isNull(avaProgressReport.lastaccess),
-        inArray(sql`lower(trim(coalesce(${avaProgressReport.lastaccess}, '')))`, this.termosSemAcesso)
-      ));
-    } else if (acesso_value === "com_acesso") {
-      conditions.push(and(
-        isNotNull(avaProgressReport.lastaccess),
-        not(inArray(sql`lower(trim(coalesce(${avaProgressReport.lastaccess}, '')))`, this.termosSemAcesso))
-      ));
+    if (acesso_value === 'sem_acesso') {
+      conditions.push(
+        or(
+          isNull(avaProgressReport.lastaccess),
+          inArray(
+            sql`lower(trim(coalesce(${avaProgressReport.lastaccess}, '')))`,
+            this.termosSemAcesso,
+          ),
+        ),
+      );
+    } else if (acesso_value === 'com_acesso') {
+      conditions.push(
+        and(
+          isNotNull(avaProgressReport.lastaccess),
+          not(
+            inArray(
+              sql`lower(trim(coalesce(${avaProgressReport.lastaccess}, '')))`,
+              this.termosSemAcesso,
+            ),
+          ),
+        ),
+      );
     } else if (acesso_value) {
       conditions.push(ilike(avaProgressReport.lastaccess, `%${acesso_value}%`));
     }
 
     if (filtro_inatividade) {
-      if (filtro_inatividade.includes("-")) {
-        const [minD, maxD] = filtro_inatividade.split("-").map(Number);
+      if (filtro_inatividade.includes('-')) {
+        const [minD, maxD] = filtro_inatividade.split('-').map(Number);
         if (!isNaN(minD) && !isNaN(maxD)) {
-          conditions.push(sql`(${avaProgressReport.diasSemAcesso} ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer between ${minD} and ${maxD})`);
+          conditions.push(
+            sql`(${avaProgressReport.diasSemAcesso} ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer between ${minD} and ${maxD})`,
+          );
         }
       } else {
         const match = filtro_inatividade.match(/\d+/);
         if (match) {
           const valMin = parseInt(match[0]);
-          conditions.push(sql`(${avaProgressReport.diasSemAcesso} ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer >= ${valMin})`);
+          conditions.push(
+            sql`(${avaProgressReport.diasSemAcesso} ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer >= ${valMin})`,
+          );
         }
       }
     }
@@ -172,43 +287,83 @@ export class AvaReportsService {
   private buildGradesConditions(filters: any) {
     const conditions: any[] = [];
 
-    if (filters.sourceInstitution) conditions.push(eq(avaGradesReport.sourceInstitution, filters.sourceInstitution));
-    if (filters.aluno) conditions.push(ilike(avaGradesReport.studentName, `%${filters.aluno}%`));
-    if (filters.curso) conditions.push(ilike(avaGradesReport.courseFullname, `%${filters.curso}%`));
-    if (filters.usuario) conditions.push(ilike(avaGradesReport.userUsername, `%${filters.usuario}%`));
-    if (filters.matricula) conditions.push(ilike(avaGradesReport.userIdentification, `%${filters.matricula}%`));
+    if (filters.sourceInstitution)
+      conditions.push(
+        eq(avaGradesReport.sourceInstitution, filters.sourceInstitution),
+      );
+    if (filters.aluno)
+      conditions.push(ilike(avaGradesReport.studentName, `%${filters.aluno}%`));
+    if (filters.curso)
+      conditions.push(
+        ilike(avaGradesReport.courseFullname, `%${filters.curso}%`),
+      );
+    if (filters.usuario)
+      conditions.push(
+        ilike(avaGradesReport.userUsername, `%${filters.usuario}%`),
+      );
+    if (filters.matricula)
+      conditions.push(
+        ilike(avaGradesReport.userIdentification, `%${filters.matricula}%`),
+      );
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
-    if (periodoFilter) conditions.push(ilike(avaGradesReport.periodo, `%${periodoFilter}%`));
+    const periodoFilter =
+      filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
+    if (periodoFilter)
+      conditions.push(ilike(avaGradesReport.periodo, `%${periodoFilter}%`));
 
-
-    if (filters.curso_perfil) conditions.push(ilike(avaGradesReport.cursoPerfil, `%${filters.curso_perfil}%`));
-    if (filters.periodo_perfil) conditions.push(ilike(avaGradesReport.periodoPerfil, `%${filters.periodo_perfil}%`));
-    if (filters.unidade_fisica) conditions.push(ilike(avaGradesReport.unidadeFisica, `%${filters.unidade_fisica}%`));
-    if (filters.enrolment_status) conditions.push(ilike(avaGradesReport.enrolmentStatus, `%${filters.enrolment_status}%`));
+    if (filters.curso_perfil)
+      conditions.push(
+        ilike(avaGradesReport.cursoPerfil, `%${filters.curso_perfil}%`),
+      );
+    if (filters.periodo_perfil)
+      conditions.push(
+        ilike(avaGradesReport.periodoPerfil, `%${filters.periodo_perfil}%`),
+      );
+    if (filters.unidade_fisica)
+      conditions.push(
+        ilike(avaGradesReport.unidadeFisica, `%${filters.unidade_fisica}%`),
+      );
+    if (filters.enrolment_status)
+      conditions.push(
+        ilike(avaGradesReport.enrolmentStatus, `%${filters.enrolment_status}%`),
+      );
 
     const acesso_value = filters.lastaccess;
     const filtro_inatividade = filters.dias_sem_acesso;
 
-    if (acesso_value === "sem_acesso") {
-      conditions.push(or(
-        isNull(avaGradesReport.lastaccess),
-        inArray(sql`lower(trim(coalesce(${avaGradesReport.lastaccess}, '')))`, this.termosSemAcesso)
-      ));
-    } else if (acesso_value === "com_acesso") {
-      conditions.push(and(
-        isNotNull(avaGradesReport.lastaccess),
-        not(inArray(sql`lower(trim(coalesce(${avaGradesReport.lastaccess}, '')))`, this.termosSemAcesso))
-      ));
+    if (acesso_value === 'sem_acesso') {
+      conditions.push(
+        or(
+          isNull(avaGradesReport.lastaccess),
+          inArray(
+            sql`lower(trim(coalesce(${avaGradesReport.lastaccess}, '')))`,
+            this.termosSemAcesso,
+          ),
+        ),
+      );
+    } else if (acesso_value === 'com_acesso') {
+      conditions.push(
+        and(
+          isNotNull(avaGradesReport.lastaccess),
+          not(
+            inArray(
+              sql`lower(trim(coalesce(${avaGradesReport.lastaccess}, '')))`,
+              this.termosSemAcesso,
+            ),
+          ),
+        ),
+      );
     } else if (acesso_value) {
       conditions.push(ilike(avaGradesReport.lastaccess, `%${acesso_value}%`));
     }
 
     if (filtro_inatividade) {
-      if (filtro_inatividade.includes("-")) {
-        const [minD, maxD] = filtro_inatividade.split("-").map(Number);
+      if (filtro_inatividade.includes('-')) {
+        const [minD, maxD] = filtro_inatividade.split('-').map(Number);
         if (!isNaN(minD) && !isNaN(maxD)) {
-          conditions.push(sql`(${avaGradesReport.lastaccess} is not null and lower(trim(${avaGradesReport.lastaccess})) not in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-'))`);
+          conditions.push(
+            sql`(${avaGradesReport.lastaccess} is not null and lower(trim(${avaGradesReport.lastaccess})) not in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-'))`,
+          );
         }
       }
     }
@@ -216,14 +371,20 @@ export class AvaReportsService {
     return conditions.length > 0 ? and(...conditions) : undefined;
   }
 
-  async getProgressData(user: SessionUser, page: number, size: number, filters: any) {
+  async getProgressData(
+    user: SessionUser,
+    page: number,
+    size: number,
+    filters: any,
+  ) {
     await this.assertAvaAccess(user);
 
     try {
       const whereClause = this.buildProgressConditions(filters);
 
       // 1. Contagem total diretamente no PostgreSQL
-      const [countRes] = await this.db.select({ count: sql<number>`count(*)` })
+      const [countRes] = await this.db
+        .select({ count: sql<number>`count(*)` })
         .from(avaProgressReport)
         .where(whereClause);
 
@@ -232,37 +393,44 @@ export class AvaReportsService {
       const offset = (page - 1) * size;
 
       // 2. Busca paginada SQL com LIMIT e OFFSET (sem carregar base inteira na RAM)
-      const pageRows = total_records > 0
-        ? await this.db.select()
-            .from(avaProgressReport)
-            .where(whereClause)
-            .orderBy(avaProgressReport.aluno, avaProgressReport.curso, avaProgressReport.id)
-            .limit(size)
-            .offset(offset)
-        : [];
+      const pageRows =
+        total_records > 0
+          ? await this.db
+              .select()
+              .from(avaProgressReport)
+              .where(whereClause)
+              .orderBy(
+                avaProgressReport.aluno,
+                avaProgressReport.curso,
+                avaProgressReport.id,
+              )
+              .limit(size)
+              .offset(offset)
+          : [];
 
-      const data = pageRows.map(row => ({
+      const data = pageRows.map((row) => ({
         ...row,
         diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
       }));
 
       // 3. Agregações estatísticas em SQL nativo no PostgreSQL
-      const [statsRes] = await this.db.select({
-        avgTotal: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgF1: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.fase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgF2: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.fase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgF3: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.fase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        matSemAcesso: sql<number>`count(case when lower(trim(coalesce(${avaProgressReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
-        uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaProgressReport.alunoId}, ''), ${avaProgressReport.matricula}))`,
-        uniqueDisciplines: sql<number>`count(distinct ${avaProgressReport.curso})`,
-        belowExpected: sql<number>`count(case when (
+      const [statsRes] = await this.db
+        .select({
+          avgTotal: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgF1: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.fase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgF2: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.fase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgF3: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.fase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          matSemAcesso: sql<number>`count(case when lower(trim(coalesce(${avaProgressReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
+          uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaProgressReport.alunoId}, ''), ${avaProgressReport.matricula}))`,
+          uniqueDisciplines: sql<number>`count(distinct ${avaProgressReport.curso})`,
+          belowExpected: sql<number>`count(case when (
           (nullif(regexp_replace(${avaProgressReport.fase1}, '[^0-9.]', '', 'g'), '')::numeric < 40) or
           (nullif(regexp_replace(${avaProgressReport.fase2}, '[^0-9.]', '', 'g'), '')::numeric < 40) or
           (nullif(regexp_replace(${avaProgressReport.fase3}, '[^0-9.]', '', 'g'), '')::numeric < 40)
         ) then 1 end)`,
-      })
-      .from(avaProgressReport)
-      .where(whereClause);
+        })
+        .from(avaProgressReport)
+        .where(whereClause);
 
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
@@ -275,20 +443,34 @@ export class AvaReportsService {
       const inicio_f3 = phaseDates.fase3.inicio;
       const fim_f3 = phaseDates.fase3.fim;
 
-      const avg_total = statsRes?.avgTotal ? Math.round(Number(statsRes.avgTotal)) : 0;
+      const avg_total = statsRes?.avgTotal
+        ? Math.round(Number(statsRes.avgTotal))
+        : 0;
       const avg_f1 = statsRes?.avgF1 ? Math.round(Number(statsRes.avgF1)) : 0;
       const avg_f2 = statsRes?.avgF2 ? Math.round(Number(statsRes.avgF2)) : 0;
       const avg_f3 = statsRes?.avgF3 ? Math.round(Number(statsRes.avgF3)) : 0;
 
       const status_f1 = this.calculateFaseStatus(avg_f1, inicio_f1, fim_f1);
-      const status_f2 = hoje >= inicio_f2 ? this.calculateFaseStatus(avg_f2, inicio_f2, fim_f2) : 'neutral';
-      const status_f3 = hoje >= inicio_f3 ? this.calculateFaseStatus(avg_f3, inicio_f3, fim_f3) : 'neutral';
+      const status_f2 =
+        hoje >= inicio_f2
+          ? this.calculateFaseStatus(avg_f2, inicio_f2, fim_f2)
+          : 'neutral';
+      const status_f3 =
+        hoje >= inicio_f3
+          ? this.calculateFaseStatus(avg_f3, inicio_f3, fim_f3)
+          : 'neutral';
 
       const below_expected_count = Number(statsRes?.belowExpected || 0);
-      const average_below_expected = total_records > 0 ? Math.round((below_expected_count / total_records) * 100) : 0;
+      const average_below_expected =
+        total_records > 0
+          ? Math.round((below_expected_count / total_records) * 100)
+          : 0;
 
       const count_mat_sem_acesso = Number(statsRes?.matSemAcesso || 0);
-      const percent_mat_sem_acesso = total_records > 0 ? Math.round((count_mat_sem_acesso / total_records) * 100) : 0;
+      const percent_mat_sem_acesso =
+        total_records > 0
+          ? Math.round((count_mat_sem_acesso / total_records) * 100)
+          : 0;
 
       const total_alunos_unicos = Number(statsRes?.uniqueStudents || 0);
       const total_disciplinas = Number(statsRes?.uniqueDisciplines || 0);
@@ -304,17 +486,36 @@ export class AvaReportsService {
         average_below_expected,
         total_disciplines: total_disciplinas,
         critical_disciplines: 0,
-        average_fase1: avg_f1, status_fase1: status_f1, f1_below: 0, f1_crit: 0,
-        average_fase2: avg_f2, status_fase2: status_f2, f2_below: 0, f2_crit: 0,
-        average_fase3: avg_f3, status_fase3: status_f3, f3_below: 0, f3_crit: 0,
-        count_mat_sem_acesso, percent_mat_sem_acesso, count_alunos_sem_acesso: count_mat_sem_acesso, percent_alunos_sem_acesso: percent_mat_sem_acesso,
+        average_fase1: avg_f1,
+        status_fase1: status_f1,
+        f1_below: 0,
+        f1_crit: 0,
+        average_fase2: avg_f2,
+        status_fase2: status_f2,
+        f2_below: 0,
+        f2_crit: 0,
+        average_fase3: avg_f3,
+        status_fase3: status_f3,
+        f3_below: 0,
+        f3_crit: 0,
+        count_mat_sem_acesso,
+        percent_mat_sem_acesso,
+        count_alunos_sem_acesso: count_mat_sem_acesso,
+        percent_alunos_sem_acesso: percent_mat_sem_acesso,
         total_alunos_unicos,
         matriculas_em_dia: Math.max(0, total_records - below_expected_count),
-        percent_matriculas_em_dia: total_records > 0 ? Math.round((Math.max(0, total_records - below_expected_count) / total_records) * 100) : 0,
+        percent_matriculas_em_dia:
+          total_records > 0
+            ? Math.round(
+                (Math.max(0, total_records - below_expected_count) /
+                  total_records) *
+                  100,
+              )
+            : 0,
       };
     } catch (error) {
-      console.error("Erro em getProgressData:", error);
-      throw new Error("Falha ao buscar dados de progresso");
+      console.error('Erro em getProgressData:', error);
+      throw new Error('Falha ao buscar dados de progresso');
     }
   }
 
@@ -323,102 +524,195 @@ export class AvaReportsService {
 
     try {
       const whereClause = this.buildProgressConditions(filters);
-      const rawData = await this.db.select()
+      const rawData = await this.db
+        .select()
         .from(avaProgressReport)
         .where(whereClause)
         .orderBy(avaProgressReport.aluno, avaProgressReport.curso)
         .limit(20000); // Teto de segurança para evitar saturação de streaming
 
-      return rawData.map(row => ({
+      return rawData.map((row) => ({
         ...row,
         diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
       }));
     } catch (error) {
-      console.error("Erro ao buscar dados para exportação:", error);
-      throw new Error("Falha ao exportar dados");
+      console.error('Erro ao buscar dados para exportação:', error);
+      throw new Error('Falha ao exportar dados');
     }
   }
 
-  async syncMoodleData(user: SessionUser, institution?: string, type?: 'grades' | 'progress') {
+  async syncMoodleData(
+    user: SessionUser,
+    institution?: string,
+    type?: 'grades' | 'progress',
+  ) {
     await this.assertAvaAccess(user);
 
     try {
       const inst = institution?.toLowerCase() || 'ead';
       const allTasks = [
-        { name: 'ead', type: 'grades', get: process.env.MOODLE_EAD_GRADES_GET_URL, att: process.env.MOODLE_EAD_GRADES_ATT_URL },
-        { name: 'ead', type: 'progress', get: process.env.MOODLE_EAD_PROGRESS_GET_URL, att: process.env.MOODLE_EAD_PROGRESS_ATT_URL },
-        { name: 'uni', type: 'grades', get: process.env.MOODLE_UNI_GRADES_GET_URL, att: process.env.MOODLE_UNI_GRADES_ATT_URL },
-        { name: 'uni', type: 'progress', get: process.env.MOODLE_UNI_PROGRESS_GET_URL, att: process.env.MOODLE_UNI_PROGRESS_ATT_URL },
-        { name: 'uniego', type: 'grades', get: process.env.MOODLE_UNIEGO_GRADES_GET_URL, att: process.env.MOODLE_UNIEGO_GRADES_ATT_URL },
-        { name: 'uniego', type: 'progress', get: process.env.MOODLE_UNIEGO_PROGRESS_GET_URL, att: process.env.MOODLE_UNIEGO_PROGRESS_ATT_URL },
-        { name: 'raizes', type: 'grades', get: process.env.MOODLE_RAIZES_GRADES_GET_URL, att: process.env.MOODLE_RAIZES_GRADES_ATT_URL },
-        { name: 'raizes', type: 'progress', get: process.env.MOODLE_RAIZES_PROGRESS_GET_URL, att: process.env.MOODLE_RAIZES_PROGRESS_ATT_URL },
-        { name: 'eefn', type: 'grades', get: process.env.MOODLE_EEFN_GRADES_GET_URL, att: process.env.MOODLE_EEFN_GRADES_ATT_URL },
-        { name: 'eefn', type: 'progress', get: process.env.MOODLE_EEFN_PROGRESS_GET_URL, att: process.env.MOODLE_EEFN_PROGRESS_ATT_URL },
-        { name: 'pos', type: 'grades', get: process.env.MOODLE_POS_GRADES_GET_URL, att: process.env.MOODLE_POS_GRADES_ATT_URL },
+        {
+          name: 'ead',
+          type: 'grades',
+          get: process.env.MOODLE_EAD_GRADES_GET_URL,
+          att: process.env.MOODLE_EAD_GRADES_ATT_URL,
+        },
+        {
+          name: 'ead',
+          type: 'progress',
+          get: process.env.MOODLE_EAD_PROGRESS_GET_URL,
+          att: process.env.MOODLE_EAD_PROGRESS_ATT_URL,
+        },
+        {
+          name: 'uni',
+          type: 'grades',
+          get: process.env.MOODLE_UNI_GRADES_GET_URL,
+          att: process.env.MOODLE_UNI_GRADES_ATT_URL,
+        },
+        {
+          name: 'uni',
+          type: 'progress',
+          get: process.env.MOODLE_UNI_PROGRESS_GET_URL,
+          att: process.env.MOODLE_UNI_PROGRESS_ATT_URL,
+        },
+        {
+          name: 'uniego',
+          type: 'grades',
+          get: process.env.MOODLE_UNIEGO_GRADES_GET_URL,
+          att: process.env.MOODLE_UNIEGO_GRADES_ATT_URL,
+        },
+        {
+          name: 'uniego',
+          type: 'progress',
+          get: process.env.MOODLE_UNIEGO_PROGRESS_GET_URL,
+          att: process.env.MOODLE_UNIEGO_PROGRESS_ATT_URL,
+        },
+        {
+          name: 'raizes',
+          type: 'grades',
+          get: process.env.MOODLE_RAIZES_GRADES_GET_URL,
+          att: process.env.MOODLE_RAIZES_GRADES_ATT_URL,
+        },
+        {
+          name: 'raizes',
+          type: 'progress',
+          get: process.env.MOODLE_RAIZES_PROGRESS_GET_URL,
+          att: process.env.MOODLE_RAIZES_PROGRESS_ATT_URL,
+        },
+        {
+          name: 'eefn',
+          type: 'grades',
+          get: process.env.MOODLE_EEFN_GRADES_GET_URL,
+          att: process.env.MOODLE_EEFN_GRADES_ATT_URL,
+        },
+        {
+          name: 'eefn',
+          type: 'progress',
+          get: process.env.MOODLE_EEFN_PROGRESS_GET_URL,
+          att: process.env.MOODLE_EEFN_PROGRESS_ATT_URL,
+        },
+        {
+          name: 'pos',
+          type: 'grades',
+          get: process.env.MOODLE_POS_GRADES_GET_URL,
+          att: process.env.MOODLE_POS_GRADES_ATT_URL,
+        },
       ];
 
       let tasksToProcess = allTasks;
-      if (institution) tasksToProcess = tasksToProcess.filter(t => t.name === inst);
-      if (type) tasksToProcess = tasksToProcess.filter(t => t.type === type);
+      if (institution)
+        tasksToProcess = tasksToProcess.filter((t) => t.name === inst);
+      if (type) tasksToProcess = tasksToProcess.filter((t) => t.type === type);
 
       if (tasksToProcess.length === 0) {
-        throw new BadRequestException('Nenhuma tarefa de sincronização correspondente encontrada.');
+        throw new BadRequestException(
+          'Nenhuma tarefa de sincronização correspondente encontrada.',
+        );
       }
 
       const results: any[] = [];
       for (const task of tasksToProcess) {
-        const res = task.type === 'grades'
-          ? await this.avaSyncService.syncGrades(task.name, task.get, task.att)
-          : await this.avaSyncService.syncProgress(task.name, task.get, task.att);
+        const res =
+          task.type === 'grades'
+            ? await this.avaSyncService.syncGrades(
+                task.name,
+                task.get,
+                task.att,
+              )
+            : await this.avaSyncService.syncProgress(
+                task.name,
+                task.get,
+                task.att,
+              );
         results.push(res);
       }
 
-      const onlyErrors = results.filter(r => r.status === 'error');
-      const onlySkipped = results.filter(r => r.status === 'skipped');
-      const onlyQueued = results.filter(r => r.status === 'queued');
-      const onlySuccess = results.filter(r => r.status === 'success');
+      const onlyErrors = results.filter((r) => r.status === 'error');
+      const onlySkipped = results.filter((r) => r.status === 'skipped');
+      const onlyQueued = results.filter((r) => r.status === 'queued');
+      const onlySuccess = results.filter((r) => r.status === 'success');
 
       if (onlySkipped.length === results.length && results.length > 0) {
-        const reasons = results.map(r => `${r.source}: ${r.reason || r.status}`).join('; ');
-        throw new BadRequestException(`Sincronização não executada: ${reasons}`);
+        const reasons = results
+          .map((r) => `${r.source}: ${r.reason || r.status}`)
+          .join('; ');
+        throw new BadRequestException(
+          `Sincronização não executada: ${reasons}`,
+        );
       }
 
       if (onlyErrors.length === results.length && results.length > 0) {
-        const reasons = results.map(r => `${r.source}: ${r.reason || r.status}`).join('; ');
+        const reasons = results
+          .map((r) => `${r.source}: ${r.reason || r.status}`)
+          .join('; ');
         throw new BadRequestException(`Falha na sincronização: ${reasons}`);
       }
 
       const hasQueued = onlyQueued.length > 0;
       let message = 'Sincronização concluída com sucesso.';
       if (hasQueued && onlySuccess.length === 0) {
-        message = 'Solicitação de geração enviada ao Moodle com sucesso. O relatório está sendo processado na fila do Moodle e estará pronto em instantes.';
+        message =
+          'Solicitação de geração enviada ao Moodle com sucesso. O relatório está sendo processado na fila do Moodle e estará pronto em instantes.';
       } else if (hasQueued && onlySuccess.length > 0) {
-        message = 'Dados disponíveis sincronizados com sucesso. Os relatórios pendentes foram solicitados ao Moodle e estão sendo gerados.';
+        message =
+          'Dados disponíveis sincronizados com sucesso. Os relatórios pendentes foram solicitados ao Moodle e estão sendo gerados.';
       }
 
       return { success: true, queued: hasQueued, message, results };
     } catch (error: any) {
-      console.error("Erro na action de sync:", error);
-      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+      console.error('Erro na action de sync:', error);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException
+      ) {
         throw error;
       }
-      throw new BadRequestException(error.message || "Erro interno na sincronização");
+      throw new BadRequestException(
+        error.message || 'Erro interno na sincronização',
+      );
     }
-
-
   }
 
-
-  async getGradesData(user: SessionUser, page: number, size: number, filters: any) {
+  async getGradesData(
+    user: SessionUser,
+    page: number,
+    size: number,
+    filters: any,
+  ) {
     await this.assertAvaAccess(user);
 
     try {
       const whereClause = this.buildGradesConditions(filters);
 
       const parseGrade = (value: any) => {
-        if (value === null || value === undefined || value === "" || value === "-") return null;
-        const parsed = parseFloat(String(value).replace(",", "."));
+        if (
+          value === null ||
+          value === undefined ||
+          value === '' ||
+          value === '-'
+        )
+          return null;
+        const parsed = parseFloat(String(value).replace(',', '.'));
         return isNaN(parsed) ? null : parsed;
       };
 
@@ -431,7 +725,8 @@ export class AvaReportsService {
       const getNormalizedGrade = (value: any) => normalize(parseGrade(value));
 
       // 1. Contagem total de registros no PostgreSQL
-      const [countRes] = await this.db.select({ count: sql<number>`count(*)` })
+      const [countRes] = await this.db
+        .select({ count: sql<number>`count(*)` })
         .from(avaGradesReport)
         .where(whereClause);
 
@@ -440,62 +735,76 @@ export class AvaReportsService {
       const offset = (page - 1) * size;
 
       const joinCondition = and(
-        eq(avaProgressReport.sourceInstitution, avaGradesReport.sourceInstitution),
-        or(
-          and(isNotNull(avaGradesReport.userId), eq(avaGradesReport.userId, avaProgressReport.alunoId)),
-          and(isNotNull(avaGradesReport.userIdentification), eq(avaGradesReport.userIdentification, avaProgressReport.matricula))
+        eq(
+          avaProgressReport.sourceInstitution,
+          avaGradesReport.sourceInstitution,
         ),
-        eq(avaProgressReport.curso, avaGradesReport.courseFullname)
+        or(
+          and(
+            isNotNull(avaGradesReport.userId),
+            eq(avaGradesReport.userId, avaProgressReport.alunoId),
+          ),
+          and(
+            isNotNull(avaGradesReport.userIdentification),
+            eq(avaGradesReport.userIdentification, avaProgressReport.matricula),
+          ),
+        ),
+        eq(avaProgressReport.curso, avaGradesReport.courseFullname),
       );
 
       // 2. Consulta paginada no PostgreSQL
-      const pageRows = total_records > 0
-        ? await this.db.select({
-            id: avaGradesReport.id,
-            sourceInstitution: avaGradesReport.sourceInstitution,
-            courseId: avaGradesReport.courseId,
-            courseFullname: avaGradesReport.courseFullname,
-            courseShortname: avaGradesReport.courseShortname,
-            userId: avaGradesReport.userId,
-            userIdentification: avaGradesReport.userIdentification,
-            userUsername: avaGradesReport.userUsername,
-            studentName: avaGradesReport.studentName,
-            userEmail: avaGradesReport.userEmail,
-            userPhone1: avaGradesReport.userPhone1,
-            userPhone2: avaGradesReport.userPhone2,
-            enrolmentStatus: avaGradesReport.enrolmentStatus,
-            cursoPerfil: avaGradesReport.cursoPerfil,
-            periodoPerfil: avaGradesReport.periodoPerfil,
-            unidadeFisica: avaGradesReport.unidadeFisica,
-            periodo: avaGradesReport.periodo,
-            fase1: avaGradesReport.fase1,
-            fase2: avaGradesReport.fase2,
-            fase3: avaGradesReport.fase3,
-            media: avaGradesReport.media,
-            customCourse: avaGradesReport.customCourse,
-            lastaccess: avaGradesReport.lastaccess,
-            updatedAt: avaGradesReport.updatedAt,
-            // Joined Progress / Activities & Notes
-            listaFase1: sql<string>`coalesce(nullif(${avaGradesReport.listaFase1}, ''), ${avaProgressReport.listaFase1})`,
-            listaFase2: sql<string>`coalesce(nullif(${avaGradesReport.listaFase2}, ''), ${avaProgressReport.listaFase2})`,
-            listaFase3: sql<string>`coalesce(nullif(${avaGradesReport.listaFase3}, ''), ${avaProgressReport.listaFase3})`,
-            listaNotas: avaGradesReport.listaNotas,
-            progressoFase1: avaProgressReport.fase1,
-            progressoFase2: avaProgressReport.fase2,
-            progressoFase3: avaProgressReport.fase3,
-            progressoTotal: avaProgressReport.progressoTotal,
-          })
+      const pageRows =
+        total_records > 0
+          ? await this.db
+              .select({
+                id: avaGradesReport.id,
+                sourceInstitution: avaGradesReport.sourceInstitution,
+                courseId: avaGradesReport.courseId,
+                courseFullname: avaGradesReport.courseFullname,
+                courseShortname: avaGradesReport.courseShortname,
+                userId: avaGradesReport.userId,
+                userIdentification: avaGradesReport.userIdentification,
+                userUsername: avaGradesReport.userUsername,
+                studentName: avaGradesReport.studentName,
+                userEmail: avaGradesReport.userEmail,
+                userPhone1: avaGradesReport.userPhone1,
+                userPhone2: avaGradesReport.userPhone2,
+                enrolmentStatus: avaGradesReport.enrolmentStatus,
+                cursoPerfil: avaGradesReport.cursoPerfil,
+                periodoPerfil: avaGradesReport.periodoPerfil,
+                unidadeFisica: avaGradesReport.unidadeFisica,
+                periodo: avaGradesReport.periodo,
+                fase1: avaGradesReport.fase1,
+                fase2: avaGradesReport.fase2,
+                fase3: avaGradesReport.fase3,
+                media: avaGradesReport.media,
+                customCourse: avaGradesReport.customCourse,
+                lastaccess: avaGradesReport.lastaccess,
+                updatedAt: avaGradesReport.updatedAt,
+                // Joined Progress / Activities & Notes
+                listaFase1: sql<string>`coalesce(nullif(${avaGradesReport.listaFase1}, ''), ${avaProgressReport.listaFase1})`,
+                listaFase2: sql<string>`coalesce(nullif(${avaGradesReport.listaFase2}, ''), ${avaProgressReport.listaFase2})`,
+                listaFase3: sql<string>`coalesce(nullif(${avaGradesReport.listaFase3}, ''), ${avaProgressReport.listaFase3})`,
+                listaNotas: avaGradesReport.listaNotas,
+                progressoFase1: avaProgressReport.fase1,
+                progressoFase2: avaProgressReport.fase2,
+                progressoFase3: avaProgressReport.fase3,
+                progressoTotal: avaProgressReport.progressoTotal,
+              })
 
-          .from(avaGradesReport)
-          .leftJoin(avaProgressReport, joinCondition)
-          .where(whereClause)
-          .orderBy(avaGradesReport.studentName, avaGradesReport.courseFullname, avaGradesReport.id)
-          .limit(size)
-          .offset(offset)
-        : [];
+              .from(avaGradesReport)
+              .leftJoin(avaProgressReport, joinCondition)
+              .where(whereClause)
+              .orderBy(
+                avaGradesReport.studentName,
+                avaGradesReport.courseFullname,
+                avaGradesReport.id,
+              )
+              .limit(size)
+              .offset(offset)
+          : [];
 
-
-      const data = pageRows.map(row => {
+      const data = pageRows.map((row) => {
         const f1Norm = getNormalizedGrade(row.fase1);
         const f2Norm = getNormalizedGrade(row.fase2);
         const f3Norm = getNormalizedGrade(row.fase3);
@@ -507,50 +816,66 @@ export class AvaReportsService {
           fase2: f2Norm !== null ? String(f2Norm) : row.fase2,
           fase3: f3Norm !== null ? String(f3Norm) : row.fase3,
           media: mediaNorm !== null ? String(mediaNorm) : row.media,
-          diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess)
+          diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
         };
       });
 
       // 3. Agregações estatísticas gerais via SQL
-      const [statsRes] = await this.db.select({
-        avgMedia: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgF1: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.fase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgF2: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.fase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgF3: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.fase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        approvedCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) >= 60 then 1 end)`,
-        belowExpectedCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
-        criticalCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 30 then 1 end)`,
-        semNotaCount: sql<number>`count(case when nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '') is null then 1 end)`,
-        matSemAcesso: sql<number>`count(case when lower(trim(coalesce(${avaGradesReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
-        uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaGradesReport.userIdentification}, ''), ${avaGradesReport.studentName}))`,
-        uniqueDisciplines: sql<number>`count(distinct ${avaGradesReport.courseFullname})`,
-      })
-      .from(avaGradesReport)
-      .where(whereClause);
+      const [statsRes] = await this.db
+        .select({
+          avgMedia: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgF1: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.fase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgF2: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.fase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgF3: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.fase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          approvedCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) >= 60 then 1 end)`,
+          belowExpectedCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
+          criticalCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 30 then 1 end)`,
+          semNotaCount: sql<number>`count(case when nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '') is null then 1 end)`,
+          matSemAcesso: sql<number>`count(case when lower(trim(coalesce(${avaGradesReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
+          uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaGradesReport.userIdentification}, ''), ${avaGradesReport.studentName}))`,
+          uniqueDisciplines: sql<number>`count(distinct ${avaGradesReport.courseFullname})`,
+        })
+        .from(avaGradesReport)
+        .where(whereClause);
 
       // 4. Ranking de melhores e piores disciplinas via GROUP BY SQL
-      const coursesRes = await this.db.select({
-        name: avaGradesReport.courseFullname,
-        average: sql<number>`round(avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric), 1)`,
-      })
-      .from(avaGradesReport)
-      .where(whereClause)
-      .groupBy(avaGradesReport.courseFullname)
-      .having(sql`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) is not null`)
-      .limit(100);
+      const coursesRes = await this.db
+        .select({
+          name: avaGradesReport.courseFullname,
+          average: sql<number>`round(avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric), 1)`,
+        })
+        .from(avaGradesReport)
+        .where(whereClause)
+        .groupBy(avaGradesReport.courseFullname)
+        .having(
+          sql`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) is not null`,
+        )
+        .limit(100);
 
-      const courses = coursesRes.map(c => ({
+      const courses = coursesRes.map((c) => ({
         name: c.name || 'Disciplina',
-        average: Number(c.average || 0)
+        average: Number(c.average || 0),
       }));
 
-      const worstCourses = [...courses].sort((a, b) => a.average - b.average).slice(0, 5);
-      const bestCourses = [...courses].sort((a, b) => b.average - a.average).slice(0, 5);
+      const worstCourses = [...courses]
+        .sort((a, b) => a.average - b.average)
+        .slice(0, 5);
+      const bestCourses = [...courses]
+        .sort((a, b) => b.average - a.average)
+        .slice(0, 5);
 
-      const avg_total = statsRes?.avgMedia ? Number(Number(statsRes.avgMedia).toFixed(1)) : 0;
-      const avg_f1 = statsRes?.avgF1 ? Number(Number(statsRes.avgF1).toFixed(1)) : 0;
-      const avg_f2 = statsRes?.avgF2 ? Number(Number(statsRes.avgF2).toFixed(1)) : 0;
-      const avg_f3 = statsRes?.avgF3 ? Number(Number(statsRes.avgF3).toFixed(1)) : 0;
+      const avg_total = statsRes?.avgMedia
+        ? Number(Number(statsRes.avgMedia).toFixed(1))
+        : 0;
+      const avg_f1 = statsRes?.avgF1
+        ? Number(Number(statsRes.avgF1).toFixed(1))
+        : 0;
+      const avg_f2 = statsRes?.avgF2
+        ? Number(Number(statsRes.avgF2).toFixed(1))
+        : 0;
+      const avg_f3 = statsRes?.avgF3
+        ? Number(Number(statsRes.avgF3).toFixed(1))
+        : 0;
 
       const approved_count = Number(statsRes?.approvedCount || 0);
       const below_expected_count = Number(statsRes?.belowExpectedCount || 0);
@@ -570,40 +895,70 @@ export class AvaReportsService {
         average_fase1: avg_f1,
         average_fase2: avg_f2,
         average_fase3: avg_f3,
-        percent_acima_aprovacao: total_records > 0 ? Math.round((approved_count / total_records) * 100) : 0,
+        percent_acima_aprovacao:
+          total_records > 0
+            ? Math.round((approved_count / total_records) * 100)
+            : 0,
         below_expected: below_expected_count,
-        average_below_expected: total_records > 0 ? Math.round((below_expected_count / total_records) * 100) : 0,
+        average_below_expected:
+          total_records > 0
+            ? Math.round((below_expected_count / total_records) * 100)
+            : 0,
         f1_below_percent: 0,
         f2_below_percent: 0,
         f3_below_percent: 0,
-        percent_critical: total_records > 0 ? Math.round((critical_count / total_records) * 100) : 0,
+        percent_critical:
+          total_records > 0
+            ? Math.round((critical_count / total_records) * 100)
+            : 0,
         f1_crit_percent: 0,
         f2_crit_percent: 0,
         f3_crit_percent: 0,
         count_mat_sem_acesso,
-        percent_mat_sem_acesso: total_records > 0 ? Math.round((count_mat_sem_acesso / total_records) * 100) : 0,
+        percent_mat_sem_acesso:
+          total_records > 0
+            ? Math.round((count_mat_sem_acesso / total_records) * 100)
+            : 0,
         count_alunos_sem_acesso: count_mat_sem_acesso,
-        percent_alunos_sem_acesso: total_alunos_unicos > 0 ? Math.round((count_mat_sem_acesso / total_alunos_unicos) * 100) : 0,
+        percent_alunos_sem_acesso:
+          total_alunos_unicos > 0
+            ? Math.round((count_mat_sem_acesso / total_alunos_unicos) * 100)
+            : 0,
         total_alunos_unicos,
         percent_sem_acesso_nota_critica: 0,
         mediana: avg_total,
         nota_minima: 0,
         nota_maxima: 100,
-        approved_percent: total_records > 0 ? Math.round((approved_count / total_records) * 100) : 0,
-        reproved_percent: total_records > 0 ? Math.round((below_expected_count / total_records) * 100) : 0,
-        sem_nota_percent: total_records > 0 ? Math.round((sem_nota_count / total_records) * 100) : 0,
+        approved_percent:
+          total_records > 0
+            ? Math.round((approved_count / total_records) * 100)
+            : 0,
+        reproved_percent:
+          total_records > 0
+            ? Math.round((below_expected_count / total_records) * 100)
+            : 0,
+        sem_nota_percent:
+          total_records > 0
+            ? Math.round((sem_nota_count / total_records) * 100)
+            : 0,
         histogram_percents: {
-          range_0_3: total_records > 0 ? Math.round((critical_count / total_records) * 100) : 0,
+          range_0_3:
+            total_records > 0
+              ? Math.round((critical_count / total_records) * 100)
+              : 0,
           range_3_5: 0,
           range_5_6: 0,
           range_6_7: 0,
           range_7_8: 0,
           range_8_9: 0,
-          range_9_10: total_records > 0 ? Math.round((approved_count / total_records) * 100) : 0,
+          range_9_10:
+            total_records > 0
+              ? Math.round((approved_count / total_records) * 100)
+              : 0,
         },
         total_disciplines,
-        critical_disciplines: courses.filter(c => c.average < 60).length,
-        excellent_disciplines: courses.filter(c => c.average >= 80).length,
+        critical_disciplines: courses.filter((c) => c.average < 60).length,
+        excellent_disciplines: courses.filter((c) => c.average >= 80).length,
         worstCourses,
         bestCourses,
         count_critical_grade: below_expected_count,
@@ -611,8 +966,8 @@ export class AvaReportsService {
         count_no_grade: sem_nota_count,
       };
     } catch (error) {
-      console.error("Erro em getGradesData:", error);
-      throw new Error("Falha ao buscar dados de notas");
+      console.error('Erro em getGradesData:', error);
+      throw new Error('Falha ao buscar dados de notas');
     }
   }
 
@@ -621,73 +976,122 @@ export class AvaReportsService {
 
     try {
       const whereClause = this.buildGradesConditions(filters);
-      const rawData = await this.db.select()
+      const rawData = await this.db
+        .select()
         .from(avaGradesReport)
         .where(whereClause)
         .orderBy(avaGradesReport.studentName, avaGradesReport.courseFullname)
         .limit(20000); // Teto de segurança para exportação
 
-      return rawData.map(row => ({
+      return rawData.map((row) => ({
         ...row,
         diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
       }));
     } catch (error) {
-      console.error("Erro ao exportar dados de notas:", error);
-      throw new Error("Falha ao exportar dados");
+      console.error('Erro ao exportar dados de notas:', error);
+      throw new Error('Falha ao exportar dados');
     }
   }
 
   private buildConsolidatedConditions(filters: any) {
     const conditions: any[] = [];
     const sourceInstitution = filters.sourceInstitution || 'ead';
-    conditions.push(eq(avaConsolidatedReport.sourceInstitution, sourceInstitution));
+    conditions.push(
+      eq(avaConsolidatedReport.sourceInstitution, sourceInstitution),
+    );
 
-    if (filters.aluno) conditions.push(ilike(avaConsolidatedReport.aluno, `%${filters.aluno}%`));
-    if (filters.matricula) conditions.push(ilike(avaConsolidatedReport.matricula, `%${filters.matricula}%`));
-    if (filters.usuario) conditions.push(ilike(avaConsolidatedReport.usuario, `%${filters.usuario}%`));
-    if (filters.curso) conditions.push(ilike(avaConsolidatedReport.curso, `%${filters.curso}%`));
-    if (filters.unidade_fisica) conditions.push(ilike(avaConsolidatedReport.unidadeFisica, `%${filters.unidade_fisica}%`));
-    if (filters.enrolment_status) conditions.push(ilike(avaConsolidatedReport.enrolmentStatus, `%${filters.enrolment_status}%`));
+    if (filters.aluno)
+      conditions.push(ilike(avaConsolidatedReport.aluno, `%${filters.aluno}%`));
+    if (filters.matricula)
+      conditions.push(
+        ilike(avaConsolidatedReport.matricula, `%${filters.matricula}%`),
+      );
+    if (filters.usuario)
+      conditions.push(
+        ilike(avaConsolidatedReport.usuario, `%${filters.usuario}%`),
+      );
+    if (filters.curso)
+      conditions.push(ilike(avaConsolidatedReport.curso, `%${filters.curso}%`));
+    if (filters.unidade_fisica)
+      conditions.push(
+        ilike(
+          avaConsolidatedReport.unidadeFisica,
+          `%${filters.unidade_fisica}%`,
+        ),
+      );
+    if (filters.enrolment_status)
+      conditions.push(
+        ilike(
+          avaConsolidatedReport.enrolmentStatus,
+          `%${filters.enrolment_status}%`,
+        ),
+      );
 
-    const periodoFilter = filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
-    if (periodoFilter) conditions.push(ilike(avaConsolidatedReport.periodo, `%${periodoFilter}%`));
+    const periodoFilter =
+      filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
+    if (periodoFilter)
+      conditions.push(
+        ilike(avaConsolidatedReport.periodo, `%${periodoFilter}%`),
+      );
 
     if (filters.search) {
       const s = `%${filters.search}%`;
-      conditions.push(or(
-        ilike(avaConsolidatedReport.aluno, s),
-        ilike(avaConsolidatedReport.matricula, s),
-        ilike(avaConsolidatedReport.usuario, s),
-        ilike(avaConsolidatedReport.curso, s)
-      ));
+      conditions.push(
+        or(
+          ilike(avaConsolidatedReport.aluno, s),
+          ilike(avaConsolidatedReport.matricula, s),
+          ilike(avaConsolidatedReport.usuario, s),
+          ilike(avaConsolidatedReport.curso, s),
+        ),
+      );
     }
 
     const acesso_value = filters.lastaccess;
-    if (acesso_value === "sem_acesso") {
-      conditions.push(or(
-        isNull(avaConsolidatedReport.lastaccess),
-        inArray(sql`lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, '')))`, this.termosSemAcesso)
-      ));
-    } else if (acesso_value === "com_acesso") {
-      conditions.push(and(
-        isNotNull(avaConsolidatedReport.lastaccess),
-        not(inArray(sql`lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, '')))`, this.termosSemAcesso))
-      ));
+    if (acesso_value === 'sem_acesso') {
+      conditions.push(
+        or(
+          isNull(avaConsolidatedReport.lastaccess),
+          inArray(
+            sql`lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, '')))`,
+            this.termosSemAcesso,
+          ),
+        ),
+      );
+    } else if (acesso_value === 'com_acesso') {
+      conditions.push(
+        and(
+          isNotNull(avaConsolidatedReport.lastaccess),
+          not(
+            inArray(
+              sql`lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, '')))`,
+              this.termosSemAcesso,
+            ),
+          ),
+        ),
+      );
     } else if (acesso_value) {
-      conditions.push(ilike(avaConsolidatedReport.lastaccess, `%${acesso_value}%`));
+      conditions.push(
+        ilike(avaConsolidatedReport.lastaccess, `%${acesso_value}%`),
+      );
     }
 
     return and(...conditions);
   }
 
-  async getConsolidatedData(user: SessionUser, page: number, size: number, filters: any) {
+  async getConsolidatedData(
+    user: SessionUser,
+    page: number,
+    size: number,
+    filters: any,
+  ) {
     await this.assertAvaAccess(user);
 
     try {
       const whereClause = this.buildConsolidatedConditions(filters);
 
       // 1. Contagem total ultrarrápida no snapshot
-      const [countRes] = await this.db.select({ count: sql<number>`count(*)` })
+      const [countRes] = await this.db
+        .select({ count: sql<number>`count(*)` })
         .from(avaConsolidatedReport)
         .where(whereClause);
 
@@ -696,54 +1100,60 @@ export class AvaReportsService {
       const offset = (page - 1) * size;
 
       // 2. Busca paginada direta no Snapshot (Zero Left Joins em runtime - ~14ms!)
-      const pageRows = total_records > 0
-        ? await this.db.select({
-            id: avaConsolidatedReport.id,
-            alunoId: avaConsolidatedReport.alunoId,
-            matricula: avaConsolidatedReport.matricula,
-            usuario: avaConsolidatedReport.usuario,
-            aluno: avaConsolidatedReport.aluno,
-            email: avaConsolidatedReport.email,
-            userPhone1: avaConsolidatedReport.userPhone1,
-            periodo: avaConsolidatedReport.periodo,
-            curso: avaConsolidatedReport.curso,
-            cursoPerfil: avaConsolidatedReport.cursoPerfil,
-            periodoPerfil: avaConsolidatedReport.periodoPerfil,
-            unidadeFisica: avaConsolidatedReport.unidadeFisica,
-            enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
-            lastaccess: avaConsolidatedReport.lastaccess,
-            diasSemAcesso: avaConsolidatedReport.diasSemAcesso,
-            // Progresso
-            progressoFase1: avaConsolidatedReport.progressoFase1,
-            progressoFase2: avaConsolidatedReport.progressoFase2,
-            progressoFase3: avaConsolidatedReport.progressoFase3,
-            progressoTotal: avaConsolidatedReport.progressoTotal,
-            progressoListaFase1: avaConsolidatedReport.progressoListaFase1,
-            progressoListaFase2: avaConsolidatedReport.progressoListaFase2,
-            progressoListaFase3: avaConsolidatedReport.progressoListaFase3,
-            listaFase1: avaConsolidatedReport.progressoListaFase1,
-            listaFase2: avaConsolidatedReport.progressoListaFase2,
-            listaFase3: avaConsolidatedReport.progressoListaFase3,
-            sourceInstitution: avaConsolidatedReport.sourceInstitution,
-            // Notas
-            gradeId: avaConsolidatedReport.gradeId,
-            notaFase1: avaConsolidatedReport.notaFase1,
-            notaFase2: avaConsolidatedReport.notaFase2,
-            notaFase3: avaConsolidatedReport.notaFase3,
-            mediaFinal: avaConsolidatedReport.mediaFinal,
-            notasListaFase1: avaConsolidatedReport.notasListaFase1,
-            notasListaFase2: avaConsolidatedReport.notasListaFase2,
-            notasListaFase3: avaConsolidatedReport.notasListaFase3,
-            listaNotas: avaConsolidatedReport.listaNotas,
-          })
-          .from(avaConsolidatedReport)
-          .where(whereClause)
-          .orderBy(avaConsolidatedReport.aluno, avaConsolidatedReport.curso, avaConsolidatedReport.id)
-          .limit(size)
-          .offset(offset)
-        : [];
+      const pageRows =
+        total_records > 0
+          ? await this.db
+              .select({
+                id: avaConsolidatedReport.id,
+                alunoId: avaConsolidatedReport.alunoId,
+                matricula: avaConsolidatedReport.matricula,
+                usuario: avaConsolidatedReport.usuario,
+                aluno: avaConsolidatedReport.aluno,
+                email: avaConsolidatedReport.email,
+                userPhone1: avaConsolidatedReport.userPhone1,
+                periodo: avaConsolidatedReport.periodo,
+                curso: avaConsolidatedReport.curso,
+                cursoPerfil: avaConsolidatedReport.cursoPerfil,
+                periodoPerfil: avaConsolidatedReport.periodoPerfil,
+                unidadeFisica: avaConsolidatedReport.unidadeFisica,
+                enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
+                lastaccess: avaConsolidatedReport.lastaccess,
+                diasSemAcesso: avaConsolidatedReport.diasSemAcesso,
+                // Progresso
+                progressoFase1: avaConsolidatedReport.progressoFase1,
+                progressoFase2: avaConsolidatedReport.progressoFase2,
+                progressoFase3: avaConsolidatedReport.progressoFase3,
+                progressoTotal: avaConsolidatedReport.progressoTotal,
+                progressoListaFase1: avaConsolidatedReport.progressoListaFase1,
+                progressoListaFase2: avaConsolidatedReport.progressoListaFase2,
+                progressoListaFase3: avaConsolidatedReport.progressoListaFase3,
+                listaFase1: avaConsolidatedReport.progressoListaFase1,
+                listaFase2: avaConsolidatedReport.progressoListaFase2,
+                listaFase3: avaConsolidatedReport.progressoListaFase3,
+                sourceInstitution: avaConsolidatedReport.sourceInstitution,
+                // Notas
+                gradeId: avaConsolidatedReport.gradeId,
+                notaFase1: avaConsolidatedReport.notaFase1,
+                notaFase2: avaConsolidatedReport.notaFase2,
+                notaFase3: avaConsolidatedReport.notaFase3,
+                mediaFinal: avaConsolidatedReport.mediaFinal,
+                notasListaFase1: avaConsolidatedReport.notasListaFase1,
+                notasListaFase2: avaConsolidatedReport.notasListaFase2,
+                notasListaFase3: avaConsolidatedReport.notasListaFase3,
+                listaNotas: avaConsolidatedReport.listaNotas,
+              })
+              .from(avaConsolidatedReport)
+              .where(whereClause)
+              .orderBy(
+                avaConsolidatedReport.aluno,
+                avaConsolidatedReport.curso,
+                avaConsolidatedReport.id,
+              )
+              .limit(size)
+              .offset(offset)
+          : [];
 
-      const data = pageRows.map(row => ({
+      const data = pageRows.map((row) => ({
         ...row,
         diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
         notaFase1: row.notaFase1 ?? '-',
@@ -753,26 +1163,27 @@ export class AvaReportsService {
       }));
 
       // 3. Agregações estatísticas em SQL nativo no snapshot
-      const [statsRes] = await this.db.select({
-        avgProgress: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgProgF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgProgF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgProgF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
+      const [statsRes] = await this.db
+        .select({
+          avgProgress: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgProgF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgProgF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgProgF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
 
-        avgGrade: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgNotaF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgNotaF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
-        avgNotaF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgGrade: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgNotaF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgNotaF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
+          avgNotaF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
 
-        belowApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
-        aboveApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) >= 60 then 1 end)`,
-        onTrackProgress: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric) >= 70 then 1 end)`,
-        noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
-        uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaConsolidatedReport.alunoId}, ''), ${avaConsolidatedReport.matricula}))`,
-        uniqueDisciplines: sql<number>`count(distinct ${avaConsolidatedReport.curso})`,
-      })
-      .from(avaConsolidatedReport)
-      .where(whereClause);
+          belowApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
+          aboveApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) >= 60 then 1 end)`,
+          onTrackProgress: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric) >= 70 then 1 end)`,
+          noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
+          uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaConsolidatedReport.alunoId}, ''), ${avaConsolidatedReport.matricula}))`,
+          uniqueDisciplines: sql<number>`count(distinct ${avaConsolidatedReport.curso})`,
+        })
+        .from(avaConsolidatedReport)
+        .where(whereClause);
 
       // 4. Dropdowns de filtros únicos diretamente do snapshot com cache
       const sourceInstitution = filters.sourceInstitution || 'ead';
@@ -784,14 +1195,30 @@ export class AvaReportsService {
         total_records,
         total_pages,
         data,
-        average_progress: statsRes?.avgProgress ? Math.round(Number(statsRes.avgProgress)) : 0,
-        average_fase1: statsRes?.avgProgF1 ? Math.round(Number(statsRes.avgProgF1)) : 0,
-        average_fase2: statsRes?.avgProgF2 ? Math.round(Number(statsRes.avgProgF2)) : 0,
-        average_fase3: statsRes?.avgProgF3 ? Math.round(Number(statsRes.avgProgF3)) : 0,
-        average_grade: statsRes?.avgGrade ? Number(Number(statsRes.avgGrade).toFixed(1)) : 0,
-        average_nota_fase1: statsRes?.avgNotaF1 ? Number(Number(statsRes.avgNotaF1).toFixed(1)) : 0,
-        average_nota_fase2: statsRes?.avgNotaF2 ? Number(Number(statsRes.avgNotaF2).toFixed(1)) : 0,
-        average_nota_fase3: statsRes?.avgNotaF3 ? Number(Number(statsRes.avgNotaF3).toFixed(1)) : 0,
+        average_progress: statsRes?.avgProgress
+          ? Math.round(Number(statsRes.avgProgress))
+          : 0,
+        average_fase1: statsRes?.avgProgF1
+          ? Math.round(Number(statsRes.avgProgF1))
+          : 0,
+        average_fase2: statsRes?.avgProgF2
+          ? Math.round(Number(statsRes.avgProgF2))
+          : 0,
+        average_fase3: statsRes?.avgProgF3
+          ? Math.round(Number(statsRes.avgProgF3))
+          : 0,
+        average_grade: statsRes?.avgGrade
+          ? Number(Number(statsRes.avgGrade).toFixed(1))
+          : 0,
+        average_nota_fase1: statsRes?.avgNotaF1
+          ? Number(Number(statsRes.avgNotaF1).toFixed(1))
+          : 0,
+        average_nota_fase2: statsRes?.avgNotaF2
+          ? Number(Number(statsRes.avgNotaF2).toFixed(1))
+          : 0,
+        average_nota_fase3: statsRes?.avgNotaF3
+          ? Number(Number(statsRes.avgNotaF3).toFixed(1))
+          : 0,
         below_approval: Number(statsRes?.belowApproval || 0),
         above_approval: Number(statsRes?.aboveApproval || 0),
         on_track_progress: Number(statsRes?.onTrackProgress || 0),
@@ -803,8 +1230,8 @@ export class AvaReportsService {
         unique_polos: dropdowns.polos,
       };
     } catch (error) {
-      console.error("Erro em getConsolidatedData:", error);
-      throw new Error("Falha ao buscar dados consolidados do AVA");
+      console.error('Erro em getConsolidatedData:', error);
+      throw new Error('Falha ao buscar dados consolidados do AVA');
     }
   }
 
@@ -814,37 +1241,38 @@ export class AvaReportsService {
     try {
       const whereClause = this.buildConsolidatedConditions(filters);
 
-      const rawData = await this.db.select({
-        id: avaConsolidatedReport.id,
-        alunoId: avaConsolidatedReport.alunoId,
-        matricula: avaConsolidatedReport.matricula,
-        usuario: avaConsolidatedReport.usuario,
-        aluno: avaConsolidatedReport.aluno,
-        email: avaConsolidatedReport.email,
-        userPhone1: avaConsolidatedReport.userPhone1,
-        periodo: avaConsolidatedReport.periodo,
-        curso: avaConsolidatedReport.curso,
-        cursoPerfil: avaConsolidatedReport.cursoPerfil,
-        periodoPerfil: avaConsolidatedReport.periodoPerfil,
-        unidadeFisica: avaConsolidatedReport.unidadeFisica,
-        enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
-        lastaccess: avaConsolidatedReport.lastaccess,
-        // Progresso
-        progressoFase1: avaConsolidatedReport.progressoFase1,
-        progressoFase2: avaConsolidatedReport.progressoFase2,
-        progressoFase3: avaConsolidatedReport.progressoFase3,
-        progressoTotal: avaConsolidatedReport.progressoTotal,
-        // Notas
-        notaFase1: avaConsolidatedReport.notaFase1,
-        notaFase2: avaConsolidatedReport.notaFase2,
-        notaFase3: avaConsolidatedReport.notaFase3,
-        mediaFinal: avaConsolidatedReport.mediaFinal,
-      })
-      .from(avaConsolidatedReport)
-      .where(whereClause)
-      .orderBy(avaConsolidatedReport.aluno, avaConsolidatedReport.curso);
+      const rawData = await this.db
+        .select({
+          id: avaConsolidatedReport.id,
+          alunoId: avaConsolidatedReport.alunoId,
+          matricula: avaConsolidatedReport.matricula,
+          usuario: avaConsolidatedReport.usuario,
+          aluno: avaConsolidatedReport.aluno,
+          email: avaConsolidatedReport.email,
+          userPhone1: avaConsolidatedReport.userPhone1,
+          periodo: avaConsolidatedReport.periodo,
+          curso: avaConsolidatedReport.curso,
+          cursoPerfil: avaConsolidatedReport.cursoPerfil,
+          periodoPerfil: avaConsolidatedReport.periodoPerfil,
+          unidadeFisica: avaConsolidatedReport.unidadeFisica,
+          enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
+          lastaccess: avaConsolidatedReport.lastaccess,
+          // Progresso
+          progressoFase1: avaConsolidatedReport.progressoFase1,
+          progressoFase2: avaConsolidatedReport.progressoFase2,
+          progressoFase3: avaConsolidatedReport.progressoFase3,
+          progressoTotal: avaConsolidatedReport.progressoTotal,
+          // Notas
+          notaFase1: avaConsolidatedReport.notaFase1,
+          notaFase2: avaConsolidatedReport.notaFase2,
+          notaFase3: avaConsolidatedReport.notaFase3,
+          mediaFinal: avaConsolidatedReport.mediaFinal,
+        })
+        .from(avaConsolidatedReport)
+        .where(whereClause)
+        .orderBy(avaConsolidatedReport.aluno, avaConsolidatedReport.curso);
 
-      return rawData.map(row => ({
+      return rawData.map((row) => ({
         ...row,
         diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
         notaFase1: row.notaFase1 ?? '-',
@@ -853,41 +1281,46 @@ export class AvaReportsService {
         mediaFinal: row.mediaFinal ?? '-',
       }));
     } catch (error) {
-      console.error("Erro ao exportar dados consolidados:", error);
-      throw new Error("Falha ao exportar dados consolidados");
+      console.error('Erro ao exportar dados consolidados:', error);
+      throw new Error('Falha ao exportar dados consolidados');
     }
   }
-
 
   async getAvaDashboardStats(user: SessionUser) {
     await this.assertAvaAccess(user);
 
     try {
       const [progressStatsRes, gradeStatsRes] = await Promise.all([
-        this.db.select({
-          sourceInstitution: avaProgressReport.sourceInstitution,
-          totalStudents: sql<number>`count(*)`,
-          validProgressCount: sql<number>`count(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), ''))`,
-          avgProgress: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaProgressReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') or (coalesce(${avaProgressReport.diasSemAcesso}, '') ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer > 14) then 1 end)`,
-          lastSync: sql<Date>`max(${avaProgressReport.updatedAt})`,
-        })
-        .from(avaProgressReport)
-        .groupBy(avaProgressReport.sourceInstitution),
+        this.db
+          .select({
+            sourceInstitution: avaProgressReport.sourceInstitution,
+            totalStudents: sql<number>`count(*)`,
+            validProgressCount: sql<number>`count(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), ''))`,
+            avgProgress: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaProgressReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') or (coalesce(${avaProgressReport.diasSemAcesso}, '') ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer > 14) then 1 end)`,
+            lastSync: sql<Date>`max(${avaProgressReport.updatedAt})`,
+          })
+          .from(avaProgressReport)
+          .groupBy(avaProgressReport.sourceInstitution),
 
-        this.db.select({
-          sourceInstitution: avaGradesReport.sourceInstitution,
-          validGradesCount: sql<number>`count(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), ''))`,
-          avgGrade: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          belowApprovalCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
-          lastSync: sql<Date>`max(${avaGradesReport.updatedAt})`,
-        })
-        .from(avaGradesReport)
-        .groupBy(avaGradesReport.sourceInstitution)
+        this.db
+          .select({
+            sourceInstitution: avaGradesReport.sourceInstitution,
+            validGradesCount: sql<number>`count(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), ''))`,
+            avgGrade: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            belowApprovalCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
+            lastSync: sql<Date>`max(${avaGradesReport.updatedAt})`,
+          })
+          .from(avaGradesReport)
+          .groupBy(avaGradesReport.sourceInstitution),
       ]);
 
-      const progressMap = new Map(progressStatsRes.map(r => [r.sourceInstitution?.toLowerCase(), r]));
-      const gradeMap = new Map(gradeStatsRes.map(r => [r.sourceInstitution?.toLowerCase(), r]));
+      const progressMap = new Map(
+        progressStatsRes.map((r) => [r.sourceInstitution?.toLowerCase(), r]),
+      );
+      const gradeMap = new Map(
+        gradeStatsRes.map((r) => [r.sourceInstitution?.toLowerCase(), r]),
+      );
 
       let totalStudents = 0;
       let totalProgressWeighted = 0;
@@ -916,11 +1349,17 @@ export class AvaReportsService {
         belowApprovalCount += Number(g.belowApprovalCount || 0);
       }
 
-      const averageProgress = totalValidProgress > 0 ? Math.round(totalProgressWeighted / totalValidProgress) : 0;
-      const averageGrade = totalValidGrades > 0 ? Math.round(totalGradeWeighted / totalValidGrades) : 0;
+      const averageProgress =
+        totalValidProgress > 0
+          ? Math.round(totalProgressWeighted / totalValidProgress)
+          : 0;
+      const averageGrade =
+        totalValidGrades > 0
+          ? Math.round(totalGradeWeighted / totalValidGrades)
+          : 0;
 
       const institutions = ['ead', 'eefn', 'raizes', 'uni', 'uniego'];
-      const institutionsStats = institutions.map(inst => {
+      const institutionsStats = institutions.map((inst) => {
         const p = progressMap.get(inst);
         const g = gradeMap.get(inst);
 
@@ -937,7 +1376,9 @@ export class AvaReportsService {
           id: inst,
           name: inst.toUpperCase(),
           totalStudents: Number(p?.totalStudents || 0),
-          averageProgress: p?.avgProgress ? Math.round(Number(p.avgProgress)) : 0,
+          averageProgress: p?.avgProgress
+            ? Math.round(Number(p.avgProgress))
+            : 0,
           averageGrade: g?.avgGrade ? Math.round(Number(g.avgGrade)) : 0,
           belowApprovalCount: Number(g?.belowApprovalCount || 0),
           noAccessCount: Number(p?.noAccessCount || 0),
@@ -955,7 +1396,7 @@ export class AvaReportsService {
         institutionsStats,
       };
     } catch (error) {
-      console.error("Error in getAvaDashboardStats:", error);
+      console.error('Error in getAvaDashboardStats:', error);
       return {
         totalStudents: 0,
         averageProgress: 0,
@@ -963,42 +1404,115 @@ export class AvaReportsService {
         belowApprovalCount: 0,
         noAccessCount: 0,
         institutionsStats: [
-          { id: 'ead', name: 'EAD', totalStudents: 0, averageProgress: 0, averageGrade: 0, belowApprovalCount: 0, noAccessCount: 0, lastSync: null, status: 'offline' },
-          { id: 'eefn', name: 'EEFN', totalStudents: 0, averageProgress: 0, averageGrade: 0, belowApprovalCount: 0, noAccessCount: 0, lastSync: null, status: 'offline' },
-          { id: 'raizes', name: 'RAÍZES', totalStudents: 0, averageProgress: 0, averageGrade: 0, belowApprovalCount: 0, noAccessCount: 0, lastSync: null, status: 'offline' },
-          { id: 'uni', name: 'UNI', totalStudents: 0, averageProgress: 0, averageGrade: 0, belowApprovalCount: 0, noAccessCount: 0, lastSync: null, status: 'offline' },
-          { id: 'uniego', name: 'UNIEGO', totalStudents: 0, averageProgress: 0, averageGrade: 0, belowApprovalCount: 0, noAccessCount: 0, lastSync: null, status: 'offline' },
+          {
+            id: 'ead',
+            name: 'EAD',
+            totalStudents: 0,
+            averageProgress: 0,
+            averageGrade: 0,
+            belowApprovalCount: 0,
+            noAccessCount: 0,
+            lastSync: null,
+            status: 'offline',
+          },
+          {
+            id: 'eefn',
+            name: 'EEFN',
+            totalStudents: 0,
+            averageProgress: 0,
+            averageGrade: 0,
+            belowApprovalCount: 0,
+            noAccessCount: 0,
+            lastSync: null,
+            status: 'offline',
+          },
+          {
+            id: 'raizes',
+            name: 'RAÍZES',
+            totalStudents: 0,
+            averageProgress: 0,
+            averageGrade: 0,
+            belowApprovalCount: 0,
+            noAccessCount: 0,
+            lastSync: null,
+            status: 'offline',
+          },
+          {
+            id: 'uni',
+            name: 'UNI',
+            totalStudents: 0,
+            averageProgress: 0,
+            averageGrade: 0,
+            belowApprovalCount: 0,
+            noAccessCount: 0,
+            lastSync: null,
+            status: 'offline',
+          },
+          {
+            id: 'uniego',
+            name: 'UNIEGO',
+            totalStudents: 0,
+            averageProgress: 0,
+            averageGrade: 0,
+            belowApprovalCount: 0,
+            noAccessCount: 0,
+            lastSync: null,
+            status: 'offline',
+          },
         ],
       };
     }
   }
 
-  async getCachedDropdownOptions(institution: string): Promise<{ periodos: string[]; cursos: string[]; polos: string[] }> {
+  async getCachedDropdownOptions(
+    institution: string,
+  ): Promise<{ periodos: string[]; cursos: string[]; polos: string[] }> {
     if (this.cacheService) {
       return this.cacheService.wrap(
         `ava:dropdowns:${institution}`,
         async () => {
-          const [uniquePeriodos, uniqueCursos, uniquePolos] = await Promise.all([
-            this.db
-              .selectDistinct({ value: avaConsolidatedReport.periodo })
-              .from(avaConsolidatedReport)
-              .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.periodo)))
-              .orderBy(desc(avaConsolidatedReport.periodo)),
-            this.db
-              .selectDistinct({ value: avaConsolidatedReport.curso })
-              .from(avaConsolidatedReport)
-              .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.curso)))
-              .orderBy(avaConsolidatedReport.curso),
-            this.db
-              .selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
-              .from(avaConsolidatedReport)
-              .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.unidadeFisica)))
-              .orderBy(avaConsolidatedReport.unidadeFisica),
-          ]);
+          const [uniquePeriodos, uniqueCursos, uniquePolos] = await Promise.all(
+            [
+              this.db
+                .selectDistinct({ value: avaConsolidatedReport.periodo })
+                .from(avaConsolidatedReport)
+                .where(
+                  and(
+                    eq(avaConsolidatedReport.sourceInstitution, institution),
+                    isNotNull(avaConsolidatedReport.periodo),
+                  ),
+                )
+                .orderBy(desc(avaConsolidatedReport.periodo)),
+              this.db
+                .selectDistinct({ value: avaConsolidatedReport.curso })
+                .from(avaConsolidatedReport)
+                .where(
+                  and(
+                    eq(avaConsolidatedReport.sourceInstitution, institution),
+                    isNotNull(avaConsolidatedReport.curso),
+                  ),
+                )
+                .orderBy(avaConsolidatedReport.curso),
+              this.db
+                .selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
+                .from(avaConsolidatedReport)
+                .where(
+                  and(
+                    eq(avaConsolidatedReport.sourceInstitution, institution),
+                    isNotNull(avaConsolidatedReport.unidadeFisica),
+                  ),
+                )
+                .orderBy(avaConsolidatedReport.unidadeFisica),
+            ],
+          );
 
           return {
-            periodos: uniquePeriodos.map((p) => p.value).filter(Boolean) as string[],
-            cursos: uniqueCursos.map((c) => c.value).filter(Boolean) as string[],
+            periodos: uniquePeriodos
+              .map((p) => p.value)
+              .filter(Boolean) as string[],
+            cursos: uniqueCursos
+              .map((c) => c.value)
+              .filter(Boolean) as string[],
             polos: uniquePolos.map((u) => u.value).filter(Boolean) as string[],
           };
         },
@@ -1010,17 +1524,32 @@ export class AvaReportsService {
       this.db
         .selectDistinct({ value: avaConsolidatedReport.periodo })
         .from(avaConsolidatedReport)
-        .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.periodo)))
+        .where(
+          and(
+            eq(avaConsolidatedReport.sourceInstitution, institution),
+            isNotNull(avaConsolidatedReport.periodo),
+          ),
+        )
         .orderBy(desc(avaConsolidatedReport.periodo)),
       this.db
         .selectDistinct({ value: avaConsolidatedReport.curso })
         .from(avaConsolidatedReport)
-        .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.curso)))
+        .where(
+          and(
+            eq(avaConsolidatedReport.sourceInstitution, institution),
+            isNotNull(avaConsolidatedReport.curso),
+          ),
+        )
         .orderBy(avaConsolidatedReport.curso),
       this.db
         .selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
         .from(avaConsolidatedReport)
-        .where(and(eq(avaConsolidatedReport.sourceInstitution, institution), isNotNull(avaConsolidatedReport.unidadeFisica)))
+        .where(
+          and(
+            eq(avaConsolidatedReport.sourceInstitution, institution),
+            isNotNull(avaConsolidatedReport.unidadeFisica),
+          ),
+        )
         .orderBy(avaConsolidatedReport.unidadeFisica),
     ]);
 

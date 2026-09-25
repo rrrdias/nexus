@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JobsService } from './jobs.service';
 import { getQueueToken } from '@nestjs/bullmq';
-import { QUEUE_ACADEMIC_SYNC, QUEUE_AVA_SYNC, JOB_ACADEMIC_SYNC, JOB_AVA_SYNC } from './jobs.constants';
+import {
+  QUEUE_ACADEMIC_SYNC,
+  QUEUE_AVA_SYNC,
+  JOB_ACADEMIC_SYNC,
+  JOB_AVA_SYNC,
+} from './jobs.constants';
 import { NotFoundException } from '@nestjs/common';
 
 describe('JobsService', () => {
@@ -46,42 +51,55 @@ describe('JobsService', () => {
   describe('addAcademicSyncJob', () => {
     it('should create a new job if none active or waiting', async () => {
       const result = await service.addAcademicSyncJob();
-      expect(result).toEqual({ jobId: 'job-acad-123', queue: QUEUE_ACADEMIC_SYNC });
+      expect(result).toEqual({
+        jobId: 'job-acad-123',
+        queue: QUEUE_ACADEMIC_SYNC,
+      });
       expect(academicQueue.add).toHaveBeenCalledWith(
         JOB_ACADEMIC_SYNC,
         {},
-        expect.objectContaining({ attempts: 3 })
+        expect.objectContaining({ attempts: 3 }),
       );
     });
 
     it('should reuse existing job if one is already active', async () => {
       academicQueue.getActive.mockResolvedValue([{ id: 'existing-job-1' }]);
       const result = await service.addAcademicSyncJob();
-      expect(result).toEqual({ jobId: 'existing-job-1', queue: QUEUE_ACADEMIC_SYNC });
+      expect(result).toEqual({
+        jobId: 'existing-job-1',
+        queue: QUEUE_ACADEMIC_SYNC,
+      });
       expect(academicQueue.add).not.toHaveBeenCalled();
     });
   });
 
   describe('addAvaSyncJob', () => {
     it('should enqueue a new AVA sync job', async () => {
-      const result = await service.addAvaSyncJob({ institution: 'ead', type: 'grades' });
+      const result = await service.addAvaSyncJob({
+        institution: 'ead',
+        type: 'grades',
+      });
       expect(result).toEqual({ jobId: 'job-ava-456', queue: QUEUE_AVA_SYNC });
       expect(avaQueue.add).toHaveBeenCalledWith(
         JOB_AVA_SYNC,
         { institution: 'ead', type: 'grades' },
-        expect.objectContaining({ attempts: 2 })
+        expect.objectContaining({ attempts: 2 }),
       );
     });
   });
 
   describe('getJobStatus', () => {
     it('should throw NotFoundException for invalid queue', async () => {
-      await expect(service.getJobStatus('invalid-queue', '123')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getJobStatus('invalid-queue', '123'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if job not found', async () => {
       academicQueue.getJob.mockResolvedValue(null);
-      await expect(service.getJobStatus(QUEUE_ACADEMIC_SYNC, '999')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.getJobStatus(QUEUE_ACADEMIC_SYNC, '999'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should return formatted job status when job exists', async () => {

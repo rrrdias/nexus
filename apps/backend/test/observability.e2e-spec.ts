@@ -10,7 +10,9 @@ import { AcademicService } from '../src/academic/academic.service';
 describe('Observability & Health (e2e)', () => {
   let app: INestApplication;
 
-  const createChain = (defaultResult: any = [{ id: 'test-id', isActive: true }]) => {
+  const createChain = (
+    defaultResult: any = [{ id: 'test-id', isActive: true }],
+  ) => {
     const chain: any = {
       from: jest.fn().mockImplementation(() => chain),
       innerJoin: jest.fn().mockImplementation(() => chain),
@@ -47,14 +49,24 @@ describe('Observability & Health (e2e)', () => {
   };
 
   const mockJobsService = {
-    checkRedisHealth: jest.fn().mockResolvedValue({ status: 'up', latencyMs: 2 }),
-    addAcademicSyncJob: jest.fn().mockResolvedValue({ jobId: 'job-1', queue: 'academic-sync' }),
-    addAvaSyncJob: jest.fn().mockResolvedValue({ jobId: 'job-2', queue: 'ava-sync' }),
-    getJobStatus: jest.fn().mockResolvedValue({ id: 'job-1', state: 'completed', progress: 100 }),
+    checkRedisHealth: jest
+      .fn()
+      .mockResolvedValue({ status: 'up', latencyMs: 2 }),
+    addAcademicSyncJob: jest
+      .fn()
+      .mockResolvedValue({ jobId: 'job-1', queue: 'academic-sync' }),
+    addAvaSyncJob: jest
+      .fn()
+      .mockResolvedValue({ jobId: 'job-2', queue: 'ava-sync' }),
+    getJobStatus: jest
+      .fn()
+      .mockResolvedValue({ id: 'job-1', state: 'completed', progress: 100 }),
   };
 
   const mockAcademicService = {
-    checkLyceumHealth: jest.fn().mockResolvedValue({ status: 'up', latencyMs: 5 }),
+    checkLyceumHealth: jest
+      .fn()
+      .mockResolvedValue({ status: 'up', latencyMs: 5 }),
     onModuleInit: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -73,7 +85,9 @@ describe('Observability & Health (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
 
     await app.init();
   });
@@ -134,4 +148,3 @@ describe('Observability & Health (e2e)', () => {
     expect(response.body).toHaveProperty('timestamp');
   });
 });
-

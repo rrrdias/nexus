@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Res,
+  BadRequestException,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { SchedulingService } from './scheduling.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -26,10 +37,7 @@ export class SchedulingController {
 
   @RequireAdmin()
   @Put('locals/:id')
-  async updateLocal(
-    @Param('id') id: string,
-    @Body() body: UpdateLocalDto
-  ) {
+  async updateLocal(@Param('id') id: string, @Body() body: UpdateLocalDto) {
     return this.schedulingService.updateLocal(id, body);
   }
 
@@ -39,13 +47,13 @@ export class SchedulingController {
     @Query('localId') localId?: string,
     @Query('data') data?: string,
     @Query('apenasDisponiveis') apenasDisponiveis?: string,
-    @Query('incluirInativos') incluirInativos?: string
+    @Query('incluirInativos') incluirInativos?: string,
   ) {
     return this.schedulingService.listOptions({
       localId,
       data,
       apenasDisponiveis: apenasDisponiveis === 'true',
-      incluirInativos: incluirInativos === 'true'
+      incluirInativos: incluirInativos === 'true',
     });
   }
 
@@ -57,10 +65,7 @@ export class SchedulingController {
 
   @RequireAdmin()
   @Put('options/:id')
-  async updateOption(
-    @Param('id') id: string,
-    @Body() body: UpdateOptionDto
-  ) {
+  async updateOption(@Param('id') id: string, @Body() body: UpdateOptionDto) {
     return this.schedulingService.updateOption(id, body);
   }
 
@@ -68,7 +73,7 @@ export class SchedulingController {
   @Get('profile/:matricula/:periodo')
   getStudentProfile(
     @Param('matricula') matricula: string,
-    @Param('periodo') periodo: string
+    @Param('periodo') periodo: string,
   ) {
     return this.schedulingService.getStudentProfile(matricula, periodo);
   }
@@ -82,7 +87,7 @@ export class SchedulingController {
     @Query('data') data?: string,
     @Query('status') status?: string,
     @Query('page') page?: string,
-    @Query('size') size?: string
+    @Query('size') size?: string,
   ) {
     return this.schedulingService.listBookings({
       matricula,
@@ -91,7 +96,7 @@ export class SchedulingController {
       data,
       status,
       page: page ? parseInt(page) : undefined,
-      size: size ? parseInt(size) : undefined
+      size: size ? parseInt(size) : undefined,
     });
   }
 
@@ -126,25 +131,30 @@ export class SchedulingController {
     @Query('periodo') periodo: string | undefined,
     @Query('data') data: string | undefined,
     @Query('status') status: string | undefined,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
     const records = await this.schedulingService.getExportData({
       matricula,
       localId,
       periodo,
       data,
-      status
+      status,
     });
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename=agendamentos.csv');
-    
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=agendamentos.csv',
+    );
+
     // UTF-8 BOM for Microsoft Excel
     res.write('\uFEFF');
-    
+
     // Header Row
-    res.write('Matrícula,Nome,E-mail,Campus,Data Prova,Hora Início,Período,Status,Disciplinas Agendadas,Criado Em\n');
-    
+    res.write(
+      'Matrícula,Nome,E-mail,Campus,Data Prova,Hora Início,Período,Status,Disciplinas Agendadas,Criado Em\n',
+    );
+
     // Content Rows
     for (const row of records) {
       const disciplines = row.descricao.replace(/"/g, '""');
@@ -153,8 +163,10 @@ export class SchedulingController {
       const localNome = row.localNome.replace(/"/g, '""');
       const bookingDate = new Date(row.data).toLocaleDateString('pt-BR');
       const createdAt = new Date(row.createdAt).toLocaleString('pt-BR');
-      
-      res.write(`"${row.matricula}","${studentName}","${studentEmail}","${localNome}","${bookingDate}","${row.hora.slice(0, 5)}","${row.periodo}","${row.status}","${disciplines}","${createdAt}"\n`);
+
+      res.write(
+        `"${row.matricula}","${studentName}","${studentEmail}","${localNome}","${bookingDate}","${row.hora.slice(0, 5)}","${row.periodo}","${row.status}","${disciplines}","${createdAt}"\n`,
+      );
     }
 
     res.end();
@@ -164,9 +176,10 @@ export class SchedulingController {
   @Post('import')
   async importBookings(@Body() body: { bookings: any[] }) {
     if (!body.bookings || !Array.isArray(body.bookings)) {
-      throw new BadRequestException('Formato inválido. Esperado array de bookings.');
+      throw new BadRequestException(
+        'Formato inválido. Esperado array de bookings.',
+      );
     }
     return this.schedulingService.importBookings(body.bookings);
   }
 }
-

@@ -4,11 +4,11 @@ import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { AcademicService } from './academic.service';
 import { sql as drizzleSql, inArray } from 'drizzle-orm';
-import { 
-  academicTurma, 
-  academicDiscente, 
-  academicDocente, 
-  academicMatricula 
+import {
+  academicTurma,
+  academicDiscente,
+  academicDocente,
+  academicMatricula,
 } from '../db/schema';
 import { getLyceumActivePeriods } from '../config/app-config';
 
@@ -19,7 +19,7 @@ export class AcademicSyncService {
 
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
-    private readonly academicService: AcademicService
+    private readonly academicService: AcademicService,
   ) {}
 
   @Cron('0 3 * * *') // Executa todos os dias às 03:00 AM
@@ -29,21 +29,28 @@ export class AcademicSyncService {
   }
 
   // Permite chamada manual via controller ou job worker
-  async syncActivePeriods(onProgress?: (progress: number, step: string) => Promise<void>) {
+  async syncActivePeriods(
+    onProgress?: (progress: number, step: string) => Promise<void>,
+  ) {
     if (this.isSyncing) {
-      this.logger.warn('A sync process is already running. Skipping new trigger.');
+      this.logger.warn(
+        'A sync process is already running. Skipping new trigger.',
+      );
       return { status: 'already_running' };
     }
-    
+
     this.isSyncing = true;
     const startTime = Date.now();
 
     try {
-      if (onProgress) await onProgress(5, 'Verificando períodos ativos no Lyceum');
+      if (onProgress)
+        await onProgress(5, 'Verificando períodos ativos no Lyceum');
       const activePeriods = getLyceumActivePeriods();
-      
+
       if (activePeriods.length === 0) {
-        this.logger.warn('No LYCEUM_ACTIVE_PERIODS configured. Skipping sync to prevent syncing all historical data.');
+        this.logger.warn(
+          'No LYCEUM_ACTIVE_PERIODS configured. Skipping sync to prevent syncing all historical data.',
+        );
         return { status: 'aborted', reason: 'No active periods configured' };
       }
 
@@ -51,11 +58,11 @@ export class AcademicSyncService {
 
       const lyceumPool = this.academicService.getSqlPool();
       const prefix = this.academicService.getDbPrefix();
-      
+
       // 1. Sync Turmas
       if (onProgress) await onProgress(15, 'Sincronizando Turmas');
       this.logger.log('Step 1: Syncing Turmas...');
-      const periodsInStr = activePeriods.map(p => `'${p}'`).join(',');
+      const periodsInStr = activePeriods.map((p) => `'${p}'`).join(',');
       const turmasRes = await lyceumPool.request().query(`
         SELECT 
           T.ID, T.TURMA, T.DISCIPLINA, T.NOME_DISCIPLINA, 
@@ -66,33 +73,45 @@ export class AcademicSyncService {
         LEFT JOIN ${prefix}VW_AVA_CURSO C ON T.CURSO = C.ID
         WHERE T.PERIODO IN (${periodsInStr})
       `);
-      
+
       const turmas = turmasRes.recordset;
       this.logger.log(`Found ${turmas.length} active turmas.`);
-      
+
       if (turmas.length > 0) {
         const chunkSize = 1000;
         for (let i = 0; i < turmas.length; i += chunkSize) {
           const chunk = turmas.slice(i, i + chunkSize);
-          await this.db.insert(academicTurma)
-            .values(chunk.map(t => ({
-              id: t.ID.toString(),
-              turma: t.TURMA,
-              codTurma: t.TURMA, // Usando TURMA como fallback
-              disciplina: t.DISCIPLINA,
-              nomeDisciplina: t.NOME_DISCIPLINA,
-              codDisciplina: t.DISCIPLINA, // Usando DISCIPLINA como fallback
-              curso: t.CURSO,
-              periodo: t.PERIODO,
-              serie: t.SERIE,
-              modelagem: t.MODELAGEM && t.MODELAGEM.toString().trim() ? t.MODELAGEM.toString().trim() : 'Sem Modelagem',
-              cursoNome: t.CURSO_NOME,
-              cursoInstituicao: t.CURSO_INSTITUICAO,
-              dataAtualizacao: t.DATA_ATUALIZACAO ? new Date(t.DATA_ATUALIZACAO) : null,
-              dataInicioTurma: t.DATA_INICIO_TURMA ? new Date(t.DATA_INICIO_TURMA) : null,
-              dataFimTurma: t.DATA_FIM_TURMA ? new Date(t.DATA_FIM_TURMA) : null,
-              updatedAt: new Date(),
-            })))
+          await this.db
+            .insert(academicTurma)
+            .values(
+              chunk.map((t) => ({
+                id: t.ID.toString(),
+                turma: t.TURMA,
+                codTurma: t.TURMA, // Usando TURMA como fallback
+                disciplina: t.DISCIPLINA,
+                nomeDisciplina: t.NOME_DISCIPLINA,
+                codDisciplina: t.DISCIPLINA, // Usando DISCIPLINA como fallback
+                curso: t.CURSO,
+                periodo: t.PERIODO,
+                serie: t.SERIE,
+                modelagem:
+                  t.MODELAGEM && t.MODELAGEM.toString().trim()
+                    ? t.MODELAGEM.toString().trim()
+                    : 'Sem Modelagem',
+                cursoNome: t.CURSO_NOME,
+                cursoInstituicao: t.CURSO_INSTITUICAO,
+                dataAtualizacao: t.DATA_ATUALIZACAO
+                  ? new Date(t.DATA_ATUALIZACAO)
+                  : null,
+                dataInicioTurma: t.DATA_INICIO_TURMA
+                  ? new Date(t.DATA_INICIO_TURMA)
+                  : null,
+                dataFimTurma: t.DATA_FIM_TURMA
+                  ? new Date(t.DATA_FIM_TURMA)
+                  : null,
+                updatedAt: new Date(),
+              })),
+            )
             .onConflictDoUpdate({
               target: academicTurma.id,
               set: {
@@ -111,12 +130,12 @@ export class AcademicSyncService {
                 dataInicioTurma: drizzleSql`EXCLUDED.data_inicio_turma`,
                 dataFimTurma: drizzleSql`EXCLUDED.data_fim_turma`,
                 updatedAt: drizzleSql`EXCLUDED."updatedAt"`,
-              }
+              },
             });
         }
       }
 
-      const activeTurmaIds = turmas.map(t => t.ID.toString());
+      const activeTurmaIds = turmas.map((t) => t.ID.toString());
       if (activeTurmaIds.length === 0) {
         this.logger.warn('No active turmas found. Stopping sync.');
         return { status: 'success', synced: 0 };
@@ -133,7 +152,7 @@ export class AcademicSyncService {
         INNER JOIN ${prefix}VW_AVA_TURMA T ON M.TURMA = T.ID
         WHERE T.PERIODO IN (${periodsInStr})
       `);
-      
+
       const matriculas = matriculasRes.recordset;
       this.logger.log(`Found ${matriculas.length} active matriculas.`);
 
@@ -143,7 +162,9 @@ export class AcademicSyncService {
           const deleteChunkSize = 1000;
           for (let i = 0; i < activeTurmaIds.length; i += deleteChunkSize) {
             const chunk = activeTurmaIds.slice(i, i + deleteChunkSize);
-            await tx.delete(academicMatricula).where(inArray(academicMatricula.turmaId, chunk));
+            await tx
+              .delete(academicMatricula)
+              .where(inArray(academicMatricula.turmaId, chunk));
           }
         }
 
@@ -152,14 +173,17 @@ export class AcademicSyncService {
           const chunkSize = 2000;
           for (let i = 0; i < matriculas.length; i += chunkSize) {
             const chunk = matriculas.slice(i, i + chunkSize);
-            await tx.insert(academicMatricula)
-              .values(chunk.map(m => ({
-                usuarioId: m.USUARIO.toString(),
-                turmaId: m.TURMA.toString(),
-                nivel: m.NIVEL?.toString(),
-                ativo: m.ATIVO?.toString() || null,
-                situacao: m.SITUACAO?.toString() || null,
-              })))
+            await tx
+              .insert(academicMatricula)
+              .values(
+                chunk.map((m) => ({
+                  usuarioId: m.USUARIO.toString(),
+                  turmaId: m.TURMA.toString(),
+                  nivel: m.NIVEL?.toString(),
+                  ativo: m.ATIVO?.toString() || null,
+                  situacao: m.SITUACAO?.toString() || null,
+                })),
+              )
               .onConflictDoNothing();
           }
         }
@@ -167,11 +191,12 @@ export class AcademicSyncService {
 
       // Collect active users
       const activeUserIds = new Set<string>();
-      matriculas.forEach(m => activeUserIds.add(m.USUARIO.toString()));
+      matriculas.forEach((m) => activeUserIds.add(m.USUARIO.toString()));
       this.logger.log(`Identified ${activeUserIds.size} unique active users.`);
 
       if (activeUserIds.size > 0) {
-        if (onProgress) await onProgress(60, 'Sincronizando Discentes e Docentes');
+        if (onProgress)
+          await onProgress(60, 'Sincronizando Discentes e Docentes');
         const usersArray = Array.from(activeUserIds);
         const userChunks: string[][] = [];
         for (let i = 0; i < usersArray.length; i += 1000) {
@@ -182,14 +207,20 @@ export class AcademicSyncService {
         let syncedDocentes = 0;
 
         for (let i = 0; i < userChunks.length; i++) {
-          const chunkProgress = Math.round(60 + ((i + 1) / userChunks.length) * 35);
-          if (onProgress) await onProgress(chunkProgress, `Sincronizando Usuários (Lote ${i + 1}/${userChunks.length})`);
+          const chunkProgress = Math.round(
+            60 + ((i + 1) / userChunks.length) * 35,
+          );
+          if (onProgress)
+            await onProgress(
+              chunkProgress,
+              `Sincronizando Usuários (Lote ${i + 1}/${userChunks.length})`,
+            );
           const chunk = userChunks[i];
           const inParams = chunk
 
-            .map(id => String(id).replace(/[^a-zA-Z0-9_-]/g, ''))
+            .map((id) => String(id).replace(/[^a-zA-Z0-9_-]/g, ''))
             .filter(Boolean)
-            .map(id => `'${id}'`)
+            .map((id) => `'${id}'`)
             .join(',');
 
           if (!inParams) continue;
@@ -208,32 +239,40 @@ export class AcademicSyncService {
             WHERE U.ID IN (${inParams})
           `);
 
-
           if (discRes.recordset.length > 0) {
             syncedDiscentes += discRes.recordset.length;
-            await this.db.insert(academicDiscente)
-              .values(discRes.recordset.map(u => ({
-                id: u.ID.toString(),
-                nome: u.NOME,
-                email: u.EMAIL,
-                cpf: u.CPF,
-                serie: u.SERIE,
-                turno: u.TURNO,
-                telefone: u.TELEFONE,
-                cidade: u.CIDADE,
-                pais: u.PAIS,
-                curso: u.CURSO,
-                unidadeFisica: u.UNIDADE_FISICA,
-                nomeSocial: u.NOME_SOCIAL,
-                nomeUnidadeFisica: u.NOME_UNIDADE_FISICA,
-                sobrenome: u.SOBRENOME,
-                sobrenomeSocial: u.SOBRENOME_SOCIAL,
-                cursoNome: u.CURSO_NOME,
-                cursoInstituicao: u.CURSO_INSTITUICAO,
-                matricula: u.MATRICULA ? u.MATRICULA.toString() : u.ID.toString(),
-                usuario: u.USUARIO ? u.USUARIO.toString() : (u.EMAIL ? u.EMAIL.toString() : u.ID.toString()),
-                updatedAt: new Date(),
-              })))
+            await this.db
+              .insert(academicDiscente)
+              .values(
+                discRes.recordset.map((u) => ({
+                  id: u.ID.toString(),
+                  nome: u.NOME,
+                  email: u.EMAIL,
+                  cpf: u.CPF,
+                  serie: u.SERIE,
+                  turno: u.TURNO,
+                  telefone: u.TELEFONE,
+                  cidade: u.CIDADE,
+                  pais: u.PAIS,
+                  curso: u.CURSO,
+                  unidadeFisica: u.UNIDADE_FISICA,
+                  nomeSocial: u.NOME_SOCIAL,
+                  nomeUnidadeFisica: u.NOME_UNIDADE_FISICA,
+                  sobrenome: u.SOBRENOME,
+                  sobrenomeSocial: u.SOBRENOME_SOCIAL,
+                  cursoNome: u.CURSO_NOME,
+                  cursoInstituicao: u.CURSO_INSTITUICAO,
+                  matricula: u.MATRICULA
+                    ? u.MATRICULA.toString()
+                    : u.ID.toString(),
+                  usuario: u.USUARIO
+                    ? u.USUARIO.toString()
+                    : u.EMAIL
+                      ? u.EMAIL.toString()
+                      : u.ID.toString(),
+                  updatedAt: new Date(),
+                })),
+              )
               .onConflictDoUpdate({
                 target: academicDiscente.id,
                 set: {
@@ -256,10 +295,9 @@ export class AcademicSyncService {
                   matricula: drizzleSql`EXCLUDED.matricula`,
                   usuario: drizzleSql`EXCLUDED.usuario`,
                   updatedAt: drizzleSql`EXCLUDED."updatedAt"`,
-                }
+                },
               });
           }
-
 
           // Sync Docentes
           const docRes = await lyceumPool.request().query(`
@@ -273,20 +311,23 @@ export class AcademicSyncService {
 
           if (docRes.recordset.length > 0) {
             syncedDocentes += docRes.recordset.length;
-            await this.db.insert(academicDocente)
-              .values(docRes.recordset.map(u => ({
-                id: u.ID.toString(),
-                nome: u.NOME,
-                email: u.EMAIL,
-                cpf: u.CPF,
-                telefone: u.TELEFONE,
-                cidade: u.CIDADE,
-                pais: u.PAIS,
-                sobrenome: u.SOBRENOME,
-                nomeSocial: u.NOME_SOCIAL,
-                sobrenomeSocial: u.SOBRENOME_SOCIAL,
-                updatedAt: new Date(),
-              })))
+            await this.db
+              .insert(academicDocente)
+              .values(
+                docRes.recordset.map((u) => ({
+                  id: u.ID.toString(),
+                  nome: u.NOME,
+                  email: u.EMAIL,
+                  cpf: u.CPF,
+                  telefone: u.TELEFONE,
+                  cidade: u.CIDADE,
+                  pais: u.PAIS,
+                  sobrenome: u.SOBRENOME,
+                  nomeSocial: u.NOME_SOCIAL,
+                  sobrenomeSocial: u.SOBRENOME_SOCIAL,
+                  updatedAt: new Date(),
+                })),
+              )
               .onConflictDoUpdate({
                 target: academicDocente.id,
                 set: {
@@ -300,27 +341,28 @@ export class AcademicSyncService {
                   nomeSocial: drizzleSql`EXCLUDED.nome_social`,
                   sobrenomeSocial: drizzleSql`EXCLUDED.sobrenome_social`,
                   updatedAt: drizzleSql`EXCLUDED."updatedAt"`,
-                }
+                },
               });
           }
-          
+
           this.logger.log(`Processed user chunk ${i + 1}/${userChunks.length}`);
         }
 
-        this.logger.log(`Sync complete: ${syncedDiscentes} discentes and ${syncedDocentes} docentes synced.`);
+        this.logger.log(
+          `Sync complete: ${syncedDiscentes} discentes and ${syncedDocentes} docentes synced.`,
+        );
       }
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       this.logger.log(`Synchronization finished in ${duration} seconds.`);
-      
-      return { 
-        status: 'success', 
-        turmas: turmas.length, 
+
+      return {
+        status: 'success',
+        turmas: turmas.length,
         matriculas: matriculas.length,
         usersSync: activeUserIds.size,
-        durationSeconds: duration
+        durationSeconds: duration,
       };
-      
     } catch (error: any) {
       this.logger.error('Error during Lyceum synchronization', error);
       return { status: 'error', error: error.message };

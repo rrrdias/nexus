@@ -10,7 +10,7 @@ export class JobsController {
   @Get(':queue/:id/status')
   async getStatus(
     @Param('queue') queue: string,
-    @Param('id') id: string
+    @Param('id') id: string,
   ): Promise<JobStatusResponse> {
     return this.jobsService.getJobStatus(queue, id);
   }

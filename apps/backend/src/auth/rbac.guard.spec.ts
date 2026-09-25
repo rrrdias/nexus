@@ -1,4 +1,8 @@
-import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RbacGuard } from './rbac.guard';
 import { REQUIRE_ADMIN_KEY, REQUIRE_MODULES_KEY } from './rbac.decorators';
@@ -26,7 +30,11 @@ describe('RbacGuard (Authorization & RBAC Test)', () => {
     guard = new RbacGuard(reflector, db);
   });
 
-  const mockContext = (user?: any, handler?: any, targetClass?: any): ExecutionContext => {
+  const mockContext = (
+    user?: any,
+    handler?: any,
+    targetClass?: any,
+  ): ExecutionContext => {
     const req = { user };
     return {
       switchToHttp: () => ({
@@ -38,7 +46,9 @@ describe('RbacGuard (Authorization & RBAC Test)', () => {
   };
 
   it('should ALLOW access when route is @Public()', async () => {
-    reflector.getAllAndOverride.mockImplementation((key) => key === IS_PUBLIC_KEY);
+    reflector.getAllAndOverride.mockImplementation(
+      (key) => key === IS_PUBLIC_KEY,
+    );
     const ctx = mockContext(undefined);
     const result = await guard.canActivate(ctx);
     expect(result).toBe(true);
@@ -63,7 +73,11 @@ describe('RbacGuard (Authorization & RBAC Test)', () => {
       return false;
     });
 
-    const ctx = mockContext({ id: 'admin-1', isSuperAdmin: true, isDisabled: false });
+    const ctx = mockContext({
+      id: 'admin-1',
+      isSuperAdmin: true,
+      isDisabled: false,
+    });
     const result = await guard.canActivate(ctx);
     expect(result).toBe(true);
   });
@@ -74,7 +88,11 @@ describe('RbacGuard (Authorization & RBAC Test)', () => {
       return false;
     });
 
-    const ctx = mockContext({ id: 'user-normal', isSuperAdmin: false, isDisabled: false });
+    const ctx = mockContext({
+      id: 'user-normal',
+      isSuperAdmin: false,
+      isDisabled: false,
+    });
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 
@@ -85,9 +103,15 @@ describe('RbacGuard (Authorization & RBAC Test)', () => {
     });
 
     // Mock DB queries for direct and group modules
-    db.where.mockResolvedValueOnce([{ slug: 'academic' }]).mockResolvedValueOnce([]);
+    db.where
+      .mockResolvedValueOnce([{ slug: 'academic' }])
+      .mockResolvedValueOnce([]);
 
-    const ctx = mockContext({ id: 'user-academic', isSuperAdmin: false, isDisabled: false });
+    const ctx = mockContext({
+      id: 'user-academic',
+      isSuperAdmin: false,
+      isDisabled: false,
+    });
     const result = await guard.canActivate(ctx);
     expect(result).toBe(true);
   });
@@ -99,9 +123,15 @@ describe('RbacGuard (Authorization & RBAC Test)', () => {
     });
 
     // Mock DB queries returning empty or other modules
-    db.where.mockResolvedValueOnce([{ slug: 'academic' }]).mockResolvedValueOnce([]);
+    db.where
+      .mockResolvedValueOnce([{ slug: 'academic' }])
+      .mockResolvedValueOnce([]);
 
-    const ctx = mockContext({ id: 'user-no-ava', isSuperAdmin: false, isDisabled: false });
+    const ctx = mockContext({
+      id: 'user-no-ava',
+      isSuperAdmin: false,
+      isDisabled: false,
+    });
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 });

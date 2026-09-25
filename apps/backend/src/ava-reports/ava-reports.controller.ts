@@ -15,12 +15,20 @@ export class AvaReportsController {
 
   @Post('progress')
   async getProgressData(@Req() req: any, @Body() dto: ReportQueryDto) {
-    return this.avaReportsService.getProgressData(req.user, dto.page ?? 1, dto.size ?? 15, dto.filters || {});
+    return this.avaReportsService.getProgressData(
+      req.user,
+      dto.page ?? 1,
+      dto.size ?? 15,
+      dto.filters || {},
+    );
   }
 
   @Post('progress/export')
   async getProgressExportData(@Req() req: any, @Body() dto: ExportReportDto) {
-    return this.avaReportsService.getProgressExportData(req.user, dto.filters || {});
+    return this.avaReportsService.getProgressExportData(
+      req.user,
+      dto.filters || {},
+    );
   }
 
   @RequireAdmin()
@@ -28,10 +36,14 @@ export class AvaReportsController {
   async syncMoodleData(
     @Req() req: any,
     @Body() dto: SyncMoodleDto,
-    @Query('async') isAsync?: string
+    @Query('async') isAsync?: string,
   ) {
     if (isAsync === 'false') {
-      return this.avaReportsService.syncMoodleData(req.user, dto.institution, dto.type);
+      return this.avaReportsService.syncMoodleData(
+        req.user,
+        dto.institution,
+        dto.type,
+      );
     }
     const { jobId, queue } = await this.jobsService.addAvaSyncJob({
       institution: dto.institution,
@@ -48,7 +60,12 @@ export class AvaReportsController {
 
   @Post('grades')
   async getGradesData(@Req() req: any, @Body() dto: ReportQueryDto) {
-    return this.avaReportsService.getGradesData(req.user, dto.page ?? 1, dto.size ?? 15, dto.filters || {});
+    return this.avaReportsService.getGradesData(
+      req.user,
+      dto.page ?? 1,
+      dto.size ?? 15,
+      dto.filters || {},
+    );
   }
 
   @Post('grades/export')
@@ -58,12 +75,20 @@ export class AvaReportsController {
 
   @Post('consolidated')
   async getConsolidatedData(@Req() req: any, @Body() dto: ReportQueryDto) {
-    return this.avaReportsService.getConsolidatedData(req.user, dto.page ?? 1, dto.size ?? 15, dto.filters || {});
+    return this.avaReportsService.getConsolidatedData(
+      req.user,
+      dto.page ?? 1,
+      dto.size ?? 15,
+      dto.filters || {},
+    );
   }
 
   @Post('consolidated/export')
   async exportConsolidatedData(@Req() req: any, @Body() dto: ExportReportDto) {
-    return this.avaReportsService.getConsolidatedExportData(req.user, dto.filters || {});
+    return this.avaReportsService.getConsolidatedExportData(
+      req.user,
+      dto.filters || {},
+    );
   }
 
   @Get('dashboard-stats')
@@ -71,4 +96,3 @@ export class AvaReportsController {
     return this.avaReportsService.getAvaDashboardStats(req.user);
   }
 }
-

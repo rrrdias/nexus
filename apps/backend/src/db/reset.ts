@@ -11,15 +11,18 @@ export async function hashPassword(password: string): Promise<string> {
 async function main() {
   console.log('Resetando senha para admin...');
   const newPassword = await hashPassword('admin');
-  
-  await db.update(users)
+
+  await db
+    .update(users)
     .set({ password: newPassword })
     .where(eq(users.email, 'rrrdias25@gmail.com'));
-    
+
   console.log('Senha atualizada com sucesso para rrrdias25@gmail.com!');
 }
 
-main().then(() => process.exit(0)).catch(e => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });

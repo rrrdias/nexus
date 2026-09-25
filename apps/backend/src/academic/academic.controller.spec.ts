@@ -25,7 +25,9 @@ describe('AcademicController', () => {
     };
 
     jobsService = {
-      addAcademicSyncJob: jest.fn().mockResolvedValue({ jobId: 'job-acad-1', queue: 'academic-sync' }),
+      addAcademicSyncJob: jest
+        .fn()
+        .mockResolvedValue({ jobId: 'job-acad-1', queue: 'academic-sync' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({

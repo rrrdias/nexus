@@ -1,16 +1,16 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { 
-  systemModules, 
-  userGroups, 
-  usersSystemAccess, 
+import {
+  systemModules,
+  userGroups,
+  usersSystemAccess,
   groupSystemAccess,
   users,
   groups,
   auditLogs,
   avaProgressReport,
-  avaGradesReport
+  avaGradesReport,
 } from '../db/schema';
 import { eq, inArray, sql, desc } from 'drizzle-orm';
 
@@ -32,39 +32,64 @@ export class SystemService {
 
   async getSidebarModules(userId: string) {
     const [userGroupRecords, directAccess] = await Promise.all([
-      this.db.select({ groupId: userGroups.groupId })
+      this.db
+        .select({ groupId: userGroups.groupId })
         .from(userGroups)
         .where(eq(userGroups.userId, userId)),
-      this.db.select({ module: systemModules })
+      this.db
+        .select({ module: systemModules })
         .from(usersSystemAccess)
-        .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
+        .innerJoin(
+          systemModules,
+          eq(usersSystemAccess.systemModuleId, systemModules.id),
+        )
         .where(eq(usersSystemAccess.userId, userId)),
     ]);
-    const groupIds = userGroupRecords.map(g => g.groupId);
+    const groupIds = userGroupRecords.map((g) => g.groupId);
 
     let groupAccess: any[] = [];
     if (groupIds.length > 0) {
-      groupAccess = await this.db.select({ module: systemModules })
+      groupAccess = await this.db
+        .select({ module: systemModules })
         .from(groupSystemAccess)
-        .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+        .innerJoin(
+          systemModules,
+          eq(groupSystemAccess.systemModuleId, systemModules.id),
+        )
         .where(inArray(groupSystemAccess.groupId, groupIds));
     }
 
-    const allModules = [...directAccess.map(a => a.module), ...groupAccess.map(a => a.module)];
-    return Array.from(new Map(allModules.map(m => [m.id, m])).values());
+    const allModules = [
+      ...directAccess.map((a) => a.module),
+      ...groupAccess.map((a) => a.module),
+    ];
+    return Array.from(new Map(allModules.map((m) => [m.id, m])).values());
   }
 
   async getSystemAdminDashboardStats() {
     try {
       const startTime = Date.now();
-      
+
       // 1. Query counts
-      const [userCountRes, groupCountRes, progressCountRes, gradesCountRes] = await Promise.all([
-        this.db.select({ count: sql<number>`count(*)` }).from(users).catch(() => [{ count: 0 }]),
-        this.db.select({ count: sql<number>`count(*)` }).from(groups).catch(() => [{ count: 0 }]),
-        this.db.select({ count: sql<number>`count(*)` }).from(avaProgressReport).catch(() => [{ count: 0 }]),
-        this.db.select({ count: sql<number>`count(*)` }).from(avaGradesReport).catch(() => [{ count: 0 }]),
-      ]);
+      const [userCountRes, groupCountRes, progressCountRes, gradesCountRes] =
+        await Promise.all([
+          this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(users)
+            .catch(() => [{ count: 0 }]),
+          this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(groups)
+            .catch(() => [{ count: 0 }]),
+          this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(avaProgressReport)
+            .catch(() => [{ count: 0 }]),
+          this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(avaGradesReport)
+            .catch(() => [{ count: 0 }]),
+        ]);
 
       const totalUsers = Number(userCountRes[0]?.count || 0);
       const totalGroups = Number(groupCountRes[0]?.count || 0);
@@ -78,43 +103,49 @@ export class SystemService {
       // 3. Moodle Last Sync statuses per institution
       let lastSyncsProgress: any[] = [];
       try {
-        lastSyncsProgress = await this.db.select({
-          institution: avaProgressReport.sourceInstitution,
-          lastUpdated: sql<Date>`max(${avaProgressReport.updatedAt})`
-        })
-        .from(avaProgressReport)
-        .groupBy(avaProgressReport.sourceInstitution);
+        lastSyncsProgress = await this.db
+          .select({
+            institution: avaProgressReport.sourceInstitution,
+            lastUpdated: sql<Date>`max(${avaProgressReport.updatedAt})`,
+          })
+          .from(avaProgressReport)
+          .groupBy(avaProgressReport.sourceInstitution);
       } catch (err) {
-        console.error("Error querying avaProgressReport last syncs:", err);
+        console.error('Error querying avaProgressReport last syncs:', err);
       }
 
       let lastSyncsGrades: any[] = [];
       try {
-        lastSyncsGrades = await this.db.select({
-          institution: avaGradesReport.sourceInstitution,
-          lastUpdated: sql<Date>`max(${avaGradesReport.updatedAt})`
-        })
-        .from(avaGradesReport)
-        .groupBy(avaGradesReport.sourceInstitution);
+        lastSyncsGrades = await this.db
+          .select({
+            institution: avaGradesReport.sourceInstitution,
+            lastUpdated: sql<Date>`max(${avaGradesReport.updatedAt})`,
+          })
+          .from(avaGradesReport)
+          .groupBy(avaGradesReport.sourceInstitution);
       } catch (err) {
-        console.error("Error querying avaGradesReport last syncs:", err);
+        console.error('Error querying avaGradesReport last syncs:', err);
       }
 
       // Combine sync records
       const institutions = ['ead', 'eefn', 'raizes', 'uni', 'uniego'];
       const syncStatusMap = new Map<string, Date>();
-      
+
       for (const item of [...lastSyncsProgress, ...lastSyncsGrades]) {
         if (item.institution) {
           const existing = syncStatusMap.get(item.institution);
           const current = item.lastUpdated ? new Date(item.lastUpdated) : null;
-          if (current && !isNaN(current.getTime()) && (!existing || current > existing)) {
+          if (
+            current &&
+            !isNaN(current.getTime()) &&
+            (!existing || current > existing)
+          ) {
             syncStatusMap.set(item.institution, current);
           }
         }
       }
 
-      const integrations = institutions.map(inst => {
+      const integrations = institutions.map((inst) => {
         const lastSync = syncStatusMap.get(inst);
         return {
           id: inst,
@@ -128,26 +159,32 @@ export class SystemService {
       // 4. Audit Logs
       let rawLogs: any[] = [];
       try {
-        rawLogs = await this.db.select({
-          id: auditLogs.id,
-          action: auditLogs.action,
-          timestamp: auditLogs.timestamp,
-          userName: users.name,
-        })
-        .from(auditLogs)
-        .innerJoin(users, eq(auditLogs.userId, users.id))
-        .orderBy(desc(auditLogs.timestamp))
-        .limit(5);
+        rawLogs = await this.db
+          .select({
+            id: auditLogs.id,
+            action: auditLogs.action,
+            timestamp: auditLogs.timestamp,
+            userName: users.name,
+          })
+          .from(auditLogs)
+          .innerJoin(users, eq(auditLogs.userId, users.id))
+          .orderBy(desc(auditLogs.timestamp))
+          .limit(5);
       } catch (err) {
-        console.warn("Could not retrieve real audit logs (table may be empty or unpopulated):", err.message);
+        console.warn(
+          'Could not retrieve real audit logs (table may be empty or unpopulated):',
+          err.message,
+        );
       }
 
-      const logs = rawLogs.map(l => {
+      const logs = rawLogs.map((l) => {
         const logDate = l.timestamp ? new Date(l.timestamp) : new Date();
         return {
           id: l.id,
           action: l.action,
-          timestamp: !isNaN(logDate.getTime()) ? logDate.toISOString() : new Date().toISOString(),
+          timestamp: !isNaN(logDate.getTime())
+            ? logDate.toISOString()
+            : new Date().toISOString(),
           userName: l.userName || 'Sistema',
         };
       });
@@ -156,17 +193,19 @@ export class SystemService {
       let activeUsers = totalUsers;
       let inactiveUsers = 0;
       try {
-        const activeUserCountRes = await this.db.select({ count: sql<number>`count(*)` })
+        const activeUserCountRes = await this.db
+          .select({ count: sql<number>`count(*)` })
           .from(users)
           .where(eq(users.isActive, true));
         activeUsers = Number(activeUserCountRes[0]?.count || 0);
 
-        const inactiveUserCountRes = await this.db.select({ count: sql<number>`count(*)` })
+        const inactiveUserCountRes = await this.db
+          .select({ count: sql<number>`count(*)` })
           .from(users)
           .where(eq(users.isActive, false));
         inactiveUsers = Number(inactiveUserCountRes[0]?.count || 0);
       } catch (err) {
-        console.error("Error querying active/inactive users count:", err);
+        console.error('Error querying active/inactive users count:', err);
       }
 
       // 6. Online Users Count (Real Dynamic Sessions)
@@ -183,7 +222,7 @@ export class SystemService {
         }
         onlineUsers = onlineCount > 0 ? onlineCount : 1; // At least 1 (the current user)
       } catch (err) {
-        console.error("Error calculating online users:", err);
+        console.error('Error calculating online users:', err);
       }
 
       return {
@@ -199,7 +238,7 @@ export class SystemService {
         logs,
       };
     } catch (error) {
-      console.error("Fatal error in getSystemAdminDashboardStats:", error);
+      console.error('Fatal error in getSystemAdminDashboardStats:', error);
       return {
         uptime: Math.floor(process.uptime()),
         dbLatency: -1,
@@ -210,14 +249,45 @@ export class SystemService {
         inactiveUsers: 0,
         onlineUsers: 0,
         integrations: [
-          { id: 'ead', name: 'EAD', status: 'offline', latency: 0, lastSync: null },
-          { id: 'eefn', name: 'EEFN', status: 'offline', latency: 0, lastSync: null },
-          { id: 'raizes', name: 'RAÍZES', status: 'offline', latency: 0, lastSync: null },
-          { id: 'uni', name: 'UNI', status: 'offline', latency: 0, lastSync: null },
-          { id: 'uniego', name: 'UNIEGO', status: 'offline', latency: 0, lastSync: null },
+          {
+            id: 'ead',
+            name: 'EAD',
+            status: 'offline',
+            latency: 0,
+            lastSync: null,
+          },
+          {
+            id: 'eefn',
+            name: 'EEFN',
+            status: 'offline',
+            latency: 0,
+            lastSync: null,
+          },
+          {
+            id: 'raizes',
+            name: 'RAÍZES',
+            status: 'offline',
+            latency: 0,
+            lastSync: null,
+          },
+          {
+            id: 'uni',
+            name: 'UNI',
+            status: 'offline',
+            latency: 0,
+            lastSync: null,
+          },
+          {
+            id: 'uniego',
+            name: 'UNIEGO',
+            status: 'offline',
+            latency: 0,
+            lastSync: null,
+          },
         ],
         logs: [],
-        error: 'Falha ao consultar estatísticas do sistema. Verifique os logs do servidor.',
+        error:
+          'Falha ao consultar estatísticas do sistema. Verifique os logs do servidor.',
       };
     }
   }

@@ -4,7 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useState, useTransition, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, X, Filter } from "lucide-react"
+import { Filter } from "lucide-react"
 import { DEFAULT_PERIOD } from "@/lib/academic-config"
 
 export function ProgressoFilters() {

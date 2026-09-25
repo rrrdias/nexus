@@ -1,4 +1,9 @@
-import { Injectable, Inject, Optional, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { groups, groupSystemAccess, systemModules } from '../db/schema';
@@ -21,7 +26,9 @@ export class GroupsService {
 
   private assertSuperAdmin(user?: SessionUser) {
     if (!user?.isSuperAdmin) {
-      throw new UnauthorizedException("Acesso negado. Apenas Super Admins podem executar esta ação.");
+      throw new UnauthorizedException(
+        'Acesso negado. Apenas Super Admins podem executar esta ação.',
+      );
     }
   }
 
@@ -35,43 +42,70 @@ export class GroupsService {
     const accessRows = await this.db
       .select({ groupId: groupSystemAccess.groupId, module: systemModules })
       .from(groupSystemAccess)
-      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+      .innerJoin(
+        systemModules,
+        eq(groupSystemAccess.systemModuleId, systemModules.id),
+      )
       .where(inArray(groupSystemAccess.groupId, groupIds));
 
-    const modulesByGroup = new Map<string, (typeof systemModules.$inferSelect)[]>();
+    const modulesByGroup = new Map<
+      string,
+      (typeof systemModules.$inferSelect)[]
+    >();
     for (const row of accessRows) {
       const list = modulesByGroup.get(row.groupId) ?? [];
       list.push(row.module);
       modulesByGroup.set(row.groupId, list);
     }
 
-    return allGroups.map((g) => ({ ...g, modules: modulesByGroup.get(g.id) ?? [] }));
+    return allGroups.map((g) => ({
+      ...g,
+      modules: modulesByGroup.get(g.id) ?? [],
+    }));
   }
 
   async getGroupWithModules(user: SessionUser, groupId: string) {
     this.assertSuperAdmin(user);
-    const group = await this.db.select().from(groups).where(eq(groups.id, groupId)).limit(1);
-    if (group.length === 0) throw new Error("Grupo não encontrado.");
+    const group = await this.db
+      .select()
+      .from(groups)
+      .where(eq(groups.id, groupId))
+      .limit(1);
+    if (group.length === 0) throw new Error('Grupo não encontrado.');
 
     const access = await this.db
       .select({ module: systemModules })
       .from(groupSystemAccess)
-      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+      .innerJoin(
+        systemModules,
+        eq(groupSystemAccess.systemModuleId, systemModules.id),
+      )
       .where(eq(groupSystemAccess.groupId, groupId));
 
-    return { group: group[0], moduleIds: access.map(a => a.module.id) };
+    return { group: group[0], moduleIds: access.map((a) => a.module.id) };
   }
 
-  async createGroup(user: SessionUser, name: string, description: string, moduleIds: string[]) {
+  async createGroup(
+    user: SessionUser,
+    name: string,
+    description: string,
+    moduleIds: string[],
+  ) {
     this.assertSuperAdmin(user);
-    if (!name?.trim()) throw new Error("Nome do grupo é obrigatório.");
+    if (!name?.trim()) throw new Error('Nome do grupo é obrigatório.');
 
     await this.db.transaction(async (tx) => {
-      const [created] = await tx.insert(groups).values({ name: name.trim(), description }).returning();
+      const [created] = await tx
+        .insert(groups)
+        .values({ name: name.trim(), description })
+        .returning();
 
       if (moduleIds && moduleIds.length > 0) {
         await tx.insert(groupSystemAccess).values(
-          moduleIds.map(id => ({ groupId: created.id, systemModuleId: id }))
+          moduleIds.map((id) => ({
+            groupId: created.id,
+            systemModuleId: id,
+          })),
         );
       }
     });
@@ -84,18 +118,29 @@ export class GroupsService {
     return { success: true };
   }
 
-  async updateGroup(user: SessionUser, groupId: string, name: string, description: string, moduleIds: string[]) {
+  async updateGroup(
+    user: SessionUser,
+    groupId: string,
+    name: string,
+    description: string,
+    moduleIds: string[],
+  ) {
     this.assertSuperAdmin(user);
-    if (!name?.trim()) throw new Error("Nome do grupo é obrigatório.");
+    if (!name?.trim()) throw new Error('Nome do grupo é obrigatório.');
 
     await this.db.transaction(async (tx) => {
-      await tx.update(groups).set({ name: name.trim(), description }).where(eq(groups.id, groupId));
+      await tx
+        .update(groups)
+        .set({ name: name.trim(), description })
+        .where(eq(groups.id, groupId));
 
-      await tx.delete(groupSystemAccess).where(eq(groupSystemAccess.groupId, groupId));
+      await tx
+        .delete(groupSystemAccess)
+        .where(eq(groupSystemAccess.groupId, groupId));
       if (moduleIds && moduleIds.length > 0) {
-        await tx.insert(groupSystemAccess).values(
-          moduleIds.map(id => ({ groupId, systemModuleId: id }))
-        );
+        await tx
+          .insert(groupSystemAccess)
+          .values(moduleIds.map((id) => ({ groupId, systemModuleId: id })));
       }
     });
 

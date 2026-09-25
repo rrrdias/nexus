@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import Redis from 'ioredis';
 
 interface MemoryCacheEntry {
@@ -41,7 +46,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
       this.redisClient.on('error', (err) => {
         if (this.isRedisAvailable) {
-          this.logger.warn(`Perda de conexão com Redis (${err.message}). Utilizando fallback em memória.`);
+          this.logger.warn(
+            `Perda de conexão com Redis (${err.message}). Utilizando fallback em memória.`,
+          );
         }
         this.isRedisAvailable = false;
       });
@@ -49,11 +56,15 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       // Tentativa inicial não bloqueante de conexão
       this.redisClient.connect().catch((err) => {
         this.isRedisAvailable = false;
-        this.logger.log(`Redis não disponível (${err.message}). Operando em modo de cache local em memória.`);
+        this.logger.log(
+          `Redis não disponível (${err.message}). Operando em modo de cache local em memória.`,
+        );
       });
     } catch (err: any) {
       this.isRedisAvailable = false;
-      this.logger.log(`Inicializando CacheService com fallback em memória: ${err.message}`);
+      this.logger.log(
+        `Inicializando CacheService com fallback em memória: ${err.message}`,
+      );
     }
   }
 
@@ -78,7 +89,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         if (!raw) return null;
         return JSON.parse(raw) as T;
       } catch (err: any) {
-        this.logger.warn(`Erro ao ler chave "${key}" do Redis: ${err.message}. Verificando cache local.`);
+        this.logger.warn(
+          `Erro ao ler chave "${key}" do Redis: ${err.message}. Verificando cache local.`,
+        );
       }
     }
 
@@ -110,12 +123,15 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         }
         return;
       } catch (err: any) {
-        this.logger.warn(`Erro ao gravar chave "${key}" no Redis: ${err.message}. Gravando no cache local.`);
+        this.logger.warn(
+          `Erro ao gravar chave "${key}" no Redis: ${err.message}. Gravando no cache local.`,
+        );
       }
     }
 
     // Fallback em memória
-    const expiresAt = ttlSeconds && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null;
+    const expiresAt =
+      ttlSeconds && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null;
     this.memoryCache.set(key, { value: stringified, expiresAt });
 
     // Limpeza periódica se o mapa em memória crescer
@@ -152,7 +168,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
           await this.redisClient.del(...keys);
         }
       } catch (err: any) {
-        this.logger.warn(`Erro ao deletar padrão "${pattern}" no Redis: ${err.message}`);
+        this.logger.warn(
+          `Erro ao deletar padrão "${pattern}" no Redis: ${err.message}`,
+        );
       }
     }
 
@@ -165,7 +183,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async wrap<T>(key: string, fn: () => Promise<T>, ttlSeconds = 300): Promise<T> {
+  async wrap<T>(
+    key: string,
+    fn: () => Promise<T>,
+    ttlSeconds = 300,
+  ): Promise<T> {
     const cached = await this.get<T>(key);
     if (cached !== null && cached !== undefined) {
       return cached;

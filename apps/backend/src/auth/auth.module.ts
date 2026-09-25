@@ -7,11 +7,17 @@ import { JwtModule } from '@nestjs/jwt';
   imports: [
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_SECRET is required in production'); })() : 'nexus-dev-jwt-secret-not-for-production-min32chars'),
+      secret:
+        process.env.JWT_SECRET ||
+        (process.env.NODE_ENV === 'production'
+          ? (() => {
+              throw new Error('JWT_SECRET is required in production');
+            })()
+          : 'nexus-dev-jwt-secret-not-for-production-min32chars'),
       signOptions: { expiresIn: '2h' },
     }),
   ],
   providers: [AuthService],
-  controllers: [AuthController]
+  controllers: [AuthController],
 })
 export class AuthModule {}

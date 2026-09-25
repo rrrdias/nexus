@@ -36,7 +36,7 @@ describe('AuthService (RBAC and Login Test)', () => {
         email: 'admin@unievangelica.edu.br',
         password: '$2a$10$hashedpassword',
         isActive: true,
-      }
+      },
     ]);
 
     // Mock find user groups (second query where does not have limit)
@@ -44,7 +44,7 @@ describe('AuthService (RBAC and Login Test)', () => {
       {
         user_group: { userId: 'u1', groupId: 'g1' },
         group: { id: 'g1', name: 'Super Admin' },
-      }
+      },
     ]);
 
     const res = await service.login('admin@unievangelica.edu.br', 'senha123');
@@ -64,7 +64,7 @@ describe('AuthService (RBAC and Login Test)', () => {
         email: 'rrrdias25@gmail.com',
         password: '$2a$10$hashedpassword',
         isActive: true,
-      }
+      },
     ]);
 
     // Mock groups without Super Admin
@@ -72,7 +72,7 @@ describe('AuthService (RBAC and Login Test)', () => {
       {
         user_group: { userId: 'u2', groupId: 'g2' },
         group: { id: 'g2', name: 'Coordenadores' },
-      }
+      },
     ]);
 
     const res = await service.login('rrrdias25@gmail.com', 'senha123');
@@ -90,9 +90,11 @@ describe('AuthService (RBAC and Login Test)', () => {
         email: 'admin@unievangelica.edu.br',
         password: '$2a$10$hashedpassword',
         isActive: true,
-      }
+      },
     ]);
 
-    await expect(service.login('admin@unievangelica.edu.br', 'wrongpass')).rejects.toThrow(UnauthorizedException);
+    await expect(
+      service.login('admin@unievangelica.edu.br', 'wrongpass'),
+    ).rejects.toThrow(UnauthorizedException);
   });
 });

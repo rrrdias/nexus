@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,7 +11,6 @@ import { createGroup, updateGroup } from "@/app/actions/groups"
 import { 
   Loader2, 
   ShieldCheck, 
-  ShieldAlert, 
   Layers, 
   AlertCircle, 
   Check, 

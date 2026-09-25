@@ -32,13 +32,22 @@ describe('AuthController', () => {
   });
 
   it('should call authService.login on signIn', async () => {
-    const result = await controller.signIn({ email: 'user@test.com', password: 'password123' });
-    expect(authService.login).toHaveBeenCalledWith('user@test.com', 'password123');
+    const result = await controller.signIn({
+      email: 'user@test.com',
+      password: 'password123',
+    });
+    expect(authService.login).toHaveBeenCalledWith(
+      'user@test.com',
+      'password123',
+    );
     expect(result.access_token).toBe('fake_jwt_token');
   });
 
   it('should support login with username/userid instead of email format', async () => {
-    const result = await controller.signIn({ login: 'admin', password: 'admin' });
+    const result = await controller.signIn({
+      login: 'admin',
+      password: 'admin',
+    });
     expect(authService.login).toHaveBeenCalledWith('admin', 'admin');
     expect(result.access_token).toBe('fake_jwt_token');
   });

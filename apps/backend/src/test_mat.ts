@@ -12,9 +12,13 @@ async function run() {
 
   try {
     const pool = await new sql.ConnectionPool(config).connect();
-    const res = await pool.request().query("SELECT TOP 1 * FROM VW_AVA_MATRICULA");
+    const res = await pool
+      .request()
+      .query('SELECT TOP 1 * FROM VW_AVA_MATRICULA');
     console.log(Object.keys(res.recordset[0]));
     pool.close();
-  } catch(e) { console.error(e); }
+  } catch (e) {
+    console.error(e);
+  }
 }
 run();

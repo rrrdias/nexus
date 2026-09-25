@@ -15,10 +15,14 @@ describe('HealthService', () => {
       execute: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
     };
     mockJobsService = {
-      checkRedisHealth: jest.fn().mockResolvedValue({ status: 'up', latencyMs: 2 }),
+      checkRedisHealth: jest
+        .fn()
+        .mockResolvedValue({ status: 'up', latencyMs: 2 }),
     };
     mockAcademicService = {
-      checkLyceumHealth: jest.fn().mockResolvedValue({ status: 'up', latencyMs: 5 }),
+      checkLyceumHealth: jest
+        .fn()
+        .mockResolvedValue({ status: 'up', latencyMs: 5 }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -54,7 +58,10 @@ describe('HealthService', () => {
   });
 
   it('should return degraded status when redis or lyceum is down but database is up', async () => {
-    mockJobsService.checkRedisHealth.mockResolvedValueOnce({ status: 'down', message: 'Redis down' });
+    mockJobsService.checkRedisHealth.mockResolvedValueOnce({
+      status: 'down',
+      message: 'Redis down',
+    });
 
     const res = await service.checkHealth();
 

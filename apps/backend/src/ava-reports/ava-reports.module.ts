@@ -7,6 +7,6 @@ import { JobsModule } from '../jobs/jobs.module';
 @Module({
   imports: [AvaSyncModule, forwardRef(() => JobsModule)],
   controllers: [AvaReportsController],
-  providers: [AvaReportsService]
+  providers: [AvaReportsService],
 })
 export class AvaReportsModule {}

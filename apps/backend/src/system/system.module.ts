@@ -6,6 +6,6 @@ import { DbModule } from '../db/db.module';
 @Module({
   imports: [DbModule],
   providers: [SystemService],
-  controllers: [SystemController]
+  controllers: [SystemController],
 })
 export class SystemModule {}

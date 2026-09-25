@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { MessageCircle, MoreHorizontal, ListTodo, MessageSquare } from "lucide-react"
 import { ActivityListDialog } from "./ActivityListDialog"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -157,7 +156,7 @@ function buildMoodleUrl(institution: string | null, alunoId: string | null): str
 // ──────────────────────────────────────────
 // Ações da Linha (Dropdown Menu com Submenus)
 // ──────────────────────────────────────────
-function RowActions({ row, phoneFormatted, waUrl }: {
+function RowActions({ row, phoneFormatted: _phoneFormatted, waUrl }: {
   row: any
   phoneFormatted: string | null
   waUrl: string | null

@@ -11,7 +11,9 @@ describe('Auth & RBAC (e2e)', () => {
   let app: INestApplication;
   let jwtService: JwtService;
 
-  const createChain = (defaultResult: any = [{ id: 'test-id', isActive: true }]) => {
+  const createChain = (
+    defaultResult: any = [{ id: 'test-id', isActive: true }],
+  ) => {
     const chain: any = {
       from: jest.fn().mockImplementation(() => chain),
       innerJoin: jest.fn().mockImplementation(() => chain),
@@ -48,10 +50,18 @@ describe('Auth & RBAC (e2e)', () => {
   };
 
   const mockJobsService = {
-    checkRedisHealth: jest.fn().mockResolvedValue({ status: 'up', latencyMs: 2 }),
-    addAcademicSyncJob: jest.fn().mockResolvedValue({ jobId: 'job-academic-123', queue: 'academic-sync' }),
-    addAvaSyncJob: jest.fn().mockResolvedValue({ jobId: 'job-ava-123', queue: 'ava-sync' }),
-    getJobStatus: jest.fn().mockResolvedValue({ id: 'job-123', state: 'completed', progress: 100 }),
+    checkRedisHealth: jest
+      .fn()
+      .mockResolvedValue({ status: 'up', latencyMs: 2 }),
+    addAcademicSyncJob: jest
+      .fn()
+      .mockResolvedValue({ jobId: 'job-academic-123', queue: 'academic-sync' }),
+    addAvaSyncJob: jest
+      .fn()
+      .mockResolvedValue({ jobId: 'job-ava-123', queue: 'ava-sync' }),
+    getJobStatus: jest
+      .fn()
+      .mockResolvedValue({ id: 'job-123', state: 'completed', progress: 100 }),
   };
 
   beforeAll(async () => {
@@ -67,7 +77,9 @@ describe('Auth & RBAC (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     jwtService = moduleFixture.get<JwtService>(JwtService);
 
     await app.init();

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Req,
+} from '@nestjs/common';
 import { GroupsService } from './groups.service';
 import { RequireAdmin } from '../auth/rbac.decorators';
 import { CreateGroupDto } from './dto/create-group.dto';
@@ -21,12 +30,27 @@ export class GroupsController {
 
   @Post()
   createGroup(@Req() req: any, @Body() data: CreateGroupDto) {
-    return this.groupsService.createGroup(req.user, data.name, data.description || '', data.moduleIds || []);
+    return this.groupsService.createGroup(
+      req.user,
+      data.name,
+      data.description || '',
+      data.moduleIds || [],
+    );
   }
 
   @Put(':id')
-  updateGroup(@Req() req: any, @Param('id') id: string, @Body() data: UpdateGroupDto) {
-    return this.groupsService.updateGroup(req.user, id, data.name, data.description || '', data.moduleIds || []);
+  updateGroup(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() data: UpdateGroupDto,
+  ) {
+    return this.groupsService.updateGroup(
+      req.user,
+      id,
+      data.name,
+      data.description || '',
+      data.moduleIds || [],
+    );
   }
 
   @Delete(':id')

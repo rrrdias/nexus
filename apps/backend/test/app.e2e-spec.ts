@@ -39,7 +39,9 @@ describe('AppController (e2e)', () => {
   };
 
   const mockJobsService = {
-    checkRedisHealth: jest.fn().mockResolvedValue({ status: 'up', latencyMs: 2 }),
+    checkRedisHealth: jest
+      .fn()
+      .mockResolvedValue({ status: 'up', latencyMs: 2 }),
   };
 
   beforeAll(async () => {
@@ -69,4 +71,3 @@ describe('AppController (e2e)', () => {
       .expect('Hello World!');
   });
 });
-

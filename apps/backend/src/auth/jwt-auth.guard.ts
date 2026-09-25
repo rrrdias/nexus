@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, Inject } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+  Inject,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
@@ -41,7 +47,13 @@ export class JwtAuthGuard implements CanActivate {
     }
     try {
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('JWT_SECRET is required in production'); })() : 'nexus-dev-jwt-secret-not-for-production-min32chars')
+        secret:
+          process.env.JWT_SECRET ||
+          (process.env.NODE_ENV === 'production'
+            ? (() => {
+                throw new Error('JWT_SECRET is required in production');
+              })()
+            : 'nexus-dev-jwt-secret-not-for-production-min32chars'),
       });
 
       const userId = payload.sub;
@@ -49,11 +61,12 @@ export class JwtAuthGuard implements CanActivate {
       const now = Date.now();
       const cached = JwtAuthGuard.userActiveCache.get(userId);
 
-      if (cached && (now - cached.timestamp < JwtAuthGuard.CACHE_TTL_MS)) {
+      if (cached && now - cached.timestamp < JwtAuthGuard.CACHE_TTL_MS) {
         isActive = cached.isActive;
       } else {
         // Consultar banco para garantir que o usuário ainda existe e está ativo no sistema
-        const userResult = await this.db.select({ isActive: users.isActive })
+        const userResult = await this.db
+          .select({ isActive: users.isActive })
           .from(users)
           .where(eq(users.id, userId))
           .limit(1);
@@ -84,7 +97,7 @@ export class JwtAuthGuard implements CanActivate {
         id: payload.sub,
         email: payload.email,
         isSuperAdmin: payload.isSuperAdmin,
-        isDisabled: !isActive
+        isDisabled: !isActive,
       };
     } catch {
       throw new UnauthorizedException();

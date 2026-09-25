@@ -18,7 +18,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const isProduction = process.env.NODE_ENV === 'production';
-    const requestId = request.requestId || (request.headers['x-request-id'] as string) || '-';
+    const requestId =
+      request.requestId || (request.headers['x-request-id'] as string) || '-';
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let errorTitle = 'Internal Server Error';

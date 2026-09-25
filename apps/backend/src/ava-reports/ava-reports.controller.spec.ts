@@ -10,13 +10,19 @@ describe('AvaReportsController', () => {
 
   beforeEach(async () => {
     avaReportsService = {
-      getProgressData: jest.fn().mockResolvedValue({ total_records: 10, data: [] }),
-      getGradesData: jest.fn().mockResolvedValue({ total_records: 10, data: [] }),
+      getProgressData: jest
+        .fn()
+        .mockResolvedValue({ total_records: 10, data: [] }),
+      getGradesData: jest
+        .fn()
+        .mockResolvedValue({ total_records: 10, data: [] }),
       getAvaDashboardStats: jest.fn().mockResolvedValue({ totalStudents: 10 }),
     };
 
     jobsService = {
-      addAvaSyncJob: jest.fn().mockResolvedValue({ jobId: 'job-123', queue: 'ava-sync' }),
+      addAvaSyncJob: jest
+        .fn()
+        .mockResolvedValue({ jobId: 'job-123', queue: 'ava-sync' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -42,8 +48,17 @@ describe('AvaReportsController', () => {
 
   it('should call getProgressData', async () => {
     const req = { user: { id: '1', isSuperAdmin: true } };
-    const res = await controller.getProgressData(req, { page: 1, size: 15, filters: {} });
-    expect(avaReportsService.getProgressData).toHaveBeenCalledWith(req.user, 1, 15, {});
+    const res = await controller.getProgressData(req, {
+      page: 1,
+      size: 15,
+      filters: {},
+    });
+    expect(avaReportsService.getProgressData).toHaveBeenCalledWith(
+      req.user,
+      1,
+      15,
+      {},
+    );
     expect(res).toEqual({ total_records: 10, data: [] });
   });
 });

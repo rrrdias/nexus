@@ -12,10 +12,7 @@ describe('GroupsService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        GroupsService,
-        { provide: DB_CONNECTION, useValue: mockDb },
-      ],
+      providers: [GroupsService, { provide: DB_CONNECTION, useValue: mockDb }],
     }).compile();
 
     service = module.get<GroupsService>(GroupsService);

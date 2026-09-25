@@ -19,7 +19,6 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
       offset: jest.fn().mockReturnThis(),
     };
 
-
     db = queryBuilder;
     service = new AvaReportsService(db);
   });
@@ -65,7 +64,9 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
     expect(stats.averageGrade).toBe(82);
     expect(stats.belowApprovalCount).toBe(12);
     expect(stats.noAccessCount).toBe(10);
-    expect(stats.institutionsStats.find(i => i.id === 'ead')?.status).toBe('success');
+    expect(stats.institutionsStats.find((i) => i.id === 'ead')?.status).toBe(
+      'success',
+    );
   });
 
   it('should paginate getProgressData directly in SQL with LIMIT and OFFSET', async () => {
@@ -100,7 +101,9 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
 
     db.offset.mockResolvedValueOnce(mockRows);
 
-    const result = await service.getProgressData(superAdminUser, 1, 15, { sourceInstitution: 'ead' });
+    const result = await service.getProgressData(superAdminUser, 1, 15, {
+      sourceInstitution: 'ead',
+    });
 
     expect(result.total_records).toBe(500);
     expect(result.total_pages).toBe(34);
@@ -147,7 +150,9 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
       .mockResolvedValueOnce([{ value: 'Administração' }])
       .mockResolvedValueOnce([{ value: 'Polo Anápolis' }]);
 
-    const result = await service.getConsolidatedData(superAdminUser, 1, 15, { sourceInstitution: 'ead' });
+    const result = await service.getConsolidatedData(superAdminUser, 1, 15, {
+      sourceInstitution: 'ead',
+    });
 
     expect(result.total_records).toBe(1200);
     expect(result.data).toHaveLength(1);
@@ -158,4 +163,3 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
     expect(result.average_grade).toBe(81);
   });
 });
-

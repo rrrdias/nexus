@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUE_ACADEMIC_SYNC, JOB_ACADEMIC_SYNC } from '../jobs.constants';
+import { QUEUE_ACADEMIC_SYNC } from '../jobs.constants';
 import { AcademicSyncService } from '../../academic/academic-sync.service';
 
 @Processor(QUEUE_ACADEMIC_SYNC, {
@@ -30,7 +30,10 @@ export class AcademicSyncProcessor extends WorkerHost {
       throw new Error(result.error || 'Erro na sincronização do Lyceum');
     }
 
-    await job.updateProgress({ progress: 100, step: 'Sincronização concluída com sucesso' });
+    await job.updateProgress({
+      progress: 100,
+      step: 'Sincronização concluída com sucesso',
+    });
     this.logger.log(`Completed job ${job.name} (ID: ${job.id})`);
     return result;
   }

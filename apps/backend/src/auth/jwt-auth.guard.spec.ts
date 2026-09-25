@@ -28,7 +28,13 @@ describe('JwtAuthGuard (Security Test)', () => {
     guard = new JwtAuthGuard(jwtService, db, reflector);
   });
 
-  const mockContext = (url: string, path?: string, authHeader?: string, handler?: any, targetClass?: any): ExecutionContext => {
+  const mockContext = (
+    url: string,
+    path?: string,
+    authHeader?: string,
+    handler?: any,
+    targetClass?: any,
+  ): ExecutionContext => {
     const req = {
       url,
       path: path || url.split('?')[0],
@@ -57,13 +63,21 @@ describe('JwtAuthGuard (Security Test)', () => {
   });
 
   it('should ALLOW valid JWT tokens and populate request.user', async () => {
-    const ctx = mockContext('/api/users', '/api/users', 'Bearer valid.jwt.token');
-    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-123', email: 'test@nexus.com', isSuperAdmin: true });
+    const ctx = mockContext(
+      '/api/users',
+      '/api/users',
+      'Bearer valid.jwt.token',
+    );
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-123',
+      email: 'test@nexus.com',
+      isSuperAdmin: true,
+    });
     db.limit.mockResolvedValue([{ isActive: true }]);
 
     const result = await guard.canActivate(ctx);
     expect(result).toBe(true);
-    const req = ctx.switchToHttp().getRequest() as any;
+    const req = ctx.switchToHttp().getRequest();
     expect(req.user).toEqual({
       id: 'user-123',
       email: 'test@nexus.com',
@@ -73,16 +87,32 @@ describe('JwtAuthGuard (Security Test)', () => {
   });
 
   it('should REJECT token when user is deactivated in database', async () => {
-    const ctx = mockContext('/api/users', '/api/users', 'Bearer valid.jwt.token');
-    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-deactivated-456', email: 'test@nexus.com', isSuperAdmin: false });
+    const ctx = mockContext(
+      '/api/users',
+      '/api/users',
+      'Bearer valid.jwt.token',
+    );
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-deactivated-456',
+      email: 'test@nexus.com',
+      isSuperAdmin: false,
+    });
     db.limit.mockResolvedValue([{ isActive: false }]);
 
     await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
   });
 
   it('should verify token with secret from configuration', async () => {
-    const ctx = mockContext('/api/users', '/api/users', 'Bearer valid.jwt.token');
-    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-123', email: 'test@nexus.com', isSuperAdmin: true });
+    const ctx = mockContext(
+      '/api/users',
+      '/api/users',
+      'Bearer valid.jwt.token',
+    );
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-123',
+      email: 'test@nexus.com',
+      isSuperAdmin: true,
+    });
     db.limit.mockResolvedValue([{ isActive: true }]);
 
     const result = await guard.canActivate(ctx);
@@ -93,4 +123,3 @@ describe('JwtAuthGuard (Security Test)', () => {
     );
   });
 });
-

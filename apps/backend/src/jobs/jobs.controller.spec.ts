@@ -36,7 +36,10 @@ describe('JobsController', () => {
 
   it('should call jobsService.getJobStatus with params', async () => {
     const result = await controller.getStatus(QUEUE_ACADEMIC_SYNC, 'job-123');
-    expect(jobsService.getJobStatus).toHaveBeenCalledWith(QUEUE_ACADEMIC_SYNC, 'job-123');
+    expect(jobsService.getJobStatus).toHaveBeenCalledWith(
+      QUEUE_ACADEMIC_SYNC,
+      'job-123',
+    );
     expect(result).toEqual({
       id: 'job-123',
       queue: QUEUE_ACADEMIC_SYNC,

@@ -6,6 +6,8 @@ export class SyncMoodleDto {
   institution?: string;
 
   @IsOptional()
-  @IsIn(['grades', 'progress'], { message: 'type deve ser "grades" ou "progress".' })
+  @IsIn(['grades', 'progress'], {
+    message: 'type deve ser "grades" ou "progress".',
+  })
   type?: 'grades' | 'progress';
 }

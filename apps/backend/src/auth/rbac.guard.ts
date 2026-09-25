@@ -1,8 +1,21 @@
-import { CanActivate, ExecutionContext, Injectable, ForbiddenException, UnauthorizedException, Inject, Optional } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  ForbiddenException,
+  UnauthorizedException,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
+import {
+  systemModules,
+  usersSystemAccess,
+  userGroups,
+  groupSystemAccess,
+} from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { REQUIRE_ADMIN_KEY, REQUIRE_MODULES_KEY } from './rbac.decorators';
@@ -11,7 +24,10 @@ import { CacheService } from '../cache/cache.service';
 @Injectable()
 export class RbacGuard implements CanActivate {
   private static readonly LOCAL_CACHE_TTL_MS = 60_000;
-  private static localFallbackCache = new Map<string, { modules: Set<string>; timestamp: number }>();
+  private static localFallbackCache = new Map<
+    string,
+    { modules: Set<string>; timestamp: number }
+  >();
 
   constructor(
     private readonly reflector: Reflector,
@@ -49,20 +65,20 @@ export class RbacGuard implements CanActivate {
     }
 
     // 1. Verificar restrição exclusiva de Super Admin (@RequireAdmin)
-    const requireAdmin = this.reflector.getAllAndOverride<boolean>(REQUIRE_ADMIN_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requireAdmin = this.reflector.getAllAndOverride<boolean>(
+      REQUIRE_ADMIN_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (requireAdmin) {
       throw new ForbiddenException('Acesso restrito a administradores.');
     }
 
     // 2. Verificar permissão de módulos (@RequireModule)
-    const requiredModules = this.reflector.getAllAndOverride<string[]>(REQUIRE_MODULES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredModules = this.reflector.getAllAndOverride<string[]>(
+      REQUIRE_MODULES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredModules || requiredModules.length === 0) {
       // Nenhuma restrição de módulo específica, usuário autenticado permitido
@@ -73,7 +89,9 @@ export class RbacGuard implements CanActivate {
     const hasAccess = requiredModules.some((mod) => allowedModules.has(mod));
 
     if (!hasAccess) {
-      throw new ForbiddenException(`Acesso negado. Requer permissão em: ${requiredModules.join(', ')}.`);
+      throw new ForbiddenException(
+        `Acesso negado. Requer permissão em: ${requiredModules.join(', ')}.`,
+      );
     }
 
     return true;
@@ -88,7 +106,10 @@ export class RbacGuard implements CanActivate {
           const directModulesPromise = this.db
             .select({ slug: systemModules.slug })
             .from(usersSystemAccess)
-            .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
+            .innerJoin(
+              systemModules,
+              eq(usersSystemAccess.systemModuleId, systemModules.id),
+            )
             .where(
               and(
                 eq(usersSystemAccess.userId, userId),
@@ -99,8 +120,14 @@ export class RbacGuard implements CanActivate {
           const groupModulesPromise = this.db
             .select({ slug: systemModules.slug })
             .from(userGroups)
-            .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
-            .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+            .innerJoin(
+              groupSystemAccess,
+              eq(userGroups.groupId, groupSystemAccess.groupId),
+            )
+            .innerJoin(
+              systemModules,
+              eq(groupSystemAccess.systemModuleId, systemModules.id),
+            )
             .where(
               and(
                 eq(userGroups.userId, userId),
@@ -140,7 +167,10 @@ export class RbacGuard implements CanActivate {
       this.db
         .select({ slug: systemModules.slug })
         .from(usersSystemAccess)
-        .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
+        .innerJoin(
+          systemModules,
+          eq(usersSystemAccess.systemModuleId, systemModules.id),
+        )
         .where(
           and(
             eq(usersSystemAccess.userId, userId),
@@ -150,13 +180,16 @@ export class RbacGuard implements CanActivate {
       this.db
         .select({ slug: systemModules.slug })
         .from(userGroups)
-        .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
-        .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
+        .innerJoin(
+          groupSystemAccess,
+          eq(userGroups.groupId, groupSystemAccess.groupId),
+        )
+        .innerJoin(
+          systemModules,
+          eq(groupSystemAccess.systemModuleId, systemModules.id),
+        )
         .where(
-          and(
-            eq(userGroups.userId, userId),
-            eq(systemModules.isActive, true),
-          ),
+          and(eq(userGroups.userId, userId), eq(systemModules.isActive, true)),
         ),
     ]);
 

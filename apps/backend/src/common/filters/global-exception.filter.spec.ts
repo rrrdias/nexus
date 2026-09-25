@@ -1,5 +1,9 @@
 import { GlobalExceptionFilter } from './global-exception.filter';
-import { HttpException, HttpStatus, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  HttpStatus,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ArgumentsHost } from '@nestjs/common';
 import { Request, Response } from 'express';
 
@@ -49,7 +53,10 @@ describe('GlobalExceptionFilter', () => {
   });
 
   it('should handle validation errors with array of messages', () => {
-    const exception = new BadRequestException(['Email inválido', 'Nome é obrigatório']);
+    const exception = new BadRequestException([
+      'Email inválido',
+      'Nome é obrigatório',
+    ]);
 
     filter.catch(exception, mockHost);
 
@@ -68,7 +75,9 @@ describe('GlobalExceptionFilter', () => {
 
     filter.catch(exception, mockHost);
 
-    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+    expect(mockResponse.status).toHaveBeenCalledWith(
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
     expect(mockResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,

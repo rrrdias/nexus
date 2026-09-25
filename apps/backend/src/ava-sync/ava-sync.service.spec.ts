@@ -16,9 +16,24 @@ describe('AvaSyncService (Moodle Sync & Deduplication)', () => {
 
   it('should deduplicate progress items using fallback studentKey without collisions', async () => {
     const mockItems = [
-      { aluno_id: '101', matricula: 'M101', curso: 'Direito', progresso_total: '50' },
-      { aluno_id: '101', matricula: 'M101', curso: 'Direito', progresso_total: '60' }, // Duplicate of student 101 in same course
-      { aluno_id: '', matricula: 'M102', curso: 'Direito', progresso_total: '70' }, // Student with empty aluno_id but valid matricula
+      {
+        aluno_id: '101',
+        matricula: 'M101',
+        curso: 'Direito',
+        progresso_total: '50',
+      },
+      {
+        aluno_id: '101',
+        matricula: 'M101',
+        curso: 'Direito',
+        progresso_total: '60',
+      }, // Duplicate of student 101 in same course
+      {
+        aluno_id: '',
+        matricula: 'M102',
+        curso: 'Direito',
+        progresso_total: '70',
+      }, // Student with empty aluno_id but valid matricula
     ];
 
     global.fetch = jest.fn().mockResolvedValue({
@@ -26,7 +41,11 @@ describe('AvaSyncService (Moodle Sync & Deduplication)', () => {
       text: jest.fn().mockResolvedValue(JSON.stringify(mockItems)),
     }) as any;
 
-    const result = await service.syncProgress('ead', 'http://fake-url/progress', undefined);
+    const result = await service.syncProgress(
+      'ead',
+      'http://fake-url/progress',
+      undefined,
+    );
 
     expect(result.status).toBe('success');
     expect(db.values).toHaveBeenCalled();

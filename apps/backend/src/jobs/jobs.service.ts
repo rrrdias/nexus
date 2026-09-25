@@ -1,7 +1,12 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
-import { QUEUE_ACADEMIC_SYNC, QUEUE_AVA_SYNC, JOB_ACADEMIC_SYNC, JOB_AVA_SYNC } from './jobs.constants';
+import {
+  QUEUE_ACADEMIC_SYNC,
+  QUEUE_AVA_SYNC,
+  JOB_ACADEMIC_SYNC,
+  JOB_AVA_SYNC,
+} from './jobs.constants';
 
 export interface JobStatusResponse {
   id: string;
@@ -38,10 +43,12 @@ export class JobsService {
     // Check if an active or waiting job already exists to avoid duplicate simultaneous syncs
     const activeJobs = await this.academicQueue.getActive();
     const waitingJobs = await this.academicQueue.getWaiting();
-    
+
     const existingJob = [...activeJobs, ...waitingJobs][0];
     if (existingJob) {
-      this.logger.log(`Reutilizando job de sincronização acadêmica já em andamento (${existingJob.id})`);
+      this.logger.log(
+        `Reutilizando job de sincronização acadêmica já em andamento (${existingJob.id})`,
+      );
       return { jobId: existingJob.id as string, queue: QUEUE_ACADEMIC_SYNC };
     }
 
@@ -61,43 +68,49 @@ export class JobsService {
         removeOnFail: {
           count: 100,
         },
-      }
+      },
     );
 
-    this.logger.log(`Novo job de sincronização acadêmica enfileirado: ${job.id}`);
+    this.logger.log(
+      `Novo job de sincronização acadêmica enfileirado: ${job.id}`,
+    );
     return { jobId: job.id as string, queue: QUEUE_ACADEMIC_SYNC };
   }
 
-  async addAvaSyncJob(data: { institution?: string; type?: 'grades' | 'progress' }): Promise<{ jobId: string; queue: string }> {
-    const job = await this.avaQueue.add(
-      JOB_AVA_SYNC,
-      data,
-      {
-        attempts: 2,
-        backoff: {
-          type: 'exponential',
-          delay: 3000,
-        },
-        removeOnComplete: {
-          count: 50,
-          age: 86400,
-        },
-        removeOnFail: {
-          count: 100,
-        },
-      }
-    );
+  async addAvaSyncJob(data: {
+    institution?: string;
+    type?: 'grades' | 'progress';
+  }): Promise<{ jobId: string; queue: string }> {
+    const job = await this.avaQueue.add(JOB_AVA_SYNC, data, {
+      attempts: 2,
+      backoff: {
+        type: 'exponential',
+        delay: 3000,
+      },
+      removeOnComplete: {
+        count: 50,
+        age: 86400,
+      },
+      removeOnFail: {
+        count: 100,
+      },
+    });
 
     this.logger.log(`Novo job de sincronização AVA enfileirado: ${job.id}`);
     return { jobId: job.id as string, queue: QUEUE_AVA_SYNC };
   }
 
-  async getJobStatus(queueName: string, jobId: string): Promise<JobStatusResponse> {
+  async getJobStatus(
+    queueName: string,
+    jobId: string,
+  ): Promise<JobStatusResponse> {
     const queue = this.getQueue(queueName);
     const job: Job | undefined = await queue.getJob(jobId);
 
     if (!job) {
-      throw new NotFoundException(`Job "${jobId}" não encontrado na fila "${queueName}".`);
+      throw new NotFoundException(
+        `Job "${jobId}" não encontrado na fila "${queueName}".`,
+      );
     }
 
     const state = await job.getState();
@@ -134,7 +147,11 @@ export class JobsService {
     };
   }
 
-  async checkRedisHealth(): Promise<{ status: 'up' | 'down'; latencyMs?: number; message?: string }> {
+  async checkRedisHealth(): Promise<{
+    status: 'up' | 'down';
+    latencyMs?: number;
+    message?: string;
+  }> {
     const start = Date.now();
     try {
       await this.academicQueue.count();

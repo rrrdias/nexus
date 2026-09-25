@@ -60,20 +60,31 @@ export function getAllowedCorsOrigins() {
     getOrigin(process.env.NEXT_PUBLIC_API_URL),
   ].filter((origin): origin is string => Boolean(origin));
 
-  const defaults = process.env.NODE_ENV === 'production'
-    ? []
-    : ['http://localhost:3002', 'http://127.0.0.1:3002', 'http://localhost:3000', 'http://127.0.0.1:3000'];
+  const defaults =
+    process.env.NODE_ENV === 'production'
+      ? []
+      : [
+          'http://localhost:3002',
+          'http://127.0.0.1:3002',
+          'http://localhost:3000',
+          'http://127.0.0.1:3000',
+        ];
 
   return Array.from(new Set([...configured, ...derived, ...defaults]));
 }
 
-export function isOriginAllowed(origin: string | undefined, allowedOrigins = getAllowedCorsOrigins()) {
+export function isOriginAllowed(
+  origin: string | undefined,
+  allowedOrigins = getAllowedCorsOrigins(),
+) {
   if (!origin) return true;
 
   return allowedOrigins.some((allowed) => {
     if (allowed === origin) return true;
     if (allowed.includes('*')) {
-      const escaped = allowed.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*');
+      const escaped = allowed
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\\\*/g, '.*');
       return new RegExp(`^${escaped}$`).test(origin);
     }
     return false;

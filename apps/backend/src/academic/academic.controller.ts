@@ -1,4 +1,11 @@
-import { Controller, Get, Post, Query, Param, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Param,
+  BadRequestException,
+} from '@nestjs/common';
 import { AcademicService } from './academic.service';
 import { AcademicSyncService } from './academic-sync.service';
 import { JobsService } from '../jobs/jobs.service';
@@ -32,35 +39,57 @@ export class AcademicController {
 
   @Get('discentes')
   async getStudents(@Query() query: AcademicQueryDto) {
-    return this.academicService.getStudents(query.search, query.page, query.size);
+    return this.academicService.getStudents(
+      query.search,
+      query.page,
+      query.size,
+    );
   }
 
   @Get('discentes/:matricula/disciplinas')
   async getStudentDisciplines(@Param('matricula') matricula: string) {
-    if (!matricula?.trim()) throw new BadRequestException('Matrícula é obrigatória.');
-    const data = await this.academicService.getStudentDisciplines(matricula.trim());
+    if (!matricula?.trim())
+      throw new BadRequestException('Matrícula é obrigatória.');
+    const data = await this.academicService.getStudentDisciplines(
+      matricula.trim(),
+    );
     return { success: true, data };
   }
 
   @Get('docentes')
   async getTeachers(@Query() query: AcademicQueryDto) {
-    return this.academicService.getTeachers(query.search, query.page, query.size);
+    return this.academicService.getTeachers(
+      query.search,
+      query.page,
+      query.size,
+    );
   }
 
   @Get('docentes/:docenteId/disciplinas')
   async getTeacherDisciplines(@Param('docenteId') docenteId: string) {
-    if (!docenteId?.trim()) throw new BadRequestException('Identificador do docente é obrigatório.');
-    const data = await this.academicService.getTeacherDisciplines(docenteId.trim());
+    if (!docenteId?.trim())
+      throw new BadRequestException('Identificador do docente é obrigatório.');
+    const data = await this.academicService.getTeacherDisciplines(
+      docenteId.trim(),
+    );
     return { success: true, data };
   }
 
   @Get('turmas')
   async getClasses(@Query() query: AcademicQueryDto) {
-    return this.academicService.getClasses(query.search, query.page, query.size);
+    return this.academicService.getClasses(
+      query.search,
+      query.page,
+      query.size,
+    );
   }
 
   @Get('matriculas')
   async getMatriculas(@Query() query: AcademicQueryDto) {
-    return this.academicService.getMatriculas(query.search, query.page, query.size);
+    return this.academicService.getMatriculas(
+      query.search,
+      query.page,
+      query.size,
+    );
   }
 }

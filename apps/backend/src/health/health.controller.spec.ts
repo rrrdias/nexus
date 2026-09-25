@@ -48,7 +48,9 @@ describe('HealthController', () => {
 
     await controller.check(mockResponse as Response);
 
-    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(mockResponse.status).toHaveBeenCalledWith(
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
     expect(mockResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'error' }),
     );

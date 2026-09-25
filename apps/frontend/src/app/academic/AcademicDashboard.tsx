@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { 
   Search, 
   User, 
@@ -54,7 +54,7 @@ export function AcademicDashboard() {
   }
 
   // Fetch data dynamically on tab or query change
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       let res: any
@@ -80,13 +80,13 @@ export function AcademicDashboard() {
         showToast(res?.error || "Erro ao carregar dados.", "error")
         setListData([])
       }
-    } catch (err) {
+    } catch (_err) {
       showToast("Falha na comunicação com a API.", "error")
       setListData([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab, search, page])
 
   useEffect(() => {
     if (hasSearched) {
@@ -95,7 +95,7 @@ export function AcademicDashboard() {
       setListData([])
       setMeta({ total: 0, page: 1, size: 15, totalPages: 1 })
     }
-  }, [activeTab, page])
+  }, [fetchData, hasSearched])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -285,7 +285,7 @@ export function AcademicDashboard() {
           showToast(res.error || "Erro ao consultar disciplinas do professor.", "error")
         }
       }
-    } catch (err: any) {
+    } catch (_err: any) {
       showToast("Falha ao se conectar com o servidor.", "error")
     } finally {
       setDrawerLoading(false)
@@ -473,7 +473,7 @@ export function AcademicDashboard() {
                       <div className="space-y-1">
                         <h3 className="text-sm font-bold text-navy">Pesquisa no Lyceum</h3>
                         <p className="text-xs text-[#5F6775] leading-relaxed">
-                          Digite um termo de pesquisa e clique em <strong className="text-[#5E35B1]">"Consultar"</strong> para pesquisar registros no Lyceum.
+                          Digite um termo de pesquisa e clique em <strong className="text-[#5E35B1]">&quot;Consultar&quot;</strong> para pesquisar registros no Lyceum.
                         </p>
                       </div>
                     </div>

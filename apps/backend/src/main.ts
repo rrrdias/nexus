@@ -65,7 +65,11 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port);
-  logger.log(`CORS allowed origins: ${allowedCorsOrigins.length > 0 ? allowedCorsOrigins.join(', ') : 'server-to-server only'}`);
-  logger.log(`Nexus Core Backend initialized on port ${port} (PID: ${process.pid})`);
+  logger.log(
+    `CORS allowed origins: ${allowedCorsOrigins.length > 0 ? allowedCorsOrigins.join(', ') : 'server-to-server only'}`,
+  );
+  logger.log(
+    `Nexus Core Backend initialized on port ${port} (PID: ${process.pid})`,
+  );
 }
 bootstrap();

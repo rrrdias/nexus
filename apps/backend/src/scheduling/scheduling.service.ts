@@ -1,8 +1,24 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq, and, or, inArray, ilike, sql, isNull, desc } from 'drizzle-orm';
-import { locals, opcaos, agendamentosMatricula, avaProgressReport, systemModules, usersSystemAccess, userGroups, groupSystemAccess } from '../db/schema';
+import {
+  locals,
+  opcaos,
+  agendamentosMatricula,
+  avaProgressReport,
+  systemModules,
+  usersSystemAccess,
+  userGroups,
+  groupSystemAccess,
+} from '../db/schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
 type SessionUser = {
@@ -13,7 +29,9 @@ type SessionUser = {
 
 function parseTimeToMinutes(timeStr: string): number | null {
   if (!timeStr || typeof timeStr !== 'string') return null;
-  const match = timeStr.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+  const match = timeStr
+    .trim()
+    .match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
   if (!match) return null;
   const h = parseInt(match[1], 10);
   const m = parseInt(match[2], 10);
@@ -49,50 +67,72 @@ export class SchedulingService {
     if (user.isSuperAdmin) return;
 
     // Check direct user access
-    const directAccess = await this.db.select({ id: systemModules.id })
+    const directAccess = await this.db
+      .select({ id: systemModules.id })
       .from(usersSystemAccess)
-      .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
-      .where(and(
-        eq(usersSystemAccess.userId, user.id),
-        or(eq(systemModules.slug, 'backoffice'), eq(systemModules.slug, 'scheduling')),
-        eq(systemModules.isActive, true)
-      ))
+      .innerJoin(
+        systemModules,
+        eq(usersSystemAccess.systemModuleId, systemModules.id),
+      )
+      .where(
+        and(
+          eq(usersSystemAccess.userId, user.id),
+          or(
+            eq(systemModules.slug, 'backoffice'),
+            eq(systemModules.slug, 'scheduling'),
+          ),
+          eq(systemModules.isActive, true),
+        ),
+      )
       .limit(1);
 
     if (directAccess.length > 0) return;
 
     // Check group access
-    const groupAccess = await this.db.select({ id: systemModules.id })
+    const groupAccess = await this.db
+      .select({ id: systemModules.id })
       .from(userGroups)
-      .innerJoin(groupSystemAccess, eq(userGroups.groupId, groupSystemAccess.groupId))
-      .innerJoin(systemModules, eq(groupSystemAccess.systemModuleId, systemModules.id))
-      .where(and(
-        eq(userGroups.userId, user.id),
-        or(eq(systemModules.slug, 'backoffice'), eq(systemModules.slug, 'scheduling')),
-        eq(systemModules.isActive, true)
-      ))
+      .innerJoin(
+        groupSystemAccess,
+        eq(userGroups.groupId, groupSystemAccess.groupId),
+      )
+      .innerJoin(
+        systemModules,
+        eq(groupSystemAccess.systemModuleId, systemModules.id),
+      )
+      .where(
+        and(
+          eq(userGroups.userId, user.id),
+          or(
+            eq(systemModules.slug, 'backoffice'),
+            eq(systemModules.slug, 'scheduling'),
+          ),
+          eq(systemModules.isActive, true),
+        ),
+      )
       .limit(1);
 
     if (groupAccess.length === 0) {
-      throw new ForbiddenException('Acesso restrito a administradores do módulo de agendamento.');
+      throw new ForbiddenException(
+        'Acesso restrito a administradores do módulo de agendamento.',
+      );
     }
   }
 
-
   async listLocals(incluirInativos = false) {
     if (incluirInativos) {
-      return this.db.select()
-        .from(locals)
-        .orderBy(locals.nome);
+      return this.db.select().from(locals).orderBy(locals.nome);
     }
-    return this.db.select()
+    return this.db
+      .select()
       .from(locals)
       .where(eq(locals.status, true))
       .orderBy(locals.nome);
   }
 
   async getLocalById(id: string) {
-    const [local] = await this.db.select()
+    const [local] = await this.db
+      .select()
       .from(locals)
       .where(eq(locals.id, id))
       .limit(1);
@@ -100,15 +140,31 @@ export class SchedulingService {
     return local;
   }
 
-  async createLocal(data: { nome: string; endereco: string; linkLocal?: string; telefone?: string }) {
-    const [inserted] = await this.db.insert(locals)
+  async createLocal(data: {
+    nome: string;
+    endereco: string;
+    linkLocal?: string;
+    telefone?: string;
+  }) {
+    const [inserted] = await this.db
+      .insert(locals)
       .values({ ...data, status: true })
       .returning();
     return inserted;
   }
 
-  async updateLocal(id: string, data: Partial<{ nome: string; endereco: string; linkLocal: string; telefone: string; status: boolean }>) {
-    const [updated] = await this.db.update(locals)
+  async updateLocal(
+    id: string,
+    data: Partial<{
+      nome: string;
+      endereco: string;
+      linkLocal: string;
+      telefone: string;
+      status: boolean;
+    }>,
+  ) {
+    const [updated] = await this.db
+      .update(locals)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(locals.id, id))
       .returning();
@@ -116,7 +172,12 @@ export class SchedulingService {
     return updated;
   }
 
-  async listOptions(filters: { localId?: string; data?: string; apenasDisponiveis?: boolean; incluirInativos?: boolean }) {
+  async listOptions(filters: {
+    localId?: string;
+    data?: string;
+    apenasDisponiveis?: boolean;
+    incluirInativos?: boolean;
+  }) {
     const conditions: any[] = [];
     if (!filters.incluirInativos) {
       conditions.push(eq(opcaos.status, true));
@@ -132,37 +193,50 @@ export class SchedulingService {
       conditions.push(sql`${opcaos.vagas} > 0`);
     }
 
-    return this.db.select({
-      id: opcaos.id,
-      localId: opcaos.localId,
-      localNome: locals.nome,
-      data: opcaos.data,
-      hora: opcaos.hora,
-      vagas: opcaos.vagas,
-      status: opcaos.status
-    })
+    return this.db
+      .select({
+        id: opcaos.id,
+        localId: opcaos.localId,
+        localNome: locals.nome,
+        data: opcaos.data,
+        hora: opcaos.hora,
+        vagas: opcaos.vagas,
+        status: opcaos.status,
+      })
       .from(opcaos)
       .innerJoin(locals, eq(opcaos.localId, locals.id))
       .where(and(...conditions))
       .orderBy(opcaos.data, opcaos.hora);
   }
 
-  async createOption(data: { localId: string; data: string; horaInicio: string; horaFim: string; vagas: number }) {
+  async createOption(data: {
+    localId: string;
+    data: string;
+    horaInicio: string;
+    horaFim: string;
+    vagas: number;
+  }) {
     await this.getLocalById(data.localId);
 
     const startMin = parseTimeToMinutes(data.horaInicio);
     const endMin = parseTimeToMinutes(data.horaFim);
 
     if (startMin === null || endMin === null) {
-      throw new BadRequestException('Formato de horário inválido. Utilize o formato HH:MM (ex: 08:00).');
+      throw new BadRequestException(
+        'Formato de horário inválido. Utilize o formato HH:MM (ex: 08:00).',
+      );
     }
 
-    if (endMin <= startMin || (endMin - startMin) < 30) {
-      throw new BadRequestException('Horário final deve ser maior que o horário inicial em pelo menos 30 minutos.');
+    if (endMin <= startMin || endMin - startMin < 30) {
+      throw new BadRequestException(
+        'Horário final deve ser maior que o horário inicial em pelo menos 30 minutos.',
+      );
     }
 
     if ((endMin - startMin) % 30 !== 0) {
-      throw new BadRequestException('O intervalo total entre horário inicial e final deve ser múltiplo exato de 30 minutos.');
+      throw new BadRequestException(
+        'O intervalo total entre horário inicial e final deve ser múltiplo exato de 30 minutos.',
+      );
     }
 
     const parsedDate = new Date(data.data);
@@ -171,7 +245,9 @@ export class SchedulingService {
     }
 
     if (typeof data.vagas !== 'number' || data.vagas < 0) {
-      throw new BadRequestException('Quantidade de vagas deve ser um número maior ou igual a zero.');
+      throw new BadRequestException(
+        'Quantidade de vagas deve ser um número maior ou igual a zero.',
+      );
     }
 
     const times: string[] = [];
@@ -182,26 +258,30 @@ export class SchedulingService {
     }
 
     if (times.length === 0) {
-      throw new BadRequestException('Horário final deve ser maior que o horário inicial em pelo menos 30 minutos.');
+      throw new BadRequestException(
+        'Horário final deve ser maior que o horário inicial em pelo menos 30 minutos.',
+      );
     }
 
-    const inserts = times.map(t => ({
+    const inserts = times.map((t) => ({
       localId: data.localId,
       data: parsedDate,
       hora: t,
       vagas: data.vagas,
-      status: true
+      status: true,
     }));
 
-    const inserted = await this.db.insert(opcaos)
-      .values(inserts)
-      .returning();
-      
+    const inserted = await this.db.insert(opcaos).values(inserts).returning();
+
     return inserted;
   }
 
-  async updateOption(id: string, data: Partial<{ vagas: number; status: boolean }>) {
-    const [updated] = await this.db.update(opcaos)
+  async updateOption(
+    id: string,
+    data: Partial<{ vagas: number; status: boolean }>,
+  ) {
+    const [updated] = await this.db
+      .update(opcaos)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(opcaos.id, id))
       .returning();
@@ -212,21 +292,26 @@ export class SchedulingService {
 
   // 3. Student Profile Query (Local AVA tables)
   async getStudentProfile(matricula: string, periodo: string) {
-    const studentRecords = await this.db.select()
+    const studentRecords = await this.db
+      .select()
       .from(avaProgressReport)
-      .where(and(
-        eq(avaProgressReport.matricula, matricula),
-        eq(avaProgressReport.periodo, periodo)
-      ));
+      .where(
+        and(
+          eq(avaProgressReport.matricula, matricula),
+          eq(avaProgressReport.periodo, periodo),
+        ),
+      );
 
     if (studentRecords.length === 0) {
-      throw new NotFoundException('Estudante não encontrado ou sem disciplinas vinculadas no período atual.');
+      throw new NotFoundException(
+        'Estudante não encontrado ou sem disciplinas vinculadas no período atual.',
+      );
     }
 
     const studentName = studentRecords[0].aluno;
     const email = studentRecords[0].usuario;
     const phone = studentRecords[0].userPhone1;
-    const disciplines = studentRecords.map(r => r.curso).filter(Boolean);
+    const disciplines = studentRecords.map((r) => r.curso).filter(Boolean);
 
     return {
       matricula,
@@ -234,7 +319,7 @@ export class SchedulingService {
       email,
       telefone: phone,
       disciplinas: disciplines,
-      totalDisciplinas: disciplines.length
+      totalDisciplinas: disciplines.length,
     };
   }
 
@@ -246,70 +331,95 @@ export class SchedulingService {
     const profile = await this.getStudentProfile(matricula, periodo);
     const totalDisciplines = profile.totalDisciplinas;
     if (totalDisciplines === 0) {
-      throw new BadRequestException('O estudante não possui disciplinas matriculadas para realizar agendamentos.');
+      throw new BadRequestException(
+        'O estudante não possui disciplinas matriculadas para realizar agendamentos.',
+      );
     }
 
     // Execute pessimistic transactional slot reservation
     return this.db.transaction(async (tx) => {
       // Check for already active booking
-      const existing = await tx.select()
+      const existing = await tx
+        .select()
         .from(agendamentosMatricula)
-        .where(and(
-          eq(agendamentosMatricula.matricula, matricula),
-          eq(agendamentosMatricula.periodo, periodo),
-          eq(agendamentosMatricula.status, 'ativo')
-        ))
+        .where(
+          and(
+            eq(agendamentosMatricula.matricula, matricula),
+            eq(agendamentosMatricula.periodo, periodo),
+            eq(agendamentosMatricula.status, 'ativo'),
+          ),
+        )
         .limit(1);
 
       if (existing.length > 0) {
-        throw new BadRequestException('O estudante já possui um agendamento ativo para este período.');
+        throw new BadRequestException(
+          'O estudante já possui um agendamento ativo para este período.',
+        );
       }
 
       // Fetch base slot and Lock it
-      const [opcao] = await tx.select()
+      const [opcao] = await tx
+        .select()
         .from(opcaos)
         .where(eq(opcaos.id, opcaoId))
         .for('update');
 
-      if (!opcao) throw new NotFoundException('Horário base selecionado não encontrado.');
-      if (!opcao.status) throw new BadRequestException('O horário selecionado está desativado.');
+      if (!opcao)
+        throw new NotFoundException('Horário base selecionado não encontrado.');
+      if (!opcao.status)
+        throw new BadRequestException('O horário selecionado está desativado.');
 
       // Calculate consecutive slots needed
       const timeStr = opcao.hora.slice(0, 5); // Format HH:MM
-      const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) => getNextTimeStr(timeStr, i));
+      const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) =>
+        getNextTimeStr(timeStr, i),
+      );
 
       // Fetch and Lock all consecutive slots needed
-      const slots = await tx.select()
+      const slots = await tx
+        .select()
         .from(opcaos)
-        .where(and(
-          eq(opcaos.localId, opcao.localId),
-          eq(opcaos.data, opcao.data),
-          inArray(opcaos.hora, requiredTimes),
-          eq(opcaos.status, true)
-        ))
+        .where(
+          and(
+            eq(opcaos.localId, opcao.localId),
+            eq(opcaos.data, opcao.data),
+            inArray(opcaos.hora, requiredTimes),
+            eq(opcaos.status, true),
+          ),
+        )
         .orderBy(opcaos.hora)
         .for('update');
 
       if (slots.length < requiredTimes.length) {
-        throw new BadRequestException('Não há horários consecutivos suficientes disponíveis a partir de ' + timeStr + ' para todas as ' + totalDisciplines + ' disciplinas do aluno.');
+        throw new BadRequestException(
+          'Não há horários consecutivos suficientes disponíveis a partir de ' +
+            timeStr +
+            ' para todas as ' +
+            totalDisciplines +
+            ' disciplinas do aluno.',
+        );
       }
 
       // Check capacity for all slots
       for (const slot of slots) {
         if (slot.vagas <= 0) {
-          throw new BadRequestException(`O slot de horário ${slot.hora.slice(0, 5)} já está esgotado.`);
+          throw new BadRequestException(
+            `O slot de horário ${slot.hora.slice(0, 5)} já está esgotado.`,
+          );
         }
       }
 
       // Decrement slot vacancies by 1
       for (const slot of slots) {
-        await tx.update(opcaos)
+        await tx
+          .update(opcaos)
           .set({ vagas: slot.vagas - 1, updatedAt: new Date() })
           .where(eq(opcaos.id, slot.id));
       }
 
       // Insert scheduling entry
-      const [booking] = await tx.insert(agendamentosMatricula)
+      const [booking] = await tx
+        .insert(agendamentosMatricula)
         .values({
           opcaoId,
           matricula,
@@ -318,30 +428,33 @@ export class SchedulingService {
           periodo,
           data: opcao.data,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .returning();
 
       return {
         ...booking,
         studentName: profile.nome,
-        disciplines: profile.disciplinas
+        disciplines: profile.disciplinas,
       };
     });
   }
 
   async cancelBooking(id: string) {
     return this.db.transaction(async (tx) => {
-      const [booking] = await tx.select()
+      const [booking] = await tx
+        .select()
         .from(agendamentosMatricula)
         .where(eq(agendamentosMatricula.id, id))
         .for('update');
 
       if (!booking) throw new NotFoundException('Agendamento não encontrado.');
-      if (booking.status === 'cancelado') throw new BadRequestException('Este agendamento já está cancelado.');
+      if (booking.status === 'cancelado')
+        throw new BadRequestException('Este agendamento já está cancelado.');
 
       // Fetch base slot
-      const [opcao] = await tx.select()
+      const [opcao] = await tx
+        .select()
         .from(opcaos)
         .where(eq(opcaos.id, booking.opcaoId))
         .limit(1);
@@ -351,33 +464,40 @@ export class SchedulingService {
         const disciplines = booking.descricao.split(';');
         const totalDisciplines = disciplines.length;
         const timeStr = opcao.hora.slice(0, 5);
-        const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) => getNextTimeStr(timeStr, i));
+        const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) =>
+          getNextTimeStr(timeStr, i),
+        );
 
         // Fetch and Lock all matching slots
-        const slots = await tx.select()
+        const slots = await tx
+          .select()
           .from(opcaos)
-          .where(and(
-            eq(opcaos.localId, opcao.localId),
-            eq(opcaos.data, opcao.data),
-            inArray(opcaos.hora, requiredTimes)
-          ))
+          .where(
+            and(
+              eq(opcaos.localId, opcao.localId),
+              eq(opcaos.data, opcao.data),
+              inArray(opcaos.hora, requiredTimes),
+            ),
+          )
           .orderBy(opcaos.hora)
           .for('update');
 
         // Restore vacancy capacity (+1)
         for (const slot of slots) {
-          await tx.update(opcaos)
+          await tx
+            .update(opcaos)
             .set({ vagas: slot.vagas + 1, updatedAt: new Date() })
             .where(eq(opcaos.id, slot.id));
         }
       }
 
       // Perform soft delete
-      const [updated] = await tx.update(agendamentosMatricula)
+      const [updated] = await tx
+        .update(agendamentosMatricula)
         .set({
           status: 'cancelado',
           deletedAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(agendamentosMatricula.id, id))
         .returning();
@@ -387,23 +507,30 @@ export class SchedulingService {
   }
 
   async concludeBooking(id: string) {
-    const [booking] = await this.db.select()
+    const [booking] = await this.db
+      .select()
       .from(agendamentosMatricula)
       .where(eq(agendamentosMatricula.id, id))
       .limit(1);
 
     if (!booking) throw new NotFoundException('Agendamento não encontrado.');
-    if (booking.status !== 'ativo') throw new BadRequestException('Apenas agendamentos ativos podem ser concluídos.');
+    if (booking.status !== 'ativo')
+      throw new BadRequestException(
+        'Apenas agendamentos ativos podem ser concluídos.',
+      );
 
     // Prevent future date check-ins
     const bookingDate = new Date(booking.data);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (bookingDate > today) {
-      throw new BadRequestException('Não é possível marcar presença em agendamentos de datas futuras.');
+      throw new BadRequestException(
+        'Não é possível marcar presença em agendamentos de datas futuras.',
+      );
     }
 
-    const [updated] = await this.db.update(agendamentosMatricula)
+    const [updated] = await this.db
+      .update(agendamentosMatricula)
       .set({ status: 'presente', updatedAt: new Date() })
       .where(eq(agendamentosMatricula.id, id))
       .returning();
@@ -412,23 +539,30 @@ export class SchedulingService {
   }
 
   async markAbsentBooking(id: string) {
-    const [booking] = await this.db.select()
+    const [booking] = await this.db
+      .select()
       .from(agendamentosMatricula)
       .where(eq(agendamentosMatricula.id, id))
       .limit(1);
 
     if (!booking) throw new NotFoundException('Agendamento não encontrado.');
-    if (booking.status !== 'ativo') throw new BadRequestException('Apenas agendamentos ativos podem ser marcados como ausentes.');
+    if (booking.status !== 'ativo')
+      throw new BadRequestException(
+        'Apenas agendamentos ativos podem ser marcados como ausentes.',
+      );
 
     // Prevent future date check-ins
     const bookingDate = new Date(booking.data);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (bookingDate > today) {
-      throw new BadRequestException('Não é possível marcar falta em agendamentos de datas futuras.');
+      throw new BadRequestException(
+        'Não é possível marcar falta em agendamentos de datas futuras.',
+      );
     }
 
-    const [updated] = await this.db.update(agendamentosMatricula)
+    const [updated] = await this.db
+      .update(agendamentosMatricula)
       .set({ status: 'ausente', updatedAt: new Date() })
       .where(eq(agendamentosMatricula.id, id))
       .returning();
@@ -453,7 +587,9 @@ export class SchedulingService {
     const conditions: any[] = [isNull(agendamentosMatricula.deletedAt)];
 
     if (filters.matricula) {
-      conditions.push(ilike(agendamentosMatricula.matricula, `%${filters.matricula}%`));
+      conditions.push(
+        ilike(agendamentosMatricula.matricula, `%${filters.matricula}%`),
+      );
     }
     if (filters.localId) {
       conditions.push(eq(opcaos.localId, filters.localId));
@@ -470,31 +606,33 @@ export class SchedulingService {
 
     const whereClause = and(...conditions);
 
-    const studentSubquery = this.db.select({
-      matricula: avaProgressReport.matricula,
-      periodo: avaProgressReport.periodo,
-      aluno: sql<string>`max(${avaProgressReport.aluno})`.as('aluno'),
-      usuario: sql<string>`max(${avaProgressReport.usuario})`.as('usuario'),
-    })
+    const studentSubquery = this.db
+      .select({
+        matricula: avaProgressReport.matricula,
+        periodo: avaProgressReport.periodo,
+        aluno: sql<string>`max(${avaProgressReport.aluno})`.as('aluno'),
+        usuario: sql<string>`max(${avaProgressReport.usuario})`.as('usuario'),
+      })
       .from(avaProgressReport)
       .groupBy(avaProgressReport.matricula, avaProgressReport.periodo)
       .as('student_subquery');
 
     // Get paginated bookings details
-    const rawData = await this.db.select({
-      id: agendamentosMatricula.id,
-      matricula: agendamentosMatricula.matricula,
-      descricao: agendamentosMatricula.descricao,
-      status: agendamentosMatricula.status,
-      periodo: agendamentosMatricula.periodo,
-      data: agendamentosMatricula.data,
-      createdAt: agendamentosMatricula.createdAt,
-      hora: opcaos.hora,
-      localId: opcaos.localId,
-      localNome: locals.nome,
-      studentName: studentSubquery.aluno,
-      studentEmail: studentSubquery.usuario,
-    })
+    const rawData = await this.db
+      .select({
+        id: agendamentosMatricula.id,
+        matricula: agendamentosMatricula.matricula,
+        descricao: agendamentosMatricula.descricao,
+        status: agendamentosMatricula.status,
+        periodo: agendamentosMatricula.periodo,
+        data: agendamentosMatricula.data,
+        createdAt: agendamentosMatricula.createdAt,
+        hora: opcaos.hora,
+        localId: opcaos.localId,
+        localNome: locals.nome,
+        studentName: studentSubquery.aluno,
+        studentEmail: studentSubquery.usuario,
+      })
       .from(agendamentosMatricula)
       .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
       .innerJoin(locals, eq(opcaos.localId, locals.id))
@@ -502,8 +640,8 @@ export class SchedulingService {
         studentSubquery,
         and(
           eq(studentSubquery.matricula, agendamentosMatricula.matricula),
-          eq(studentSubquery.periodo, agendamentosMatricula.periodo)
-        )
+          eq(studentSubquery.periodo, agendamentosMatricula.periodo),
+        ),
       )
       .where(whereClause)
       .orderBy(desc(agendamentosMatricula.createdAt))
@@ -511,7 +649,8 @@ export class SchedulingService {
       .offset(offset);
 
     // Get total count
-    const [countResult] = await this.db.select({ count: sql`count(*)` })
+    const [countResult] = await this.db
+      .select({ count: sql`count(*)` })
       .from(agendamentosMatricula)
       .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
       .innerJoin(locals, eq(opcaos.localId, locals.id))
@@ -525,7 +664,7 @@ export class SchedulingService {
       return {
         ...row,
         studentName: row.studentName || 'Estudante Não Identificado',
-        studentEmail: row.studentEmail || ''
+        studentEmail: row.studentEmail || '',
       };
     });
 
@@ -534,13 +673,19 @@ export class SchedulingService {
       size,
       total_records: totalRecords,
       total_pages: totalPages,
-      data: bookings
+      data: bookings,
     };
   }
 
   // 6. Export to CSV
-  async getExportData(filters: Omit<Parameters<typeof this.listBookings>[0], 'page' | 'size'>) {
-    const result = await this.listBookings({ ...filters, page: 1, size: 50000 });
+  async getExportData(
+    filters: Omit<Parameters<typeof this.listBookings>[0], 'page' | 'size'>,
+  ) {
+    const result = await this.listBookings({
+      ...filters,
+      page: 1,
+      size: 50000,
+    });
     return result.data;
   }
 
@@ -572,11 +717,13 @@ export class SchedulingService {
       }
 
       // 3. Pré-carregar Agendamentos existentes
-      const existingBookings = await tx.select({
-        id: agendamentosMatricula.id,
-        matricula: agendamentosMatricula.matricula,
-        periodo: agendamentosMatricula.periodo,
-      }).from(agendamentosMatricula);
+      const existingBookings = await tx
+        .select({
+          id: agendamentosMatricula.id,
+          matricula: agendamentosMatricula.matricula,
+          periodo: agendamentosMatricula.periodo,
+        })
+        .from(agendamentosMatricula);
       const bookingMap = new Map<string, string>(); // `${matricula}_${periodo}` -> id
       for (const b of existingBookings) {
         bookingMap.set(`${b.matricula.trim()}_${b.periodo.trim()}`, b.id);
@@ -584,7 +731,14 @@ export class SchedulingService {
 
       for (const row of rows) {
         try {
-          if (!row.matricula || !row.campus || !row.dataProva || !row.horaInicio || !row.periodo || !row.disciplinas) {
+          if (
+            !row.matricula ||
+            !row.campus ||
+            !row.dataProva ||
+            !row.horaInicio ||
+            !row.periodo ||
+            !row.disciplinas
+          ) {
             continue;
           }
 
@@ -594,7 +748,8 @@ export class SchedulingService {
           // Obter ou criar Local (Polo)
           let localId = localMap.get(campusKey);
           if (!localId) {
-            const [newLocal] = await tx.insert(locals)
+            const [newLocal] = await tx
+              .insert(locals)
               .values({ nome: campusName, endereco: 'Importado', status: true })
               .returning();
             localId = newLocal.id;
@@ -605,9 +760,13 @@ export class SchedulingService {
           let dateObj: Date;
           if (String(row.dataProva).includes('/')) {
             const [d, m, y] = String(row.dataProva).split('/');
-            dateObj = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00Z`);
+            dateObj = new Date(
+              `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00Z`,
+            );
           } else {
-            dateObj = new Date(`${String(row.dataProva).split('T')[0]}T00:00:00Z`);
+            dateObj = new Date(
+              `${String(row.dataProva).split('T')[0]}T00:00:00Z`,
+            );
           }
 
           if (isNaN(dateObj.getTime())) {
@@ -618,19 +777,27 @@ export class SchedulingService {
           const dateISO = dateObj.toISOString().split('T')[0];
           const rawHora = String(row.horaInicio).trim();
           const horaParts = rawHora.split(':');
-          const horaStr = horaParts.length === 2 ? `${horaParts[0].padStart(2, '0')}:${horaParts[1].padStart(2, '0')}:00` : (rawHora.length === 5 ? `${rawHora}:00` : rawHora);
+          const horaStr =
+            horaParts.length === 2
+              ? `${horaParts[0].padStart(2, '0')}:${horaParts[1].padStart(2, '0')}:00`
+              : rawHora.length === 5
+                ? `${rawHora}:00`
+                : rawHora;
 
           // Obter ou criar Opção (Slot de Horário)
           const opcaoKey = `${localId}_${dateISO}_${horaStr}`;
           let opcaoId = opcaoMap.get(opcaoKey);
           if (!opcaoId) {
-            const [newOpcao] = await tx.insert(opcaos).values({
-              localId,
-              data: dateObj,
-              hora: horaStr,
-              vagas: 50,
-              status: true,
-            }).returning();
+            const [newOpcao] = await tx
+              .insert(opcaos)
+              .values({
+                localId,
+                data: dateObj,
+                hora: horaStr,
+                vagas: 50,
+                status: true,
+              })
+              .returning();
             opcaoId = newOpcao.id;
             opcaoMap.set(opcaoKey, opcaoId);
           }
@@ -639,11 +806,14 @@ export class SchedulingService {
           const periodoStr = String(row.periodo).trim();
           const bKey = `${matriculaStr}_${periodoStr}`;
           const existingBookingId = bookingMap.get(bKey);
-          const statusStr = (String(row.status || 'ativo')).trim().toLowerCase();
+          const statusStr = String(row.status || 'ativo')
+            .trim()
+            .toLowerCase();
 
           if (existingBookingId) {
             // Atualizar
-            await tx.update(agendamentosMatricula)
+            await tx
+              .update(agendamentosMatricula)
               .set({
                 status: statusStr,
                 opcaoId,
@@ -655,16 +825,19 @@ export class SchedulingService {
               .where(eq(agendamentosMatricula.id, existingBookingId));
           } else {
             // Inserir
-            const [newBooking] = await tx.insert(agendamentosMatricula).values({
-              opcaoId,
-              matricula: matriculaStr,
-              descricao: String(row.disciplinas).trim(),
-              status: statusStr,
-              periodo: periodoStr,
-              data: dateObj,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }).returning();
+            const [newBooking] = await tx
+              .insert(agendamentosMatricula)
+              .values({
+                opcaoId,
+                matricula: matriculaStr,
+                descricao: String(row.disciplinas).trim(),
+                status: statusStr,
+                periodo: periodoStr,
+                data: dateObj,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
             bookingMap.set(bKey, newBooking.id);
           }
 
@@ -679,4 +852,3 @@ export class SchedulingService {
     });
   }
 }
-

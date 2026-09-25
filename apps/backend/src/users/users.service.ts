@@ -1,7 +1,18 @@
-import { Injectable, Inject, Optional, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { users, userGroups, usersSystemAccess, groups, systemModules } from '../db/schema';
+import {
+  users,
+  userGroups,
+  usersSystemAccess,
+  groups,
+  systemModules,
+} from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { hashPassword } from './password.util';
 import { CacheService } from '../cache/cache.service';
@@ -22,7 +33,9 @@ export class UsersService {
 
   private assertSuperAdmin(user?: SessionUser) {
     if (!user?.isSuperAdmin) {
-      throw new UnauthorizedException("Acesso negado. Apenas Super Admins podem executar esta ação.");
+      throw new UnauthorizedException(
+        'Acesso negado. Apenas Super Admins podem executar esta ação.',
+      );
     }
   }
 
@@ -40,9 +53,16 @@ export class UsersService {
         .innerJoin(groups, eq(userGroups.groupId, groups.id))
         .where(inArray(userGroups.userId, userIds)),
       this.db
-        .select({ userId: usersSystemAccess.userId, id: systemModules.id, name: systemModules.name })
+        .select({
+          userId: usersSystemAccess.userId,
+          id: systemModules.id,
+          name: systemModules.name,
+        })
         .from(usersSystemAccess)
-        .innerJoin(systemModules, eq(usersSystemAccess.systemModuleId, systemModules.id))
+        .innerJoin(
+          systemModules,
+          eq(usersSystemAccess.systemModuleId, systemModules.id),
+        )
         .where(inArray(usersSystemAccess.userId, userIds)),
     ]);
 
@@ -69,8 +89,12 @@ export class UsersService {
 
   async getUserForEdit(userSession: SessionUser, userId: string) {
     this.assertSuperAdmin(userSession);
-    const user = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
-    if (user.length === 0) throw new Error("Usuário não encontrado.");
+    const user = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (user.length === 0) throw new Error('Usuário não encontrado.');
 
     const groupList = await this.db
       .select({ id: groups.id })
@@ -84,35 +108,46 @@ export class UsersService {
 
     return {
       user: user[0],
-      groupIds: groupList.map(g => g.id),
-      moduleIds: moduleList.map(m => m.id),
+      groupIds: groupList.map((g) => g.id),
+      moduleIds: moduleList.map((m) => m.id),
     };
   }
 
   async createUser(userSession: SessionUser, data: any) {
     this.assertSuperAdmin(userSession);
-    const { name, email, password, userid, isActive, groupIds, moduleIds } = data;
+    const { name, email, password, userid, isActive, groupIds, moduleIds } =
+      data;
 
     if (!name?.trim() || !email?.trim() || !password?.trim()) {
-      throw new Error("Nome, e-mail e senha são obrigatórios.");
+      throw new Error('Nome, e-mail e senha são obrigatórios.');
     }
 
     const hashedPassword = await hashPassword(password.trim());
 
     await this.db.transaction(async (tx) => {
-      const [created] = await tx.insert(users).values({
-        name: name.trim(),
-        email: email.trim(),
-        password: hashedPassword,
-        userid: userid?.trim() || undefined,
-        isActive: isActive === true || isActive === 'on' || isActive === 'true',
-      }).returning();
+      const [created] = await tx
+        .insert(users)
+        .values({
+          name: name.trim(),
+          email: email.trim(),
+          password: hashedPassword,
+          userid: userid?.trim() || undefined,
+          isActive:
+            isActive === true || isActive === 'on' || isActive === 'true',
+        })
+        .returning();
 
       if (groupIds && groupIds.length > 0) {
-        await tx.insert(userGroups).values(groupIds.map(id => ({ userId: created.id, groupId: id })));
+        await tx
+          .insert(userGroups)
+          .values(groupIds.map((id) => ({ userId: created.id, groupId: id })));
       }
       if (moduleIds && moduleIds.length > 0) {
-        await tx.insert(usersSystemAccess).values(moduleIds.map(id => ({ userId: created.id, systemModuleId: id })));
+        await tx
+          .insert(usersSystemAccess)
+          .values(
+            moduleIds.map((id) => ({ userId: created.id, systemModuleId: id })),
+          );
       }
     });
 
@@ -121,7 +156,8 @@ export class UsersService {
 
   async updateUser(userSession: SessionUser, userId: string, data: any) {
     this.assertSuperAdmin(userSession);
-    const { name, email, password, userid, isActive, groupIds, moduleIds } = data;
+    const { name, email, password, userid, isActive, groupIds, moduleIds } =
+      data;
 
     const updateData: Record<string, unknown> = {
       name: name.trim(),
@@ -138,12 +174,18 @@ export class UsersService {
 
       await tx.delete(userGroups).where(eq(userGroups.userId, userId));
       if (groupIds && groupIds.length > 0) {
-        await tx.insert(userGroups).values(groupIds.map(id => ({ userId, groupId: id })));
+        await tx
+          .insert(userGroups)
+          .values(groupIds.map((id) => ({ userId, groupId: id })));
       }
 
-      await tx.delete(usersSystemAccess).where(eq(usersSystemAccess.userId, userId));
+      await tx
+        .delete(usersSystemAccess)
+        .where(eq(usersSystemAccess.userId, userId));
       if (moduleIds && moduleIds.length > 0) {
-        await tx.insert(usersSystemAccess).values(moduleIds.map(id => ({ userId, systemModuleId: id })));
+        await tx
+          .insert(usersSystemAccess)
+          .values(moduleIds.map((id) => ({ userId, systemModuleId: id })));
       }
     });
 
@@ -155,7 +197,11 @@ export class UsersService {
     return { success: true };
   }
 
-  async toggleUserActive(userSession: SessionUser, userId: string, isActive: boolean) {
+  async toggleUserActive(
+    userSession: SessionUser,
+    userId: string,
+    isActive: boolean,
+  ) {
     this.assertSuperAdmin(userSession);
     await this.db.update(users).set({ isActive }).where(eq(users.id, userId));
 

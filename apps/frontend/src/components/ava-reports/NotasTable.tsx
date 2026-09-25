@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { MessageCircle, MoreHorizontal, MessageSquare } from "lucide-react"
 import { GradeDetailDialog } from "./GradeDetailDialog"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -104,7 +103,7 @@ function buildMoodleUrl(institution: string | null, alunoId: string | null): str
   return `${baseUrl}/message/index.php?id=${alunoId}`
 }
 
-function RowActions({ row, phoneFormatted, waUrl }: {
+function RowActions({ row, phoneFormatted: _phoneFormatted, waUrl }: {
   row: any
   phoneFormatted: string | null
   waUrl: string | null

@@ -52,7 +52,11 @@ export class HealthService {
     };
 
     // 1. PostgreSQL Check
-    let dbStatus: { status: 'up' | 'down'; latencyMs?: number; message?: string } = { status: 'down' };
+    let dbStatus: {
+      status: 'up' | 'down';
+      latencyMs?: number;
+      message?: string;
+    } = { status: 'down' };
     const dbStart = Date.now();
     try {
       await this.db.execute(sql`SELECT 1`);
@@ -68,7 +72,11 @@ export class HealthService {
     }
 
     // 2. Redis Check
-    let redisStatus: { status: 'up' | 'down'; latencyMs?: number; message?: string } = {
+    let redisStatus: {
+      status: 'up' | 'down';
+      latencyMs?: number;
+      message?: string;
+    } = {
       status: 'down',
       message: 'Módulo Jobs/Redis não configurado.',
     };
@@ -77,7 +85,11 @@ export class HealthService {
     }
 
     // 3. Lyceum Check
-    let lyceumStatus: { status: 'up' | 'down'; latencyMs?: number; message?: string } = {
+    let lyceumStatus: {
+      status: 'up' | 'down';
+      latencyMs?: number;
+      message?: string;
+    } = {
       status: 'down',
       message: 'Módulo Acadêmico/Lyceum não inicializado.',
     };
@@ -90,7 +102,10 @@ export class HealthService {
     let overallStatus: 'ok' | 'degraded' | 'error' = 'ok';
     if (dbStatus.status === 'down') {
       overallStatus = 'error';
-    } else if (redisStatus.status === 'down' || lyceumStatus.status === 'down') {
+    } else if (
+      redisStatus.status === 'down' ||
+      lyceumStatus.status === 'down'
+    ) {
       overallStatus = 'degraded';
     }
 

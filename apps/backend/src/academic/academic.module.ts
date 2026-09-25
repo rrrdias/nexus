@@ -11,4 +11,3 @@ import { JobsModule } from '../jobs/jobs.module';
   exports: [AcademicService, AcademicSyncService],
 })
 export class AcademicModule {}
-

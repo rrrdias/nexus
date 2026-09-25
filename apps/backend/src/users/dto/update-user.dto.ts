@@ -1,4 +1,12 @@
-import { IsArray, IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class UpdateUserDto {
@@ -12,7 +20,9 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(6, { message: 'A senha deve ter pelo menos 6 caracteres se fornecida.' })
+  @MinLength(6, {
+    message: 'A senha deve ter pelo menos 6 caracteres se fornecida.',
+  })
   password?: string;
 
   @IsOptional()
@@ -20,7 +30,10 @@ export class UpdateUserDto {
   userid?: string;
 
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true' || value === 'on' || value === 1)
+  @Transform(
+    ({ value }) =>
+      value === true || value === 'true' || value === 'on' || value === 1,
+  )
   @IsBoolean()
   isActive?: boolean;
 

@@ -15,7 +15,9 @@ export const DbProvider: Provider = {
 
     const maxConnections = process.env.DB_MAX_CONNECTIONS
       ? parseInt(process.env.DB_MAX_CONNECTIONS, 10)
-      : process.env.NODE_ENV === 'development' ? 10 : 25;
+      : process.env.NODE_ENV === 'development'
+        ? 10
+        : 25;
 
     const conn = postgres(connectionString, {
       prepare: false,

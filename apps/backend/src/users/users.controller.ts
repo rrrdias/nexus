@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Req,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { RequireAdmin } from '../auth/rbac.decorators';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -26,12 +35,20 @@ export class UsersController {
   }
 
   @Put(':id')
-  updateUser(@Req() req: any, @Param('id') id: string, @Body() data: UpdateUserDto) {
+  updateUser(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() data: UpdateUserDto,
+  ) {
     return this.usersService.updateUser(req.user, id, data);
   }
 
   @Put(':id/active')
-  toggleUserActive(@Req() req: any, @Param('id') id: string, @Body() data: ToggleUserActiveDto) {
+  toggleUserActive(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() data: ToggleUserActiveDto,
+  ) {
     return this.usersService.toggleUserActive(req.user, id, data.isActive);
   }
 

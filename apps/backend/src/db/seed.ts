@@ -1,17 +1,17 @@
 import { db } from './index';
-import { 
-  users, 
-  systemModules, 
-  usersSystemAccess, 
-  auditLogs, 
-  groups, 
-  userGroups, 
+import {
+  users,
+  systemModules,
+  usersSystemAccess,
+  auditLogs,
+  groups,
+  userGroups,
   groupSystemAccess,
   locals,
   opcaos,
   agendamentosMatricula,
   avaProgressReport,
-  avaOpenlms
+  avaOpenlms,
 } from './schema';
 import * as bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
@@ -40,33 +40,42 @@ async function main() {
   console.log('🧹 Tabelas limpas.');
 
   // Módulos do Sistema
-  const avaResult = await db.insert(systemModules).values({
-    name: 'AVA Reports',
-    slug: 'ava',
-    description: 'Relatórios de Progresso e Indicadores AVA',
-    colorCode: '#1976D2',
-    iconClass: 'ti-chart-bar',
-    pathUrl: '/relatorios',
-  }).returning();
+  const avaResult = await db
+    .insert(systemModules)
+    .values({
+      name: 'AVA Reports',
+      slug: 'ava',
+      description: 'Relatórios de Progresso e Indicadores AVA',
+      colorCode: '#1976D2',
+      iconClass: 'ti-chart-bar',
+      pathUrl: '/relatorios',
+    })
+    .returning();
   const ava = avaResult[0];
 
-  const backofficeResult = await db.insert(systemModules).values({
-    name: 'Backoffice Agendamentos',
-    slug: 'backoffice',
-    description: 'Gestão Dinâmica de Presença e Agendamentos',
-    colorCode: '#0097A7',
-    iconClass: 'ti-calendar-event',
-    pathUrl: '/admin/scheduling',
-  }).returning();
+  const backofficeResult = await db
+    .insert(systemModules)
+    .values({
+      name: 'Backoffice Agendamentos',
+      slug: 'backoffice',
+      description: 'Gestão Dinâmica de Presença e Agendamentos',
+      colorCode: '#0097A7',
+      iconClass: 'ti-calendar-event',
+      pathUrl: '/admin/scheduling',
+    })
+    .returning();
   const backoffice = backofficeResult[0];
 
   console.log('✅ Módulos de sistemas criados!');
 
   // Grupos
-  const superAdminGroupResult = await db.insert(groups).values({
-    name: 'Super Admin',
-    description: 'Acesso irrestrito a todos os sistemas',
-  }).returning();
+  const superAdminGroupResult = await db
+    .insert(groups)
+    .values({
+      name: 'Super Admin',
+      description: 'Acesso irrestrito a todos os sistemas',
+    })
+    .returning();
   const superAdminGroup = superAdminGroupResult[0];
 
   console.log('✅ Grupos criados!');
@@ -77,12 +86,15 @@ async function main() {
   }
 
   // Usuário Administrador
-  const adminResult = await db.insert(users).values({
-    userid: 'ricardo.dias',
-    name: 'Ricardo Dias',
-    email: 'rrrdias25@gmail.com',
-    password: await hashPassword(adminPassword),
-  }).returning();
+  const adminResult = await db
+    .insert(users)
+    .values({
+      userid: 'ricardo.dias',
+      name: 'Ricardo Dias',
+      email: 'rrrdias25@gmail.com',
+      password: await hashPassword(adminPassword),
+    })
+    .returning();
   const adminUser = adminResult[0];
 
   console.log(`👤 Usuário ${adminUser.name} criado com sucesso!`);
@@ -110,64 +122,82 @@ async function main() {
   console.log('🌱 Semeando dados de polos e agendamentos...');
 
   // 1. Criar Polos
-  const poloAnapolis = await db.insert(locals).values({
-    nome: 'Anápolis (UniEvangélica)',
-    endereco: 'Av. Universitária, km 3,5 - Cidade Universitária',
-    linkLocal: 'https://maps.google.com/?q=UniEvangelica',
-    telefone: '(62) 3310-6600',
-    status: true,
-  }).returning();
+  const poloAnapolis = await db
+    .insert(locals)
+    .values({
+      nome: 'Anápolis (UniEvangélica)',
+      endereco: 'Av. Universitária, km 3,5 - Cidade Universitária',
+      linkLocal: 'https://maps.google.com/?q=UniEvangelica',
+      telefone: '(62) 3310-6600',
+      status: true,
+    })
+    .returning();
 
-  const poloGoianesia = await db.insert(locals).values({
-    nome: 'Polo Goianésia',
-    endereco: 'Rua 33, nº 456 - Setor Sul, Goianésia - GO',
-    linkLocal: 'https://maps.google.com/?q=Goianesia',
-    telefone: '(62) 3353-1200',
-    status: true,
-  }).returning();
+  const poloGoianesia = await db
+    .insert(locals)
+    .values({
+      nome: 'Polo Goianésia',
+      endereco: 'Rua 33, nº 456 - Setor Sul, Goianésia - GO',
+      linkLocal: 'https://maps.google.com/?q=Goianesia',
+      telefone: '(62) 3353-1200',
+      status: true,
+    })
+    .returning();
 
   console.log('✅ Polos criados!');
 
   // 2. Criar Opções (Slots de Horários)
   // Hoje e Amanhã
   const hoje = new Date();
-  hoje.setHours(0,0,0,0);
+  hoje.setHours(0, 0, 0, 0);
   const amanha = new Date();
   amanha.setDate(hoje.getDate() + 1);
-  amanha.setHours(0,0,0,0);
+  amanha.setHours(0, 0, 0, 0);
 
   // Slots para Anápolis
-  const slot1 = await db.insert(opcaos).values({
-    localId: poloAnapolis[0].id,
-    data: hoje,
-    hora: '08:00:00',
-    vagas: 25,
-    status: true,
-  }).returning();
+  const slot1 = await db
+    .insert(opcaos)
+    .values({
+      localId: poloAnapolis[0].id,
+      data: hoje,
+      hora: '08:00:00',
+      vagas: 25,
+      status: true,
+    })
+    .returning();
 
-  const slot2 = await db.insert(opcaos).values({
-    localId: poloAnapolis[0].id,
-    data: hoje,
-    hora: '08:30:00',
-    vagas: 25,
-    status: true,
-  }).returning();
+  const slot2 = await db
+    .insert(opcaos)
+    .values({
+      localId: poloAnapolis[0].id,
+      data: hoje,
+      hora: '08:30:00',
+      vagas: 25,
+      status: true,
+    })
+    .returning();
 
-  const slot3 = await db.insert(opcaos).values({
-    localId: poloAnapolis[0].id,
-    data: hoje,
-    hora: '09:00:00',
-    vagas: 24, // uma vaga já ocupada
-    status: true,
-  }).returning();
+  const slot3 = await db
+    .insert(opcaos)
+    .values({
+      localId: poloAnapolis[0].id,
+      data: hoje,
+      hora: '09:00:00',
+      vagas: 24, // uma vaga já ocupada
+      status: true,
+    })
+    .returning();
 
-  const slot4 = await db.insert(opcaos).values({
-    localId: poloAnapolis[0].id,
-    data: hoje,
-    hora: '09:30:00',
-    vagas: 24, // uma vaga já ocupada
-    status: true,
-  }).returning();
+  const slot4 = await db
+    .insert(opcaos)
+    .values({
+      localId: poloAnapolis[0].id,
+      data: hoje,
+      hora: '09:30:00',
+      vagas: 24, // uma vaga já ocupada
+      status: true,
+    })
+    .returning();
 
   // Slots para Goianésia
   await db.insert(opcaos).values([
@@ -184,7 +214,7 @@ async function main() {
       hora: '14:30:00',
       vagas: 15,
       status: true,
-    }
+    },
   ]);
 
   console.log('✅ Horários (slots) criados!');
@@ -215,7 +245,7 @@ async function main() {
       curso: 'Estruturas de Dados',
       enrolmentStatus: 'active',
       progressoTotal: '30.0',
-    }
+    },
   ]);
 
   // Outro Aluno "789012" com 1 matéria
@@ -252,67 +282,86 @@ async function main() {
     {
       unidadeEns: 'UniEVANGÉLICA',
       urlSandbox: 'unievangelica-sandbox.myopenlms.net',
-      tokenSandbox: 'JB0lPNK5bHuGZynaGpNL75fUEB7I4YoDZfpot1jL8URXJ6xPlBbi773B90K3Oz7n',
+      tokenSandbox:
+        'JB0lPNK5bHuGZynaGpNL75fUEB7I4YoDZfpot1jL8URXJ6xPlBbi773B90K3Oz7n',
       urlProd: 'avagrad.unievangelica.edu.br',
-      tokenProd: 'Jtmko5WBb1PTNSwHjThcYNtrPlhRZ05ijiJNdgP5XgPkzBrYWP1udldtNABm06La',
+      tokenProd:
+        'Jtmko5WBb1PTNSwHjThcYNtrPlhRZ05ijiJNdgP5XgPkzBrYWP1udldtNABm06La',
       status: true,
     },
     {
       unidadeEns: 'EaD',
       urlSandbox: 'avaead-unievangelica-sandbox.myopenlms.net',
-      tokenSandbox: '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
+      tokenSandbox:
+        '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
       urlProd: 'avaead.unievangelica.edu.br',
-      tokenProd: '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
+      tokenProd:
+        '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
       status: true,
     },
     {
       unidadeEns: 'Ead_Unievangelica',
       urlSandbox: 'avaead-unievangelica-sandbox.myopenlms.net',
-      tokenSandbox: '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
+      tokenSandbox:
+        '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
       urlProd: 'avaead.unievangelica.edu.br',
-      tokenProd: '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
+      tokenProd:
+        '7Wynfa7j3P1seisFkEMkf0fZFkBAcQ5ZmtDIKArDPjwuHf1skDSF4ze9agA2y6Ra',
       status: true,
     },
     {
       unidadeEns: 'FAEGO',
       urlSandbox: 'faceg-sandbox.myopenlms.net',
-      tokenSandbox: 'JhbOfQpjF1W82qPj9ihjyukcglLWaeLjCmyh4dGAUc8MJNxIwTrjERCl3N7TsJ3u',
+      tokenSandbox:
+        'JhbOfQpjF1W82qPj9ihjyukcglLWaeLjCmyh4dGAUc8MJNxIwTrjERCl3N7TsJ3u',
       urlProd: 'ava.uniego.edu.br',
-      tokenProd: 'JhbOfQpjF1W82qPj9ihjyukcglLWaeLjCmyh4dGAUc8MJNxIwTrjERCl3N7TsJ3u',
+      tokenProd:
+        'JhbOfQpjF1W82qPj9ihjyukcglLWaeLjCmyh4dGAUc8MJNxIwTrjERCl3N7TsJ3u',
       status: true,
     },
     {
       unidadeEns: 'RAÍZES',
       urlSandbox: 'raizes-sandbox.myopenlms.net',
-      tokenSandbox: '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
+      tokenSandbox:
+        '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
       urlProd: 'ava.faculdaderaizes.edu.br',
-      tokenProd: '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
+      tokenProd:
+        '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
       status: true,
     },
     {
       unidadeEns: 'RAIZES',
       urlSandbox: 'raizes-sandbox.myopenlms.net',
-      tokenSandbox: '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
+      tokenSandbox:
+        '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
       urlProd: 'ava.faculdaderaizes.edu.br',
-      tokenProd: '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
+      tokenProd:
+        '9K1lgXx7sSlzBT9W7atH7xljZ1Tz07Q0HHboeOmMhNCiiC5gdonabPA0GUp6R6xa',
       status: true,
     },
     {
       unidadeEns: 'EEFN',
       urlSandbox: 'colegiosaee-sandbox.myopenlms.net',
-      tokenSandbox: '37KzpACjJEKDhHPEEeJCioxtaIeJbASU8eKneMNnRYrzg73kbDn9sasIjMRBNkWM',
+      tokenSandbox:
+        '37KzpACjJEKDhHPEEeJCioxtaIeJbASU8eKneMNnRYrzg73kbDn9sasIjMRBNkWM',
       urlProd: 'ava.aee.edu.br',
-      tokenProd: '37KzpACjJEKDhHPEEeJCioxtaIeJbASU8eKneMNnRYrzg73kbDn9sasIjMRBNkWM',
+      tokenProd:
+        '37KzpACjJEKDhHPEEeJCioxtaIeJbASU8eKneMNnRYrzg73kbDn9sasIjMRBNkWM',
       status: true,
     },
   ];
 
   for (const item of openlmsData) {
     try {
-      const existing = await db.select().from(avaOpenlms).where(eq(avaOpenlms.unidadeEns, item.unidadeEns));
+      const existing = await db
+        .select()
+        .from(avaOpenlms)
+        .where(eq(avaOpenlms.unidadeEns, item.unidadeEns));
       if (existing.length === 0) {
         await db.insert(avaOpenlms).values(item);
-        console.log(`[SEED] Inseridas credenciais para a unidade: "${item.unidadeEns}"`);
+        console.log(
+          `[SEED] Inseridas credenciais para a unidade: "${item.unidadeEns}"`,
+        );
       }
     } catch (e: any) {
       console.error(`Erro ao semear "${item.unidadeEns}":`, e.message);
@@ -321,10 +370,11 @@ async function main() {
   console.log('✅ Credenciais Moodle semeadas com sucesso!');
 }
 
-main().then(() => {
-  process.exit(0);
-}).catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
-
+main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
