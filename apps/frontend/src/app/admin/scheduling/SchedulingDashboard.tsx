@@ -515,55 +515,104 @@ export function SchedulingDashboard({
             <DialogTrigger render={<Button variant="outline" className="border-gray-300 hover:bg-gray-50 text-navy gap-2" />}>
               <RefreshCw className="w-4 h-4 text-navy" /> Importar CSV
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[400px] bg-white rounded-xl shadow-xl">
-              <DialogHeader>
-                <DialogTitle className="text-navy font-bold text-lg">Importar Agendamentos</DialogTitle>
-              </DialogHeader>
-              <div className="py-4 space-y-4">
-                <p className="text-xs text-[#5F6775]">
-                  Selecione um arquivo CSV gerado pelo sistema antigo ou pelo próprio Nexus para sincronizar e atualizar os agendamentos na base atual.
+            <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden border border-slate-200/90 shadow-2xl rounded-2xl bg-white">
+              {/* Header Fixo */}
+              <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-white select-none">
+                <div className="flex items-center gap-3.5 pr-8">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-navy shrink-0 shadow-xs">
+                    <FileSpreadsheet className="w-5 h-5 text-navy" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-bold text-navy tracking-tight">
+                      Importar Agendamentos
+                    </DialogTitle>
+                    <p className="text-xs text-[#5F6775] mt-0.5">
+                      Sincronize agendamentos em lote a partir de uma planilha CSV.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Corpo */}
+              <div className="px-6 py-5 space-y-4">
+                <p className="text-xs text-[#5F6775] leading-relaxed">
+                  Selecione um arquivo CSV gerado pelo sistema legado ou pelo próprio Nexus para sincronizar e atualizar os agendamentos na base de dados atual.
                 </p>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-navy uppercase">Arquivo CSV</Label>
+                  <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
+                    Arquivo CSV <span className="text-red-500">*</span>
+                  </Label>
                   <Input 
                     type="file" 
                     accept=".csv"
                     disabled={importing}
                     onChange={handleFileUpload}
-                    className="border-gray-300 focus:border-navy text-sm p-1.5 cursor-pointer"
+                    className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs p-1.5 cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-navy/10 file:text-navy hover:file:bg-navy/20"
                   />
                 </div>
                 {importing && (
-                  <div className="flex items-center gap-2 text-xs text-navy font-semibold mt-4">
-                    <RefreshCw className="w-4 h-4 animate-spin text-green-dark" /> Importando e sincronizando dados...
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-navy font-semibold animate-pulse">
+                    <RefreshCw className="w-4 h-4 animate-spin text-green-dark shrink-0" />
+                    <span>Importando e sincronizando registros...</span>
                   </div>
                 )}
+              </div>
+
+              {/* Rodapé */}
+              <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-end gap-2.5 select-none">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium px-4 h-9 rounded-xl transition-all cursor-pointer"
+                >
+                  Fechar
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
           
           <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
             <DialogTrigger render={<Button className="bg-green-dark hover:bg-green-brand text-white gap-2" />}>
-              <PlusCircle className="w-4 h-4" /> Novo
+              <PlusCircle className="w-4 h-4" /> Novo Agendamento
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px] bg-white rounded-xl shadow-xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-navy font-bold text-lg">Criar Novo Agendamento de Prova</DialogTitle>
-              </DialogHeader>
+            <DialogContent className="sm:max-w-xl md:max-w-2xl p-0 gap-0 overflow-hidden border border-slate-200/90 shadow-2xl rounded-2xl bg-white">
+              {/* Header Fixo */}
+              <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-white select-none">
+                <div className="flex items-center gap-3.5 pr-8">
+                  <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-dark shrink-0 shadow-xs">
+                    <Calendar className="w-5 h-5 text-green-dark" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-bold text-navy tracking-tight">
+                      Novo Agendamento de Prova
+                    </DialogTitle>
+                    <p className="text-xs text-[#5F6775] mt-0.5">
+                      Localize o discente pelo número de matrícula e reserve o polo e horário desejados.
+                    </p>
+                  </div>
+                </div>
+              </div>
               
-              <div className="space-y-4 py-4">
+              {/* Corpo Rolável */}
+              <div className="px-6 py-5 max-h-[calc(85vh-140px)] overflow-y-auto overflow-x-hidden space-y-5 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
                 {/* 1. Student Fetch */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-navy uppercase">Dados do Aluno</Label>
+                  <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    Localizar Aluno por Matrícula <span className="text-red-500">*</span>
+                  </Label>
                   <div className="flex gap-2">
                     <Input 
                       placeholder="Digite a Matrícula do Aluno" 
                       value={modalMatricula}
                       onChange={(e) => setModalMatricula(e.target.value)}
-                      className="border-gray-300 focus:border-navy focus:ring-navy flex-1"
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchStudent(); } }}
+                      className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs flex-1"
                     />
                     <select
-                      className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-navy"
+                      className="h-10 text-xs border border-slate-200 rounded-xl px-3 bg-white text-slate-800 focus:outline-none focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
                       value={modalPeriodo}
                       onChange={(e) => setModalPeriodo(e.target.value)}
                     >
@@ -574,41 +623,45 @@ export function SchedulingDashboard({
                       ))}
                     </select>
                     <Button 
+                      type="button"
                       onClick={handleSearchStudent}
                       disabled={profileLoading}
-                      className="bg-navy hover:bg-navy-light text-white shrink-0"
+                      className="bg-navy hover:bg-navy-light text-white font-bold h-10 px-4 rounded-xl shadow-xs shrink-0 transition-all cursor-pointer"
                     >
-                      {profileLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Buscar"}
+                      {profileLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      <span className="hidden sm:inline sm:ml-1.5">Buscar</span>
                     </Button>
                   </div>
                 </div>
 
                 {/* 2. Hydrated Profile Details */}
                 {studentProfile && (
-                  <div className="bg-[#F4F5F7] rounded-xl p-4 border border-gray-200 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-navy text-white flex items-center justify-center font-bold text-sm shrink-0">
+                  <div className="bg-slate-50/90 rounded-2xl p-4 md:p-5 border border-slate-200/80 space-y-3.5 shadow-2xs animate-in fade-in">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-11 h-11 rounded-xl bg-navy text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
                         {studentProfile.nome?.slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-bold text-navy text-sm">{studentProfile.nome}</p>
-                        <p className="text-xs text-[#5F6775]">{studentProfile.email}</p>
-                        {studentProfile.telefone && <p className="text-xs text-[#5F6775]">Tel: {studentProfile.telefone}</p>}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-navy text-sm truncate">{studentProfile.nome}</p>
+                        <p className="text-xs text-[#5F6775] truncate mt-0.5">{studentProfile.email}</p>
+                        {studentProfile.telefone && (
+                          <p className="text-xs text-[#5F6775] mt-0.5 font-mono">📞 {studentProfile.telefone}</p>
+                        )}
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-200 pt-3">
-                      <p className="text-xs font-bold text-navy uppercase flex items-center gap-1.5 mb-2">
+                    <div className="border-t border-slate-200/80 pt-3">
+                      <p className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5 mb-2">
                         <BookOpen className="w-3.5 h-3.5 text-green-dark" /> Disciplinas Vinculadas ({studentProfile.totalDisciplinas})
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {studentProfile.disciplinas.map((disc: string, idx: number) => (
-                          <Badge key={idx} variant="outline" className="text-[10px] bg-white border-navy/30 text-navy py-0.5">
+                          <Badge key={idx} variant="outline" className="text-[10px] bg-white border-navy/20 text-navy font-semibold py-0.5 px-2 rounded-lg">
                             {disc}
                           </Badge>
                         ))}
                       </div>
-                      <p className="text-[10px] text-[#5F6775] italic mt-2">
+                      <p className="text-[11px] text-[#5F6775] italic mt-2.5">
                         * O sistema reservará automaticamente {studentProfile.totalDisciplinas} blocos consecutivos de 30 minutos ({studentProfile.totalDisciplinas * 30} min no total).
                       </p>
                     </div>
@@ -617,18 +670,26 @@ export function SchedulingDashboard({
 
                 {/* 3. Slot Reservation Fields */}
                 {studentProfile && (
-                  <div className="space-y-4 pt-2 border-t border-gray-100">
-                    <Label className="text-xs font-bold text-navy uppercase">Opções de Agendamento</Label>
+                  <div className="space-y-4 pt-3 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-[#9AA0AC] uppercase tracking-wider">
+                        Opções de Agendamento
+                      </span>
+                      <div className="flex-1 h-[1px] bg-slate-100" />
+                    </div>
                     
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-[#5F6775]">Campus / Polo</Label>
+                        <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                          Campus / Polo <span className="text-red-500">*</span>
+                        </Label>
                         <select 
-                          className="w-full text-sm border border-gray-300 rounded-lg p-2 bg-white focus:outline-none focus:ring-1 focus:ring-navy"
+                          className="w-full h-10 text-sm border border-slate-200 rounded-xl px-3 bg-white text-slate-800 focus:outline-none focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
                           value={selectedLocal}
                           onChange={(e) => setSelectedLocal(e.target.value)}
                         >
-                          <option value="">Selecione...</option>
+                          <option value="">Selecione o polo...</option>
                           {locals.map((l: any) => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
@@ -636,43 +697,51 @@ export function SchedulingDashboard({
                       </div>
 
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-[#5F6775]">Data da Prova</Label>
+                        <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          Data da Prova <span className="text-red-500">*</span>
+                        </Label>
                         <Input 
                           type="date"
                           value={selectedDate}
                           onChange={(e) => setSelectedDate(e.target.value)}
-                          className="border-gray-300 focus:border-navy text-sm p-2"
+                          className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
                         />
                       </div>
                     </div>
 
                     {/* 4. Slot Selector */}
                     {selectedLocal && selectedDate && (
-                      <div className="space-y-2">
-                        <Label className="text-xs text-[#5F6775] block">Horários Iniciais Disponíveis</Label>
+                      <div className="space-y-2 pt-2">
+                        <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          Horários Iniciais Disponíveis <span className="text-red-500">*</span>
+                        </Label>
                         {slotsLoading ? (
-                          <div className="text-center py-4 text-xs text-[#9AA0AC] flex items-center justify-center gap-2">
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Carregando salas...
+                          <div className="text-center py-6 text-xs text-[#9AA0AC] flex items-center justify-center gap-2 bg-slate-50 rounded-xl border border-slate-100">
+                            <RefreshCw className="w-4 h-4 animate-spin text-navy" /> Carregando horários e capacidade de vagas...
                           </div>
                         ) : availableSlots.length === 0 ? (
-                          <p className="text-xs text-[#E53935] italic">Nenhum horário com capacidade de vagas para esta data.</p>
+                          <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-800 text-xs">
+                            Nenhum horário com capacidade suficiente de vagas disponível para esta data e polo.
+                          </div>
                         ) : (
-                          <div className="grid grid-cols-3 gap-2 max-h-36 overflow-y-auto pr-1">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-44 overflow-y-auto p-1 [scrollbar-width:thin]">
                             {availableSlots.map((slot) => (
                               <button
                                 key={slot.id}
                                 type="button"
                                 onClick={() => setSelectedSlotId(slot.id)}
-                                className={`p-2.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center ${
+                                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center cursor-pointer ${
                                   selectedSlotId === slot.id
-                                    ? "bg-navy text-white border-navy shadow-sm"
-                                    : "bg-white text-navy border-gray-200 hover:bg-gray-50"
+                                    ? "bg-navy text-white border-navy shadow-md ring-2 ring-navy/20"
+                                    : "bg-white text-navy border-slate-200 hover:border-navy/40 hover:bg-slate-50 shadow-2xs"
                                 }`}
                               >
-                                <span className="font-bold text-sm flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> {slot.hora?.slice(0, 5)}
+                                <span className="font-bold text-sm flex items-center gap-1 font-mono">
+                                  <Clock className="w-3.5 h-3.5" /> {slot.hora?.slice(0, 5)}
                                 </span>
-                                <span className={`text-[10px] mt-0.5 ${selectedSlotId === slot.id ? "text-white/80" : "text-[#5F6775]"}`}>
+                                <span className={`text-[10px] mt-1 font-medium ${selectedSlotId === slot.id ? "text-white/80" : "text-emerald-700 font-semibold"}`}>
                                   {slot.vagas} vagas
                                 </span>
                               </button>
@@ -685,22 +754,39 @@ export function SchedulingDashboard({
                 )}
               </div>
 
-              {/* Modal Actions */}
-              <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-[#5F6775] hover:bg-gray-100"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={handleConfirmNewBooking}
-                  disabled={submittingBooking || !selectedSlotId}
-                  className="bg-green-dark hover:bg-green-brand text-white"
-                >
-                  {submittingBooking ? "Processando..." : "Confirmar Agendamento"}
-                </Button>
+              {/* Rodapé Fixo */}
+              <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between gap-3 select-none">
+                <p className="text-[11px] text-[#9AA0AC] hidden sm:block">
+                  <span className="text-red-500 font-bold">*</span> Campos obrigatórios
+                </p>
+                <div className="flex items-center gap-2.5 ml-auto">
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    onClick={() => setIsModalOpen(false)}
+                    className="border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium px-4 h-9 rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="button"
+                    onClick={handleConfirmNewBooking}
+                    disabled={submittingBooking || !selectedSlotId}
+                    className="bg-green-dark hover:bg-green-brand text-white font-bold px-5 h-9 rounded-xl shadow-sm gap-2 transition-all cursor-pointer active:scale-98 disabled:opacity-50"
+                  >
+                    {submittingBooking ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Processando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Confirmar Agendamento</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -957,24 +1043,44 @@ export function SchedulingDashboard({
                       {/* Disciplines Modal Trigger */}
                       <TableCell className="px-5 py-3.5 hidden lg:table-cell">
                         <Dialog>
-                          <DialogTrigger render={<button className="text-left text-xs text-navy hover:text-green-dark font-medium underline flex items-center gap-1" />}>
+                          <DialogTrigger render={<button className="text-left text-xs text-navy hover:text-green-dark font-medium underline flex items-center gap-1 cursor-pointer" />}>
                             <BookOpen className="w-3.5 h-3.5 text-green-dark" /> Visualizar Disciplinas ({totalDisciplines})
                           </DialogTrigger>
-                          <DialogContent className="bg-white rounded-xl shadow-lg p-5">
-                            <DialogHeader>
-                              <DialogTitle className="text-navy font-bold text-sm uppercase">Matérias Agendadas - {row.studentName}</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-3 py-3">
-                              <div className="flex flex-col gap-2">
-                                {disciplineList.map((disc: string, i: number) => (
-                                  <div key={i} className="flex items-center gap-2 p-2.5 bg-[#F4F5F7] rounded-lg border border-gray-100 text-navy text-xs font-semibold">
-                                    <Badge className="bg-green-dark text-white text-[9px] font-bold h-4 flex items-center justify-center">
-                                      Prova {i + 1}
-                                    </Badge>
-                                    {disc}
-                                  </div>
-                                ))}
+                          <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden border border-slate-200/90 shadow-2xl rounded-2xl bg-white">
+                            {/* Header Fixo */}
+                            <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-white select-none">
+                              <div className="flex items-center gap-3.5 pr-8">
+                                <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-dark shrink-0 shadow-xs">
+                                  <BookOpen className="w-5 h-5 text-green-dark" />
+                                </div>
+                                <div>
+                                  <DialogTitle className="text-lg font-bold text-navy tracking-tight">
+                                    Matérias Agendadas
+                                  </DialogTitle>
+                                  <p className="text-xs text-[#5F6775] mt-0.5 truncate max-w-sm">
+                                    {row.studentName} • {totalDisciplines} disciplina(s)
+                                  </p>
+                                </div>
                               </div>
+                            </div>
+
+                            {/* Corpo Rolável */}
+                            <div className="px-6 py-5 max-h-[60vh] overflow-y-auto space-y-2.5 [scrollbar-width:thin]">
+                              {disciplineList.map((disc: string, i: number) => (
+                                <div key={i} className="flex items-center gap-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 text-navy text-xs font-semibold shadow-2xs">
+                                  <Badge className="bg-green-dark text-white text-[10px] font-bold h-5 px-2 flex items-center justify-center rounded-md shrink-0">
+                                    Prova {i + 1}
+                                  </Badge>
+                                  <span className="truncate">{disc}</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Rodapé Fixo */}
+                            <div className="px-6 py-3.5 bg-slate-50/90 border-t border-slate-100 flex justify-end select-none">
+                              <DialogTrigger render={<Button variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-100 text-xs h-8 px-4 rounded-xl cursor-pointer" />}>
+                                Fechar
+                              </DialogTrigger>
                             </div>
                           </DialogContent>
                         </Dialog>

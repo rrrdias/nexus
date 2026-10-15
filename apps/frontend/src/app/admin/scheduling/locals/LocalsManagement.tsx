@@ -166,77 +166,122 @@ export function LocalsManagement({ initialLocals }: { initialLocals: any[] }) {
             >
               <PlusCircle className="w-4 h-4" /> Novo Polo
             </Button>
-            <DialogContent className="sm:max-w-[500px] bg-white rounded-xl shadow-xl">
-              <DialogHeader>
-                <DialogTitle className="text-navy font-bold text-lg">
-                  {modalMode === "create" ? "Cadastrar Novo Polo" : "Editar Polo de Atendimento"}
-                </DialogTitle>
-              </DialogHeader>
-
-              <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="nome" className="text-xs font-bold text-navy uppercase">Nome do Polo</Label>
-                  <Input
-                    id="nome"
-                    placeholder="Ex: Polo Anápolis (UniEvangélica)"
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    className="border-gray-300 focus:border-navy"
-                  />
+            <DialogContent className="sm:max-w-xl md:max-w-2xl p-0 gap-0 overflow-hidden border border-slate-200/90 shadow-2xl rounded-2xl bg-white">
+              {/* Header Fixo */}
+              <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-white select-none">
+                <div className="flex items-center gap-3.5 pr-8">
+                  <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-dark shrink-0 shadow-xs">
+                    <Building2 className="w-5 h-5 text-green-dark" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-lg font-bold text-navy tracking-tight">
+                      {modalMode === "create" ? "Cadastrar Novo Polo" : "Editar Polo de Atendimento"}
+                    </DialogTitle>
+                    <p className="text-xs text-[#5F6775] mt-0.5">
+                      {modalMode === "create" 
+                        ? "Cadastre um novo polo físico de atendimento para aplicação de exames presenciais." 
+                        : "Atualize os dados cadastrais, endereço e canais de contato deste polo."}
+                    </p>
+                  </div>
                 </div>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="endereco" className="text-xs font-bold text-navy uppercase">Endereço Completo</Label>
-                  <Input
-                    id="endereco"
-                    placeholder="Av, Rua, Número, Bairro, Cidade - UF"
-                    value={endereco}
-                    onChange={(e) => setEndereco(e.target.value)}
-                    className="border-gray-300 focus:border-navy"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="flex flex-col m-0">
+                {/* Corpo Rolável */}
+                <div className="px-6 py-5 max-h-[calc(85vh-140px)] overflow-y-auto overflow-x-hidden space-y-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
                   <div className="space-y-1.5">
-                    <Label htmlFor="telefone" className="text-xs font-bold text-navy uppercase">Telefone de Contato</Label>
+                    <Label htmlFor="nome" className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                      Nome do Polo <span className="text-red-500">*</span>
+                    </Label>
                     <Input
-                      id="telefone"
-                      placeholder="(62) 3310-0000"
-                      value={telefone}
-                      onChange={(e) => setTelefone(e.target.value)}
-                      className="border-gray-300 focus:border-navy"
+                      id="nome"
+                      placeholder="Ex: Polo Anápolis (UniEvangélica)"
+                      value={nome}
+                      onChange={(e) => setNome(e.target.value)}
+                      required
+                      className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="linkLocal" className="text-xs font-bold text-navy uppercase">Link Localização (Google Maps)</Label>
+                    <Label htmlFor="endereco" className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      Endereço Completo <span className="text-red-500">*</span>
+                    </Label>
                     <Input
-                      id="linkLocal"
-                      placeholder="https://goo.gl/maps/..."
-                      value={linkLocal}
-                      onChange={(e) => setLinkLocal(e.target.value)}
-                      className="border-gray-300 focus:border-navy"
+                      id="endereco"
+                      placeholder="Av, Rua, Número, Bairro, Cidade - UF"
+                      value={endereco}
+                      onChange={(e) => setEndereco(e.target.value)}
+                      required
+                      className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="telefone" className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        Telefone de Contato
+                      </Label>
+                      <Input
+                        id="telefone"
+                        placeholder="(62) 3310-0000"
+                        value={telefone}
+                        onChange={(e) => setTelefone(e.target.value)}
+                        className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="linkLocal" className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                        Link Localização (Google Maps)
+                      </Label>
+                      <Input
+                        id="linkLocal"
+                        placeholder="https://goo.gl/maps/..."
+                        value={linkLocal}
+                        onChange={(e) => setLinkLocal(e.target.value)}
+                        className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Modal Footer Actions */}
-                <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
-                  <Button 
-                    type="button"
-                    variant="ghost" 
-                    onClick={() => setIsModalOpen(false)}
-                    className="text-[#5F6775] hover:bg-gray-100"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={submitting}
-                    className="bg-green-dark hover:bg-green-brand text-white"
-                  >
-                    {submitting ? "Processando..." : modalMode === "create" ? "Cadastrar" : "Salvar Alterações"}
-                  </Button>
+                {/* Rodapé Fixo de Ações */}
+                <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between gap-3 select-none">
+                  <p className="text-[11px] text-[#9AA0AC] hidden sm:block">
+                    <span className="text-red-500 font-bold">*</span> Campos obrigatórios
+                  </p>
+                  <div className="flex items-center gap-2.5 ml-auto">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      onClick={() => setIsModalOpen(false)}
+                      className="border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium px-4 h-9 rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit"
+                      disabled={submitting}
+                      className="bg-green-dark hover:bg-green-brand text-white font-bold px-5 h-9 rounded-xl shadow-sm gap-2 transition-all cursor-pointer active:scale-98"
+                    >
+                      {submitting ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Processando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          <span>{modalMode === "create" ? "Cadastrar Polo" : "Salvar Alterações"}</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </DialogContent>

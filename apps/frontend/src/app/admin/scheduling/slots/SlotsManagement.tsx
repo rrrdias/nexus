@@ -19,7 +19,10 @@ import {
   Search,
   AlertCircle,
   Inbox,
-  Sparkles
+  Sparkles,
+  CheckCircle,
+  Users,
+  MapPin
 } from "lucide-react"
 
 const TIME_SLOTS_30MIN = [
@@ -184,95 +187,166 @@ export function SlotsManagement({ locals }: { locals: any[] }) {
             >
               <PlusCircle className="w-4 h-4" /> Novo Horário
             </Button>
-            <DialogContent className="sm:max-w-[400px] bg-white rounded-xl shadow-xl">
-              <DialogHeader>
-                <DialogTitle className="text-navy font-bold text-lg">
-                  {modalMode === "create" ? "Criar Novo Horário" : "Ajustar Vagas Disponíveis"}
-                </DialogTitle>
-              </DialogHeader>
-
-              <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                {modalMode === "create" ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="horaInicio" className="text-xs font-bold text-navy uppercase">Hora de Início</Label>
-                      <select
-                        id="horaInicio"
-                        value={horaInicio}
-                        onChange={(e) => {
-                          const newStart = e.target.value;
-                          setHoraInicio(newStart);
-                          if (horaFim && horaFim <= newStart) {
-                            setHoraFim("");
-                          }
-                        }}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-navy"
-                      >
-                        <option value="">Selecione o início</option>
-                        {TIME_SLOTS_30MIN.slice(0, -1).map((time) => (
-                          <option key={time} value={time}>
-                            {time}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="horaFim" className="text-xs font-bold text-navy uppercase">Hora Final</Label>
-                      <select
-                        id="horaFim"
-                        value={horaFim}
-                        onChange={(e) => setHoraFim(e.target.value)}
-                        disabled={!horaInicio}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-navy disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <option value="">Selecione o término</option>
-                        {TIME_SLOTS_30MIN.filter((time) => !horaInicio || time > horaInicio).map((time) => (
-                          <option key={time} value={time}>
-                            {time}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <p className="col-span-2 text-[10px] text-[#5F6775] italic">* Os horários de ocupação são gerados estritamente em blocos de 30 em 30 minutos.</p>
+            <DialogContent className="sm:max-w-lg md:max-w-xl p-0 gap-0 overflow-hidden border border-slate-200/90 shadow-2xl rounded-2xl bg-white">
+              {/* Header Fixo */}
+              <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-white select-none">
+                <div className="flex items-center gap-3.5 pr-8">
+                  <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-dark shrink-0 shadow-xs">
+                    <Clock className="w-5 h-5 text-green-dark" />
                   </div>
-                ) : (
-                  <div className="space-y-1.5 bg-[#F4F5F7] p-3 rounded-lg border border-gray-200">
-                    <p className="text-xs text-navy font-semibold">Horário selecionado: <span className="font-bold">{horaInicio}</span></p>
-                    <p className="text-[10px] text-[#5F6775] mt-1">Data: {new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                  <div>
+                    <DialogTitle className="text-lg font-bold text-navy tracking-tight">
+                      {modalMode === "create" ? "Criar Novo Horário" : "Ajustar Vagas Disponíveis"}
+                    </DialogTitle>
+                    <p className="text-xs text-[#5F6775] mt-0.5">
+                      {modalMode === "create" 
+                        ? "Defina o horário de início e término e a capacidade máxima de vagas no polo." 
+                        : "Atualize o limite de capacidade simultânea de vagas para este horário."}
+                    </p>
                   </div>
-                )}
+                </div>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="vagas" className="text-xs font-bold text-navy uppercase">Total de Vagas</Label>
-                  <Input
-                    id="vagas"
-                    type="number"
-                    min="0"
-                    placeholder="Ex: 20"
-                    value={vagas}
-                    onChange={(e) => setVagas(Number(e.target.value))}
-                    className="border-gray-300 focus:border-navy"
-                  />
-                  <p className="text-[10px] text-[#5F6775] italic">* Capacidade máxima de alunos simultâneos.</p>
+              <form onSubmit={handleSubmit} className="flex flex-col m-0">
+                {/* Corpo Rolável */}
+                <div className="px-6 py-5 max-h-[calc(85vh-140px)] overflow-y-auto overflow-x-hidden space-y-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
+                  {modalMode === "create" ? (
+                    <>
+                      {/* Contexto do Agendamento */}
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-navy/70" />
+                          <span className="font-semibold text-navy">
+                            {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="truncate max-w-[200px]">
+                            {locals.find(l => String(l.id) === String(selectedLocal))?.nome || 'Polo selecionado'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="horaInicio" className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            Hora de Início <span className="text-red-500">*</span>
+                          </Label>
+                          <select
+                            id="horaInicio"
+                            value={horaInicio}
+                            onChange={(e) => {
+                              const newStart = e.target.value;
+                              setHoraInicio(newStart);
+                              if (horaFim && horaFim <= newStart) {
+                                setHoraFim("");
+                              }
+                            }}
+                            className="w-full h-10 text-sm border border-slate-200 rounded-xl px-3 bg-white text-slate-800 focus:outline-none focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
+                          >
+                            <option value="">Selecione o início...</option>
+                            {TIME_SLOTS_30MIN.slice(0, -1).map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="horaFim" className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            Hora Final <span className="text-red-500">*</span>
+                          </Label>
+                          <select
+                            id="horaFim"
+                            value={horaFim}
+                            onChange={(e) => setHoraFim(e.target.value)}
+                            disabled={!horaInicio}
+                            className="w-full h-10 text-sm border border-slate-200 rounded-xl px-3 bg-white text-slate-800 focus:outline-none focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                          >
+                            <option value="">Selecione o término...</option>
+                            {TIME_SLOTS_30MIN.filter((time) => !horaInicio || time > horaInicio).map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-[#5F6775]">
+                        * Os horários de ocupação são gerados estritamente em blocos de 30 em 30 minutos.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="space-y-1.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                      <p className="text-xs text-navy font-semibold flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-green-dark" />
+                        Horário selecionado: <span className="font-bold text-navy">{horaInicio}</span>
+                      </p>
+                      <p className="text-[11px] text-[#5F6775] flex items-center gap-1.5 mt-1">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        Data: {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="vagas" className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      Total de Vagas Simultâneas <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="vagas"
+                      type="number"
+                      min="0"
+                      placeholder="Ex: 20"
+                      value={vagas}
+                      onChange={(e) => setVagas(Number(e.target.value))}
+                      required
+                      className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
+                    />
+                    <p className="text-[11px] text-[#5F6775]">
+                      * Capacidade máxima de alunos simultâneos para realização da prova.
+                    </p>
+                  </div>
                 </div>
 
-                {/* Modal Footer Actions */}
-                <div className="flex justify-end gap-2 pt-4 border-t border-gray-100">
-                  <Button 
-                    type="button"
-                    variant="ghost" 
-                    onClick={() => setIsModalOpen(false)}
-                    className="text-[#5F6775] hover:bg-gray-100"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={submitting}
-                    className="bg-green-dark hover:bg-green-brand text-white"
-                  >
-                    {submitting ? "Processando..." : modalMode === "create" ? "Criar Horário" : "Atualizar Vagas"}
-                  </Button>
+                {/* Rodapé Fixo de Ações */}
+                <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between gap-3 select-none">
+                  <p className="text-[11px] text-[#9AA0AC] hidden sm:block">
+                    <span className="text-red-500 font-bold">*</span> Campos obrigatórios
+                  </p>
+                  <div className="flex items-center gap-2.5 ml-auto">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      onClick={() => setIsModalOpen(false)}
+                      className="border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium px-4 h-9 rounded-xl transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit"
+                      disabled={submitting}
+                      className="bg-green-dark hover:bg-green-brand text-white font-bold px-5 h-9 rounded-xl shadow-sm gap-2 transition-all cursor-pointer active:scale-98"
+                    >
+                      {submitting ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Processando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          <span>{modalMode === "create" ? "Criar Horário" : "Atualizar Vagas"}</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </DialogContent>

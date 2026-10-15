@@ -402,18 +402,18 @@ export function AttendanceListDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl bg-white rounded-xl shadow-2xl max-h-[92vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-4xl bg-white border border-slate-200/90 rounded-2xl shadow-2xl max-h-[92vh] flex flex-col p-0 overflow-hidden">
         {/* Header - Screen only */}
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-white shrink-0 print:hidden">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-navy/5 text-navy flex items-center justify-center">
+        <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0 print:hidden select-none">
+          <div className="flex items-center gap-3.5 pr-4">
+            <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-dark shrink-0 shadow-xs">
               <FileText className="w-5 h-5 text-green-dark" />
             </div>
             <div>
-              <DialogTitle className="text-navy font-bold text-lg">
+              <DialogTitle className="text-lg font-bold text-navy tracking-tight">
                 Lista de Presença para Fiscais de Polo
               </DialogTitle>
-              <p className="text-xs text-[#5F6775]">
+              <p className="text-xs text-[#5F6775] mt-0.5">
                 Gere e imprima folhas oficiais A4 para coleta de assinatura dos alunos.
               </p>
             </div>
@@ -422,7 +422,7 @@ export function AttendanceListDialog({
             <Button
               onClick={handlePrint}
               disabled={records.length === 0}
-              className="bg-navy hover:bg-navy-light text-white gap-2 shadow-sm disabled:opacity-50"
+              className="bg-navy hover:bg-navy-light text-white font-bold px-4 h-9 rounded-xl gap-2 shadow-sm disabled:opacity-50 transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4 text-green-brand" /> Imprimir Folha A4
             </Button>
@@ -604,13 +604,22 @@ export function AttendanceListDialog({
         </div>
 
         {/* Modal Footer (Screen only) */}
-        <div className="p-3.5 bg-white border-t border-gray-100 flex justify-end gap-2 shrink-0 print:hidden">
-          <Button variant="ghost" onClick={onClose} className="text-[#5F6775]">
+        <div className="px-6 py-4 bg-slate-50/90 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0 print:hidden select-none">
+          <Button 
+            type="button"
+            variant="outline" 
+            onClick={onClose} 
+            className="border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium px-4 h-9 rounded-xl transition-all cursor-pointer"
+          >
             Fechar
           </Button>
           {records.length > 0 && (
-            <Button onClick={handlePrint} className="bg-navy hover:bg-navy-light text-white gap-2">
-              <Printer className="w-4 h-4 text-green-brand" /> Imprimir
+            <Button 
+              type="button"
+              onClick={handlePrint} 
+              className="bg-navy hover:bg-navy-light text-white font-bold px-5 h-9 rounded-xl shadow-sm gap-2 transition-all cursor-pointer active:scale-98"
+            >
+              <Printer className="w-4 h-4 text-green-brand" /> Imprimir Folha
             </Button>
           )}
         </div>
