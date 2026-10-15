@@ -63,7 +63,17 @@ console.log("Starting tests for scheduling-utils.ts...")
   // 14:00 is future relative to 13:00 -> false
   assert.equal(isSlotInPast("2026-10-23", "14:00", refDate), false)
 
-  console.log("✓ Test 3: Past time blocking relative to current time passed")
+  // Critical: UTC Server Timezone handling for Brazil (America/Sao_Paulo)
+  // When UTC clock is 17:35:00Z, Brazilian local time is 14:35.
+  const utcServerDate = new Date("2026-10-15T17:35:00.000Z")
+  // 15:00 is in 25 minutes (future) -> MUST NOT BE IN PAST (false)
+  assert.equal(isSlotInPast("2026-10-15", "15:00", utcServerDate), false)
+  // 14:30 is in the past -> MUST BE IN PAST (true)
+  assert.equal(isSlotInPast("2026-10-15", "14:30", utcServerDate), true)
+  // 14:35 is equal to current time -> MUST BE IN PAST (true)
+  assert.equal(isSlotInPast("2026-10-15", "14:35", utcServerDate), true)
+
+  console.log("✓ Test 3: Past time blocking relative to current time in America/Sao_Paulo passed")
 }
 
 // Test 4: filterValidStartSlots (Only show slots accommodating all disciplines)

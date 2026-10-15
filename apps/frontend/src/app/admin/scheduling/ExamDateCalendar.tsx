@@ -23,15 +23,9 @@ const MONTH_NAMES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ]
 
-const WEEK_DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+import { getTodayDateStr } from "@/lib/scheduling-utils"
 
-function getTodayStr(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, "0")
-  const d = String(now.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
-}
+const WEEK_DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 
 export function ExamDateCalendar({
   selectedDate,
@@ -40,7 +34,7 @@ export function ExamDateCalendar({
   loading = false,
   disciplinesCount = 1
 }: ExamDateCalendarProps) {
-  const todayStr = useMemo(() => getTodayStr(), [])
+  const todayStr = useMemo(() => getTodayDateStr(), [])
 
   // Initial month based on selectedDate or today
   const [viewDate, setViewDate] = useState(() => {

@@ -70,27 +70,53 @@ export function normalizeDateStr(dateValue: any): string {
   return `${y}-${m}-${d}`
 }
 
+export function getNowInSaoPaulo(referenceDate: Date = new Date()): {
+  dateStr: string
+  currentMinutes: number
+  timeStr: string
+} {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+
+  const parts = formatter.formatToParts(referenceDate)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "00"
+  const year = get("year")
+  const month = get("month")
+  const day = get("day")
+  const hour = parseInt(get("hour"), 10) % 24
+  const minute = parseInt(get("minute"), 10)
+
+  const dateStr = `${year}-${month}-${day}`
+  const currentMinutes = hour * 60 + minute
+  const timeStr = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+
+  return { dateStr, currentMinutes, timeStr }
+}
+
 export function getTodayDateStr(referenceDate: Date = new Date()): string {
-  const y = referenceDate.getFullYear()
-  const m = String(referenceDate.getMonth() + 1).padStart(2, "0")
-  const d = String(referenceDate.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
+  return getNowInSaoPaulo(referenceDate).dateStr
 }
 
 /**
- * Checks if a slot on a given date has already passed relative to current time.
+ * Checks if a slot on a given date has already passed relative to current time in Brazil (America/Sao_Paulo).
  */
 export function isSlotInPast(
   dateStr: string,
   timeStr: string,
   referenceDate: Date = new Date()
 ): boolean {
-  const todayStr = getTodayDateStr(referenceDate)
+  const { dateStr: todayStr, currentMinutes } = getNowInSaoPaulo(referenceDate)
   if (dateStr < todayStr) return true
   if (dateStr > todayStr) return false
 
-  // Date is today: compare time with current time
-  const currentMinutes = referenceDate.getHours() * 60 + referenceDate.getMinutes()
+  // Date is today: compare slot time with current time in America/Sao_Paulo
   const slotMinutes = parseTimeToMinutes(timeStr)
   if (slotMinutes === null) return true
 

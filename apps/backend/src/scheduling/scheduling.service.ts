@@ -78,6 +78,36 @@ function getExamEndTime(startTime: string, disciplinesCount: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+function getNowInSaoPaulo(referenceDate: Date = new Date()): {
+  dateStr: string;
+  currentMinutes: number;
+  timeStr: string;
+} {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(referenceDate);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || '00';
+  const year = get('year');
+  const month = get('month');
+  const day = get('day');
+  const hour = parseInt(get('hour'), 10) % 24;
+  const minute = parseInt(get('minute'), 10);
+
+  const dateStr = `${year}-${month}-${day}`;
+  const currentMinutes = hour * 60 + minute;
+  const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+
+  return { dateStr, currentMinutes, timeStr };
+}
+
 @Injectable()
 export class SchedulingService implements OnModuleInit {
   constructor(
@@ -496,10 +526,9 @@ export class SchedulingService implements OnModuleInit {
       if (!opcao.status)
         throw new BadRequestException('O horário selecionado está desativado.');
 
-      // Validate that booking is not in the past for today or earlier dates
+      // Validate that booking is not in the past for today or earlier dates in Brazil timezone (America/Sao_Paulo)
       const timeStr = opcao.hora.slice(0, 5); // Format HH:MM
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const { dateStr: todayStr, currentMinutes } = getNowInSaoPaulo();
       const slotDate = opcao.data instanceof Date ? opcao.data : new Date(opcao.data);
       const slotDateStr = `${slotDate.getUTCFullYear()}-${String(slotDate.getUTCMonth() + 1).padStart(2, '0')}-${String(slotDate.getUTCDate()).padStart(2, '0')}`;
 
@@ -507,7 +536,6 @@ export class SchedulingService implements OnModuleInit {
         throw new BadRequestException('Não é permitido agendar provas para datas passadas.');
       }
       if (slotDateStr === todayStr) {
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
         const slotMinutes = parseTimeToMinutes(timeStr);
         if (slotMinutes !== null && slotMinutes <= currentMinutes) {
           throw new BadRequestException(
