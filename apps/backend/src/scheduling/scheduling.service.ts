@@ -5,10 +5,22 @@ import {
   NotFoundException,
   UnauthorizedException,
   ForbiddenException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq, and, or, inArray, ilike, sql, isNull, desc } from 'drizzle-orm';
+import {
+  eq,
+  ne,
+  and,
+  or,
+  inArray,
+  ilike,
+  sql,
+  isNull,
+  isNotNull,
+  desc,
+} from 'drizzle-orm';
 import {
   locals,
   opcaos,
@@ -18,6 +30,9 @@ import {
   usersSystemAccess,
   userGroups,
   groupSystemAccess,
+  academicDiscente,
+  academicTurma,
+  academicMatricula,
 } from '../db/schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
@@ -53,11 +68,53 @@ function getNextTimeStr(timeStr: string, index: number): string {
   return minutesToTimeStr(startMin + index * 30);
 }
 
+function getExamEndTime(startTime: string, disciplinesCount: number): string {
+  if (!startTime) return '';
+  const startMin = parseTimeToMinutes(startTime);
+  if (startMin === null) return '';
+  const totalMinutes = startMin + Math.max(1, disciplinesCount) * 30;
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 @Injectable()
-export class SchedulingService {
+export class SchedulingService implements OnModuleInit {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      await this.db.execute(sql`
+        DO $$
+        DECLARE
+            r RECORD;
+        BEGIN
+            FOR r IN (
+                SELECT conname
+                FROM pg_constraint
+                WHERE conrelid = 'agendamentos_matricula'::regclass
+                  AND contype = 'u'
+                  AND conname LIKE '%matricula%periodo%'
+            ) LOOP
+                EXECUTE 'ALTER TABLE "agendamentos_matricula" DROP CONSTRAINT IF EXISTS ' || quote_ident(r.conname);
+            END LOOP;
+        END $$;
+        CREATE UNIQUE INDEX IF NOT EXISTS "unq_agendamento_matricula_periodo_ativo" 
+          ON "agendamentos_matricula" ("matricula", "periodo") 
+          WHERE "deletedAt" IS NULL;
+      `);
+      console.log(
+        '[SchedulingService] Constraint de agendamentos atualizada para índice condicional (suporta reagendamento após cancelamento).',
+      );
+    } catch (err: any) {
+      console.error(
+        '[SchedulingService] Aviso ao inicializar índice de agendamentos no PostgreSQL:',
+        err.message,
+      );
+    }
+  }
 
   async assertSchedulingAdminAccess(user?: SessionUser) {
     if (!user?.id || user.isDisabled) {
@@ -227,6 +284,12 @@ export class SchedulingService {
       );
     }
 
+    if (startMin % 30 !== 0 || endMin % 30 !== 0) {
+      throw new BadRequestException(
+        'Os horários devem ser múltiplos de 30 minutos (ex: 08:00, 08:30, 09:00).',
+      );
+    }
+
     if (endMin <= startMin || endMin - startMin < 30) {
       throw new BadRequestException(
         'Horário final deve ser maior que o horário inicial em pelo menos 30 minutos.',
@@ -290,37 +353,100 @@ export class SchedulingService {
     return updated;
   }
 
-  // 3. Student Profile Query (Local AVA tables)
+  // 3. Student Profile Query (Hybrid: AVA Reports with Academic / Lyceum Fallback)
   async getStudentProfile(matricula: string, periodo: string) {
+    const trimmedMatricula = matricula.trim();
+    const trimmedPeriodo = periodo.trim();
+
+    // 1. Try local AVA Progress Report table
     const studentRecords = await this.db
       .select()
       .from(avaProgressReport)
       .where(
         and(
-          eq(avaProgressReport.matricula, matricula),
-          eq(avaProgressReport.periodo, periodo),
+          eq(avaProgressReport.matricula, trimmedMatricula),
+          eq(avaProgressReport.periodo, trimmedPeriodo),
         ),
       );
 
-    if (studentRecords.length === 0) {
-      throw new NotFoundException(
-        'Estudante não encontrado ou sem disciplinas vinculadas no período atual.',
-      );
+    if (studentRecords.length > 0) {
+      const studentName = studentRecords[0].aluno;
+      const email = studentRecords[0].usuario;
+      const phone = studentRecords[0].userPhone1;
+      const disciplines = studentRecords.map((r) => r.curso).filter(Boolean);
+
+      if (disciplines.length > 0) {
+        return {
+          matricula: trimmedMatricula,
+          nome: studentName,
+          email,
+          telefone: phone,
+          disciplinas: disciplines,
+          totalDisciplinas: disciplines.length,
+        };
+      }
     }
 
-    const studentName = studentRecords[0].aluno;
-    const email = studentRecords[0].usuario;
-    const phone = studentRecords[0].userPhone1;
-    const disciplines = studentRecords.map((r) => r.curso).filter(Boolean);
+    // 2. Fallback to Lyceum Academic tables (academic_discente, academic_matricula, academic_turma)
+    const [discente] = await this.db
+      .select()
+      .from(academicDiscente)
+      .where(
+        or(
+          eq(academicDiscente.matricula, trimmedMatricula),
+          eq(academicDiscente.usuario, trimmedMatricula),
+          eq(academicDiscente.id, trimmedMatricula),
+        ),
+      )
+      .limit(1);
 
-    return {
-      matricula,
-      nome: studentName,
-      email,
-      telefone: phone,
-      disciplinas: disciplines,
-      totalDisciplinas: disciplines.length,
-    };
+    if (discente) {
+      const enrollments = await this.db
+        .select({
+          nomeDisciplina: academicTurma.nomeDisciplina,
+          disciplina: academicTurma.disciplina,
+          turma: academicTurma.turma,
+        })
+        .from(academicMatricula)
+        .innerJoin(
+          academicTurma,
+          eq(academicMatricula.turmaId, academicTurma.id),
+        )
+        .where(
+          and(
+            eq(academicMatricula.usuarioId, discente.id),
+            eq(academicTurma.periodo, trimmedPeriodo),
+            eq(academicMatricula.nivel, '2'),
+          ),
+        );
+
+      const disciplines = Array.from(
+        new Set(
+          enrollments
+            .map((e) => e.nomeDisciplina || e.disciplina || e.turma)
+            .filter(Boolean),
+        ),
+      ) as string[];
+
+      if (disciplines.length > 0) {
+        const fullName =
+          discente.nomeSocial ||
+          `${discente.nome || ''} ${discente.sobrenome || ''}`.trim() ||
+          'Estudante Não Identificado';
+        return {
+          matricula: discente.matricula || trimmedMatricula,
+          nome: fullName,
+          email: discente.email || discente.usuario || '',
+          telefone: discente.telefone || '',
+          disciplinas: disciplines,
+          totalDisciplinas: disciplines.length,
+        };
+      }
+    }
+
+    throw new NotFoundException(
+      'Estudante não encontrado ou sem disciplinas vinculadas no período informado.',
+    );
   }
 
   // 4. Bookings Management (with Locking Transactions)
@@ -347,6 +473,7 @@ export class SchedulingService {
             eq(agendamentosMatricula.matricula, matricula),
             eq(agendamentosMatricula.periodo, periodo),
             eq(agendamentosMatricula.status, 'ativo'),
+            isNull(agendamentosMatricula.deletedAt),
           ),
         )
         .limit(1);
@@ -570,7 +697,55 @@ export class SchedulingService {
     return updated;
   }
 
-  // 5. Backoffice Lists & Filters
+  // 5. Distinct Periods Query
+  async getPeriods(): Promise<string[]> {
+    const periodsSet = new Set<string>();
+
+    try {
+      const turmaPeriods = await this.db
+        .selectDistinct({ periodo: academicTurma.periodo })
+        .from(academicTurma)
+        .where(isNotNull(academicTurma.periodo));
+      turmaPeriods.forEach((p) => {
+        if (p.periodo && p.periodo.trim()) periodsSet.add(p.periodo.trim());
+      });
+    } catch {
+      // Tabela academic_turma pode estar indisponível ou vazia
+    }
+
+    try {
+      const avaPeriods = await this.db
+        .selectDistinct({ periodo: avaProgressReport.periodo })
+        .from(avaProgressReport)
+        .where(isNotNull(avaProgressReport.periodo));
+      avaPeriods.forEach((p) => {
+        if (p.periodo && p.periodo.trim()) periodsSet.add(p.periodo.trim());
+      });
+    } catch {
+      // Tabela ava_progress_report pode estar indisponível ou vazia
+    }
+
+    try {
+      const bookingPeriods = await this.db
+        .selectDistinct({ periodo: agendamentosMatricula.periodo })
+        .from(agendamentosMatricula)
+        .where(isNotNull(agendamentosMatricula.periodo));
+      bookingPeriods.forEach((p) => {
+        if (p.periodo && p.periodo.trim()) periodsSet.add(p.periodo.trim());
+      });
+    } catch {
+      // Tabela agendamentos_matricula pode estar indisponível ou vazia
+    }
+
+    if (periodsSet.size === 0) {
+      periodsSet.add('2026-1');
+      periodsSet.add('2025-2');
+    }
+
+    return Array.from(periodsSet).sort((a, b) => b.localeCompare(a));
+  }
+
+  // 6. Backoffice Lists & Filters
   async listBookings(filters: {
     matricula?: string;
     localId?: string;
@@ -606,16 +781,37 @@ export class SchedulingService {
 
     const whereClause = and(...conditions);
 
+    // Subquery from AVA Progress Report
     const studentSubquery = this.db
       .select({
         matricula: avaProgressReport.matricula,
         periodo: avaProgressReport.periodo,
-        aluno: sql<string>`max(${avaProgressReport.aluno})`.as('aluno'),
-        usuario: sql<string>`max(${avaProgressReport.usuario})`.as('usuario'),
+        aluno: sql<string>`max(${avaProgressReport.aluno})`.as('ava_aluno'),
+        usuario: sql<string>`max(${avaProgressReport.usuario})`.as(
+          'ava_usuario',
+        ),
       })
       .from(avaProgressReport)
       .groupBy(avaProgressReport.matricula, avaProgressReport.periodo)
       .as('student_subquery');
+
+    // Subquery from Academic Discente (Lyceum cache)
+    const academicDiscenteSubquery = this.db
+      .select({
+        matricula: academicDiscente.matricula,
+        nomeSocial: sql<string>`max(${academicDiscente.nomeSocial})`.as(
+          'ac_nome_social',
+        ),
+        nome: sql<string>`max(${academicDiscente.nome})`.as('ac_nome'),
+        sobrenome: sql<string>`max(${academicDiscente.sobrenome})`.as(
+          'ac_sobrenome',
+        ),
+        email: sql<string>`max(${academicDiscente.email})`.as('ac_email'),
+        usuario: sql<string>`max(${academicDiscente.usuario})`.as('ac_usuario'),
+      })
+      .from(academicDiscente)
+      .groupBy(academicDiscente.matricula)
+      .as('ac_discente_subquery');
 
     // Get paginated bookings details
     const rawData = await this.db
@@ -632,6 +828,11 @@ export class SchedulingService {
         localNome: locals.nome,
         studentName: studentSubquery.aluno,
         studentEmail: studentSubquery.usuario,
+        acNomeSocial: academicDiscenteSubquery.nomeSocial,
+        acNome: academicDiscenteSubquery.nome,
+        acSobrenome: academicDiscenteSubquery.sobrenome,
+        acEmail: academicDiscenteSubquery.email,
+        acUsuario: academicDiscenteSubquery.usuario,
       })
       .from(agendamentosMatricula)
       .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
@@ -642,6 +843,10 @@ export class SchedulingService {
           eq(studentSubquery.matricula, agendamentosMatricula.matricula),
           eq(studentSubquery.periodo, agendamentosMatricula.periodo),
         ),
+      )
+      .leftJoin(
+        academicDiscenteSubquery,
+        eq(academicDiscenteSubquery.matricula, agendamentosMatricula.matricula),
       )
       .where(whereClause)
       .orderBy(desc(agendamentosMatricula.createdAt))
@@ -659,12 +864,28 @@ export class SchedulingService {
     const totalRecords = Number(countResult?.count || 0);
     const totalPages = Math.ceil(totalRecords / size);
 
-    // Hydrate names & emails from synced progress reports
-    const bookings = rawData.map((row) => {
+    // Hydrate names & emails from synced progress reports or Lyceum discentes
+    const bookings = rawData.map((row: any) => {
+      const studentName =
+        row.studentName ||
+        row.acNomeSocial ||
+        (row.acNome ? `${row.acNome} ${row.acSobrenome || ''}`.trim() : null) ||
+        'Estudante Não Identificado';
+      const studentEmail =
+        row.studentEmail || row.acEmail || row.acUsuario || '';
       return {
-        ...row,
-        studentName: row.studentName || 'Estudante Não Identificado',
-        studentEmail: row.studentEmail || '',
+        id: row.id,
+        matricula: row.matricula,
+        descricao: row.descricao,
+        status: row.status,
+        periodo: row.periodo,
+        data: row.data,
+        createdAt: row.createdAt,
+        hora: row.hora,
+        localId: row.localId,
+        localNome: row.localNome,
+        studentName,
+        studentEmail,
       };
     });
 
@@ -677,7 +898,7 @@ export class SchedulingService {
     };
   }
 
-  // 6. Export to CSV
+  // 7. Export to CSV
   async getExportData(
     filters: Omit<Parameters<typeof this.listBookings>[0], 'page' | 'size'>,
   ) {
@@ -689,8 +910,135 @@ export class SchedulingService {
     return result.data;
   }
 
-  // 7. Import from CSV
-  // 7. Import from CSV (Otimizado com Transação e Cache de Busca)
+  // 8. Attendance List for Campus Proctors (Lista de Presença A4)
+  async getAttendanceList(filters: {
+    localId?: string;
+    data?: string;
+    periodo?: string;
+  }) {
+    const conditions: any[] = [
+      isNull(agendamentosMatricula.deletedAt),
+      ne(agendamentosMatricula.status, 'cancelado'),
+    ];
+
+    if (filters.localId && filters.localId !== 'all') {
+      conditions.push(eq(opcaos.localId, filters.localId));
+    }
+    if (filters.data) {
+      conditions.push(eq(opcaos.data, new Date(filters.data)));
+    }
+    if (filters.periodo) {
+      conditions.push(eq(agendamentosMatricula.periodo, filters.periodo));
+    }
+
+    const whereClause = and(...conditions);
+
+    // Subquery from AVA Progress Report
+    const studentSubquery = this.db
+      .select({
+        matricula: avaProgressReport.matricula,
+        periodo: avaProgressReport.periodo,
+        aluno: sql<string>`max(${avaProgressReport.aluno})`.as('att_ava_aluno'),
+        usuario: sql<string>`max(${avaProgressReport.usuario})`.as(
+          'att_ava_usuario',
+        ),
+      })
+      .from(avaProgressReport)
+      .groupBy(avaProgressReport.matricula, avaProgressReport.periodo)
+      .as('att_student_subquery');
+
+    // Subquery from Academic Discente (Lyceum cache)
+    const academicDiscenteSubquery = this.db
+      .select({
+        matricula: academicDiscente.matricula,
+        nomeSocial: sql<string>`max(${academicDiscente.nomeSocial})`.as(
+          'att_ac_nome_social',
+        ),
+        nome: sql<string>`max(${academicDiscente.nome})`.as('att_ac_nome'),
+        sobrenome: sql<string>`max(${academicDiscente.sobrenome})`.as(
+          'att_ac_sobrenome',
+        ),
+        email: sql<string>`max(${academicDiscente.email})`.as('att_ac_email'),
+        usuario: sql<string>`max(${academicDiscente.usuario})`.as(
+          'att_ac_usuario',
+        ),
+      })
+      .from(academicDiscente)
+      .groupBy(academicDiscente.matricula)
+      .as('att_ac_discente_subquery');
+
+    const rawData = await this.db
+      .select({
+        id: agendamentosMatricula.id,
+        matricula: agendamentosMatricula.matricula,
+        descricao: agendamentosMatricula.descricao,
+        status: agendamentosMatricula.status,
+        periodo: agendamentosMatricula.periodo,
+        data: agendamentosMatricula.data,
+        hora: opcaos.hora,
+        localId: opcaos.localId,
+        localNome: locals.nome,
+        localEndereco: locals.endereco,
+        studentName: studentSubquery.aluno,
+        studentEmail: studentSubquery.usuario,
+        acNomeSocial: academicDiscenteSubquery.nomeSocial,
+        acNome: academicDiscenteSubquery.nome,
+        acSobrenome: academicDiscenteSubquery.sobrenome,
+        acEmail: academicDiscenteSubquery.email,
+        acUsuario: academicDiscenteSubquery.usuario,
+      })
+      .from(agendamentosMatricula)
+      .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
+      .innerJoin(locals, eq(opcaos.localId, locals.id))
+      .leftJoin(
+        studentSubquery,
+        and(
+          eq(studentSubquery.matricula, agendamentosMatricula.matricula),
+          eq(studentSubquery.periodo, agendamentosMatricula.periodo),
+        ),
+      )
+      .leftJoin(
+        academicDiscenteSubquery,
+        eq(academicDiscenteSubquery.matricula, agendamentosMatricula.matricula),
+      )
+      .where(whereClause)
+      .orderBy(opcaos.hora, agendamentosMatricula.matricula);
+
+    return rawData.map((row: any) => {
+      const studentName =
+        row.studentName ||
+        row.acNomeSocial ||
+        (row.acNome ? `${row.acNome} ${row.acSobrenome || ''}`.trim() : null) ||
+        'Estudante Não Identificado';
+
+      const disciplinas = row.descricao
+        ? row.descricao
+            .split(';')
+            .map((d: string) => d.trim())
+            .filter(Boolean)
+        : [];
+      const startTime = row.hora ? row.hora.slice(0, 5) : '';
+      const endTime = getExamEndTime(startTime, disciplinas.length || 1);
+
+      return {
+        id: row.id,
+        matricula: row.matricula,
+        studentName,
+        studentEmail: row.studentEmail || row.acEmail || row.acUsuario || '',
+        localNome: row.localNome,
+        localEndereco: row.localEndereco,
+        data: row.data,
+        horaInicio: startTime,
+        horaFim: endTime,
+        disciplinas,
+        totalDisciplinas: disciplinas.length,
+        status: row.status,
+        periodo: row.periodo,
+      };
+    });
+  }
+
+  // 8. Import from CSV (Otimizado com Transação e Cache de Busca)
   async importBookings(rows: any[]) {
     if (!rows || rows.length === 0) {
       return { success: true, imported: 0, errors: 0, total: 0 };

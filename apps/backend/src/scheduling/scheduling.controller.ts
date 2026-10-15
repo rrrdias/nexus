@@ -69,7 +69,13 @@ export class SchedulingController {
     return this.schedulingService.updateOption(id, body);
   }
 
-  // 3. Profiles
+  // 3. Periods (Distinct active semesters)
+  @Get('periods')
+  getPeriods() {
+    return this.schedulingService.getPeriods();
+  }
+
+  // 4. Profiles
   @Get('profile/:matricula/:periodo')
   getStudentProfile(
     @Param('matricula') matricula: string,
@@ -78,7 +84,21 @@ export class SchedulingController {
     return this.schedulingService.getStudentProfile(matricula, periodo);
   }
 
-  // 4. Bookings
+  // 5. Attendance List for Proctors
+  @Get('attendance-list')
+  getAttendanceList(
+    @Query('localId') localId?: string,
+    @Query('data') data?: string,
+    @Query('periodo') periodo?: string,
+  ) {
+    return this.schedulingService.getAttendanceList({
+      localId,
+      data,
+      periodo,
+    });
+  }
+
+  // 6. Bookings
   @Get('bookings')
   listBookings(
     @Query('matricula') matricula?: string,
@@ -123,7 +143,7 @@ export class SchedulingController {
     return this.schedulingService.cancelBooking(id);
   }
 
-  // 5. Excel/CSV Export
+  // 6. Excel/CSV Export
   @Get('export')
   async exportBookings(
     @Query('matricula') matricula: string | undefined,
@@ -161,7 +181,9 @@ export class SchedulingController {
       const studentName = row.studentName.replace(/"/g, '""');
       const studentEmail = row.studentEmail.replace(/"/g, '""');
       const localNome = row.localNome.replace(/"/g, '""');
-      const bookingDate = new Date(row.data).toLocaleDateString('pt-BR');
+      const bookingDate = new Date(row.data).toLocaleDateString('pt-BR', {
+        timeZone: 'UTC',
+      });
       const createdAt = new Date(row.createdAt).toLocaleString('pt-BR');
 
       res.write(

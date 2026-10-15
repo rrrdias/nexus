@@ -1,25 +1,36 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { SchedulingService } from './scheduling.service';
 
-describe('SchedulingService (createOption stability test & RBAC)', () => {
+describe('SchedulingService (createOption stability test, RBAC, Periods & Profile)', () => {
   let service: SchedulingService;
   let db: any;
+  let queryResult: any;
 
   beforeEach(() => {
-    const queryBuilder = {
+    queryResult = [];
+
+    const queryBuilder: any = {
       select: jest.fn().mockReturnThis(),
+      selectDistinct: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      limit: jest
-        .fn()
-        .mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockImplementation(() => queryBuilder),
+      groupBy: jest.fn().mockReturnThis(),
+      as: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockImplementation(() => Promise.resolve(queryResult)),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       returning: jest.fn(),
       transaction: jest.fn().mockImplementation((cb) => cb(queryBuilder)),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
+      then: (resolve: any) => resolve(queryResult),
     };
 
     db = queryBuilder;
@@ -31,6 +42,7 @@ describe('SchedulingService (createOption stability test & RBAC)', () => {
   });
 
   it('should split slots into exact 30-min intervals when duration is divisible by 30', async () => {
+    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
     db.returning.mockResolvedValue([
       {
         id: 'opt-1',
@@ -85,37 +97,71 @@ describe('SchedulingService (createOption stability test & RBAC)', () => {
     );
   });
 
-  it('should REJECT intervals that are NOT exact multiples of 30 minutes', async () => {
+  it('should REJECT invalid time formats immediately without hanging (Anti-DoS)', async () => {
+    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
+
     await expect(
       service.createOption({
         localId: 'local-1',
         data: '2026-09-01',
-        horaInicio: '08:00',
-        horaFim: '08:45',
-        vagas: 20,
+        horaInicio: 'invalid_time',
+        horaFim: '10:00',
+        vagas: 25,
       }),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should REJECT invalid intervals where horaInicio >= horaFim', async () => {
+  it('should REJECT when horaFim is earlier than horaInicio without hanging', async () => {
+    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
+
     await expect(
       service.createOption({
         localId: 'local-1',
         data: '2026-09-01',
         horaInicio: '10:00',
         horaFim: '08:00',
-        vagas: 20,
+        vagas: 25,
       }),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should REJECT intervals shorter than 30 minutes', async () => {
+  it('should REJECT when interval is less than 30 minutes', async () => {
+    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
+
     await expect(
       service.createOption({
         localId: 'local-1',
         data: '2026-09-01',
         horaInicio: '08:00',
         horaFim: '08:15',
+        vagas: 25,
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should REJECT when minutes are not multiples of 30 minutes', async () => {
+    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
+
+    await expect(
+      service.createOption({
+        localId: 'local-1',
+        data: '2026-09-01',
+        horaInicio: '08:15',
+        horaFim: '09:00',
+        vagas: 25,
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should REJECT intervals that are NOT exact multiples of 30 minutes', async () => {
+    db.limit.mockResolvedValue([{ id: 'local-1', nome: 'Campus Anápolis' }]);
+
+    await expect(
+      service.createOption({
+        localId: 'local-1',
+        data: '2026-09-01',
+        horaInicio: '08:00',
+        horaFim: '08:45',
         vagas: 20,
       }),
     ).rejects.toThrow(BadRequestException);
@@ -132,5 +178,141 @@ describe('SchedulingService (createOption stability test & RBAC)', () => {
     await expect(
       service.assertSchedulingAdminAccess({ id: 'u2', isSuperAdmin: false }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  describe('Fase 3: getPeriods()', () => {
+    it('should aggregate distinct periods from academic, ava and bookings tables and sort descending', async () => {
+      queryResult = [
+        { periodo: '2025-1' },
+        { periodo: '2026-2' },
+        { periodo: '2026-1' },
+      ];
+
+      const periods = await service.getPeriods();
+      expect(periods).toEqual(['2026-2', '2026-1', '2025-1']);
+    });
+  });
+
+  describe('Fase 2: getStudentProfile()', () => {
+    it('should return profile from AVA progress report when student has records', async () => {
+      queryResult = [
+        {
+          aluno: 'Maria Silva',
+          usuario: 'maria.silva@nexus.edu.br',
+          userPhone1: '62999998888',
+          curso: 'Direito Civil I',
+        },
+        {
+          aluno: 'Maria Silva',
+          usuario: 'maria.silva@nexus.edu.br',
+          userPhone1: '62999998888',
+          curso: 'Direito Penal I',
+        },
+      ];
+
+      const profile = await service.getStudentProfile('2026001', '2026-1');
+      expect(profile.nome).toBe('Maria Silva');
+      expect(profile.email).toBe('maria.silva@nexus.edu.br');
+      expect(profile.disciplinas).toHaveLength(2);
+      expect(profile.totalDisciplinas).toBe(2);
+    });
+
+    it('should fallback to Lyceum academic tables when AVA report has no records', async () => {
+      // First query (AVA) returns empty array
+      let callCount = 0;
+      db.then = (resolve: any) => {
+        callCount++;
+        if (callCount === 1) {
+          // AVA query
+          return resolve([]);
+        } else {
+          // academicMatricula join academicTurma
+          return resolve([
+            { nomeDisciplina: 'Cálculo I', disciplina: 'MAT101', turma: 'T1' },
+            {
+              nomeDisciplina: 'Álgebra Linear',
+              disciplina: 'MAT102',
+              turma: 'T2',
+            },
+          ]);
+        }
+      };
+
+      db.limit.mockResolvedValue([
+        {
+          id: 'discente-uuid-1',
+          matricula: '2026002',
+          nome: 'Carlos',
+          sobrenome: 'Souza',
+          nomeSocial: null,
+          email: 'carlos.souza@nexus.edu.br',
+          telefone: '62988887777',
+        },
+      ]);
+
+      const profile = await service.getStudentProfile('2026002', '2026-1');
+      expect(profile.nome).toBe('Carlos Souza');
+      expect(profile.matricula).toBe('2026002');
+      expect(profile.disciplinas).toEqual(['Cálculo I', 'Álgebra Linear']);
+      expect(profile.totalDisciplinas).toBe(2);
+    });
+
+    it('should throw NotFoundException when student is not found in AVA or Lyceum', async () => {
+      queryResult = [];
+      db.limit.mockResolvedValue([]);
+
+      await expect(
+        service.getStudentProfile('9999999', '2026-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Fase 4: getAttendanceList()', () => {
+    it('should return formatted attendance list with start/end time and student names', async () => {
+      queryResult = [
+        {
+          id: 'b-1',
+          matricula: '2026001',
+          descricao: 'Direito Penal;Direito Civil',
+          status: 'ativo',
+          periodo: '2026-1',
+          data: '2026-09-01',
+          hora: '08:00:00',
+          localId: 'local-1',
+          localNome: 'Campus Central',
+          localEndereco: 'Rua 1, 100',
+          studentName: 'Ana Silva',
+          studentEmail: 'ana@nexus.edu.br',
+          acNomeSocial: null,
+          acNome: null,
+          acSobrenome: null,
+          acEmail: null,
+          acUsuario: null,
+        },
+      ];
+
+      const list = await service.getAttendanceList({
+        localId: 'local-1',
+        data: '2026-09-01',
+        periodo: '2026-1',
+      });
+
+      expect(list).toHaveLength(1);
+      expect(list[0]).toEqual({
+        id: 'b-1',
+        matricula: '2026001',
+        studentName: 'Ana Silva',
+        studentEmail: 'ana@nexus.edu.br',
+        localNome: 'Campus Central',
+        localEndereco: 'Rua 1, 100',
+        data: '2026-09-01',
+        horaInicio: '08:00',
+        horaFim: '09:00',
+        disciplinas: ['Direito Penal', 'Direito Civil'],
+        totalDisciplinas: 2,
+        status: 'ativo',
+        periodo: '2026-1',
+      });
+    });
   });
 });

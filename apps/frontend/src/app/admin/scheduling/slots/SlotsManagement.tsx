@@ -22,6 +22,18 @@ import {
   Sparkles
 } from "lucide-react"
 
+const TIME_SLOTS_30MIN = [
+  "06:00", "06:30", "07:00", "07:30",
+  "08:00", "08:30", "09:00", "09:30",
+  "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30",
+  "14:00", "14:30", "15:00", "15:30",
+  "16:00", "16:30", "17:00", "17:30",
+  "18:00", "18:30", "19:00", "19:30",
+  "20:00", "20:30", "21:00", "21:30",
+  "22:00", "22:30", "23:00"
+]
+
 export function SlotsManagement({ locals }: { locals: any[] }) {
   const [selectedLocal, setSelectedLocal] = useState("")
   const [selectedDate, setSelectedDate] = useState("")
@@ -183,28 +195,45 @@ export function SlotsManagement({ locals }: { locals: any[] }) {
                 {modalMode === "create" ? (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="horaInicio" className="text-xs font-bold text-navy uppercase">Hora de Início (HH:MM)</Label>
-                      <Input
+                      <Label htmlFor="horaInicio" className="text-xs font-bold text-navy uppercase">Hora de Início</Label>
+                      <select
                         id="horaInicio"
-                        type="time"
-                        placeholder="Ex: 08:00"
                         value={horaInicio}
-                        onChange={(e) => setHoraInicio(e.target.value)}
-                        className="border-gray-300 focus:border-navy"
-                      />
+                        onChange={(e) => {
+                          const newStart = e.target.value;
+                          setHoraInicio(newStart);
+                          if (horaFim && horaFim <= newStart) {
+                            setHoraFim("");
+                          }
+                        }}
+                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-navy"
+                      >
+                        <option value="">Selecione o início</option>
+                        {TIME_SLOTS_30MIN.slice(0, -1).map((time) => (
+                          <option key={time} value={time}>
+                            {time}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="horaFim" className="text-xs font-bold text-navy uppercase">Hora Final (HH:MM)</Label>
-                      <Input
+                      <Label htmlFor="horaFim" className="text-xs font-bold text-navy uppercase">Hora Final</Label>
+                      <select
                         id="horaFim"
-                        type="time"
-                        placeholder="Ex: 10:00"
                         value={horaFim}
                         onChange={(e) => setHoraFim(e.target.value)}
-                        className="border-gray-300 focus:border-navy"
-                      />
+                        disabled={!horaInicio}
+                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-navy disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">Selecione o término</option>
+                        {TIME_SLOTS_30MIN.filter((time) => !horaInicio || time > horaInicio).map((time) => (
+                          <option key={time} value={time}>
+                            {time}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <p className="col-span-2 text-[10px] text-[#5F6775] italic">* O sistema cadastrará blocos de 30 minutos desde a hora de início até a hora final.</p>
+                    <p className="col-span-2 text-[10px] text-[#5F6775] italic">* Os horários de ocupação são gerados estritamente em blocos de 30 em 30 minutos.</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5 bg-[#F4F5F7] p-3 rounded-lg border border-gray-200">

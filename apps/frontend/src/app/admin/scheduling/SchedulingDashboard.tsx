@@ -44,8 +44,10 @@ import {
   BookOpen, 
   Trash2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Printer
 } from "lucide-react"
+import { AttendanceListDialog } from "./AttendanceListDialog"
 
 function getExamEndTime(startTime: string, disciplinesCount: number): string {
   if (!startTime) return ""
@@ -56,14 +58,24 @@ function getExamEndTime(startTime: string, disciplinesCount: number): string {
   return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
 }
 
-export function SchedulingDashboard({ locals, initialBookings }: { locals: any[], initialBookings: any }) {
+export function SchedulingDashboard({ 
+  locals, 
+  initialBookings,
+  availablePeriods = ["2026-1", "2025-2"],
+  defaultPeriod = "2026-1"
+}: { 
+  locals: any[], 
+  initialBookings: any,
+  availablePeriods?: string[],
+  defaultPeriod?: string
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
   // Filter States
   const [matricula, setMatricula] = useState(searchParams.get("matricula") || "")
   const [localId, setLocalId] = useState(searchParams.get("localId") || "all")
-  const [periodo, setPeriodo] = useState(searchParams.get("periodo") || "2026-1")
+  const [periodo, setPeriodo] = useState(searchParams.get("periodo") || defaultPeriod)
   const [dataFiltro, setDataFiltro] = useState(searchParams.get("data") || "")
   const [status, setStatus] = useState(searchParams.get("status") || "all")
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1"))
@@ -84,7 +96,7 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
   // Booking Modal States
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMatricula, setModalMatricula] = useState("")
-  const [modalPeriodo, setModalPeriodo] = useState("2026-1")
+  const [modalPeriodo, setModalPeriodo] = useState(defaultPeriod)
   const [studentProfile, setStudentProfile] = useState<any>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   
@@ -98,6 +110,9 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
   // Import states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+
+  // Attendance list modal state
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false)
 
   // Confirm dialog state
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -292,8 +307,8 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
     try {
       const res = await createBooking({
         opcaoId: selectedSlotId,
-        matricula: studentProfile.matricula,
-        periodo: modalPeriodo
+        matricula: studentProfile?.matricula || modalMatricula.trim(),
+        periodo: modalPeriodo || defaultPeriod
       })
       if (res.success) {
         showToast("Agendamento criado com sucesso!", "success")
@@ -488,6 +503,14 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
             <FileSpreadsheet className="w-4 h-4 text-green-dark" /> Exportar
           </Button>
 
+          <Button 
+            onClick={() => setIsAttendanceModalOpen(true)}
+            variant="outline" 
+            className="border-gray-300 hover:bg-gray-50 text-navy gap-2"
+          >
+            <Printer className="w-4 h-4 text-navy" /> Lista de Presença
+          </Button>
+
           <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
             <DialogTrigger render={<Button variant="outline" className="border-gray-300 hover:bg-gray-50 text-navy gap-2" />}>
               <RefreshCw className="w-4 h-4 text-navy" /> Importar CSV
@@ -537,8 +560,19 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
                       placeholder="Digite a Matrícula do Aluno" 
                       value={modalMatricula}
                       onChange={(e) => setModalMatricula(e.target.value)}
-                      className="border-gray-300 focus:border-navy focus:ring-navy"
+                      className="border-gray-300 focus:border-navy focus:ring-navy flex-1"
                     />
+                    <select
+                      className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-navy"
+                      value={modalPeriodo}
+                      onChange={(e) => setModalPeriodo(e.target.value)}
+                    >
+                      {availablePeriods.map((p) => (
+                        <option key={p} value={p}>
+                          {p.includes("-") ? p.replace("-", "/") : p}
+                        </option>
+                      ))}
+                    </select>
                     <Button 
                       onClick={handleSearchStudent}
                       disabled={profileLoading}
@@ -772,12 +806,12 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
                   value={periodo}
                   onChange={(e) => setPeriodo(e.target.value)}
                 >
-                  <option value="2026-2">2026/2</option>
-                  <option value="2026-1">2026/1</option>
-                  <option value="2025-2">2025/2</option>
-                  <option value="2025-1">2025/1</option>
+                  {availablePeriods.map((p) => (
+                    <option key={p} value={p}>
+                      {p.includes("-") ? p.replace("-", "/") : p}
+                    </option>
+                  ))}
                 </select>
-
               </div>
 
               {/* Date Filter */}
@@ -1069,6 +1103,16 @@ export function SchedulingDashboard({ locals, initialBookings }: { locals: any[]
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AttendanceListDialog
+        isOpen={isAttendanceModalOpen}
+        onClose={() => setIsAttendanceModalOpen(false)}
+        locals={locals}
+        availablePeriods={availablePeriods}
+        initialLocalId={localId}
+        initialDate={dataFiltro}
+        initialPeriod={periodo}
+      />
     </div>
   )
 }

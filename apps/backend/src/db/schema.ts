@@ -5,9 +5,11 @@ import {
   primaryKey,
   boolean,
   unique,
+  uniqueIndex,
   index,
   integer,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const users = pgTable(
   'user',
@@ -395,7 +397,9 @@ export const agendamentosMatricula = pgTable(
     deletedAt: timestamp('deletedAt', { mode: 'date' }),
   },
   (t) => [
-    unique('unq_agendamento_matricula_periodo').on(t.matricula, t.periodo),
+    uniqueIndex('unq_agendamento_matricula_periodo_ativo')
+      .on(t.matricula, t.periodo)
+      .where(sql`"deletedAt" IS NULL`),
     index('idx_agendamento_opcao').on(t.opcaoId),
     index('idx_agendamento_matricula').on(t.matricula),
     index('idx_agendamento_periodo_status').on(t.periodo, t.status),

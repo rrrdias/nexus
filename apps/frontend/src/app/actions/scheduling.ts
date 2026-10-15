@@ -4,8 +4,14 @@ import { fetchFromApi } from "./api"
 import { revalidatePath } from "next/cache"
 
 export async function getLocals(options: { todos?: boolean } = {}) {
-  const url = options.todos ? '/api/scheduling/locals?todos=true' : '/api/scheduling/locals';
-  return fetchFromApi(url, { method: 'GET' });
+  try {
+    const url = options.todos ? '/api/scheduling/locals?todos=true' : '/api/scheduling/locals';
+    const res = await fetchFromApi(url, { method: 'GET' });
+    return Array.isArray(res) ? res : [];
+  } catch (err: any) {
+    console.error('[getLocals Action Error]:', err?.message);
+    return [];
+  }
 }
 
 export async function createLocal(data: { nome: string; endereco: string; linkLocal?: string; telefone?: string }) {
@@ -67,16 +73,22 @@ export async function getBookings(filters: {
   page?: number;
   size?: number;
 } = {}) {
-  const params = new URLSearchParams();
-  if (filters.matricula) params.append('matricula', filters.matricula);
-  if (filters.localId) params.append('localId', filters.localId);
-  if (filters.periodo) params.append('periodo', filters.periodo);
-  if (filters.data) params.append('data', filters.data);
-  if (filters.status) params.append('status', filters.status);
-  if (filters.page) params.append('page', String(filters.page));
-  if (filters.size) params.append('size', String(filters.size));
+  try {
+    const params = new URLSearchParams();
+    if (filters.matricula) params.append('matricula', filters.matricula);
+    if (filters.localId) params.append('localId', filters.localId);
+    if (filters.periodo) params.append('periodo', filters.periodo);
+    if (filters.data) params.append('data', filters.data);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.page) params.append('page', String(filters.page));
+    if (filters.size) params.append('size', String(filters.size));
 
-  return fetchFromApi(`/api/scheduling/bookings?${params.toString()}`, { method: 'GET' });
+    const res = await fetchFromApi(`/api/scheduling/bookings?${params.toString()}`, { method: 'GET' });
+    return res && res.data ? res : { data: [], total_records: 0, total_pages: 1, page: 1, size: 15 };
+  } catch (err: any) {
+    console.error('[getBookings Action Error]:', err?.message);
+    return { data: [], total_records: 0, total_pages: 1, page: 1, size: 15 };
+  }
 }
 
 export async function createBooking(data: { opcaoId: string; matricula: string; periodo: string }) {
@@ -138,5 +150,33 @@ export async function importBookings(bookings: any[]) {
     return { success: true, data: res };
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao importar agendamentos." };
+  }
+}
+
+export async function getPeriods(): Promise<string[]> {
+  try {
+    const res = await fetchFromApi('/api/scheduling/periods', { method: 'GET' });
+    return Array.isArray(res) && res.length > 0 ? res : ['2026-1', '2025-2'];
+  } catch {
+    return ['2026-1', '2025-2'];
+  }
+}
+
+export async function getAttendanceList(filters: {
+  localId?: string;
+  data?: string;
+  periodo?: string;
+} = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (filters.localId && filters.localId !== 'all') params.append('localId', filters.localId);
+    if (filters.data) params.append('data', filters.data);
+    if (filters.periodo) params.append('periodo', filters.periodo);
+
+    const res = await fetchFromApi(`/api/scheduling/attendance-list?${params.toString()}`, { method: 'GET' });
+    return Array.isArray(res) ? res : [];
+  } catch (err: any) {
+    console.error('[getAttendanceList Action Error]:', err?.message);
+    return [];
   }
 }
