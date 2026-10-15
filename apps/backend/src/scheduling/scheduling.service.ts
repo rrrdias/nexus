@@ -496,11 +496,40 @@ export class SchedulingService implements OnModuleInit {
       if (!opcao.status)
         throw new BadRequestException('O horário selecionado está desativado.');
 
-      // Calculate consecutive slots needed
+      // Validate that booking is not in the past for today or earlier dates
       const timeStr = opcao.hora.slice(0, 5); // Format HH:MM
-      const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) =>
-        getNextTimeStr(timeStr, i),
-      );
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const slotDate = opcao.data instanceof Date ? opcao.data : new Date(opcao.data);
+      const slotDateStr = `${slotDate.getUTCFullYear()}-${String(slotDate.getUTCMonth() + 1).padStart(2, '0')}-${String(slotDate.getUTCDate()).padStart(2, '0')}`;
+
+      if (slotDateStr < todayStr) {
+        throw new BadRequestException('Não é permitido agendar provas para datas passadas.');
+      }
+      if (slotDateStr === todayStr) {
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const slotMinutes = parseTimeToMinutes(timeStr);
+        if (slotMinutes !== null && slotMinutes <= currentMinutes) {
+          throw new BadRequestException(
+            `O horário ${timeStr} já passou para o dia de hoje. Selecione um horário futuro.`,
+          );
+        }
+      }
+
+      // Calculate required consecutive slots (HH:MM)
+      const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) => {
+        const startMin = parseTimeToMinutes(timeStr);
+        const totalMin = ((startMin! + i * 30) % 1440 + 1440) % 1440;
+        const h = Math.floor(totalMin / 60);
+        const m = totalMin % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      });
+
+      // Match both HH:MM and HH:MM:00 formats in database
+      const allPossibleTimes = [
+        ...requiredTimes,
+        ...requiredTimes.map((t) => `${t}:00`),
+      ];
 
       // Fetch and Lock all consecutive slots needed
       const slots = await tx
@@ -510,34 +539,35 @@ export class SchedulingService implements OnModuleInit {
           and(
             eq(opcaos.localId, opcao.localId),
             eq(opcaos.data, opcao.data),
-            inArray(opcaos.hora, requiredTimes),
+            inArray(opcaos.hora, allPossibleTimes),
             eq(opcaos.status, true),
           ),
         )
         .orderBy(opcaos.hora)
         .for('update');
 
-      if (slots.length < requiredTimes.length) {
-        throw new BadRequestException(
-          'Não há horários consecutivos suficientes disponíveis a partir de ' +
-            timeStr +
-            ' para todas as ' +
-            totalDisciplines +
-            ' disciplinas do aluno.',
-        );
+      const matchedTimeMap = new Map<string, typeof opcao>();
+      for (const slot of slots) {
+        matchedTimeMap.set(slot.hora.slice(0, 5), slot);
       }
 
-      // Check capacity for all slots
-      for (const slot of slots) {
+      for (const reqTime of requiredTimes) {
+        const slot = matchedTimeMap.get(reqTime);
+        if (!slot) {
+          throw new BadRequestException(
+            `Não há horários consecutivos suficientes disponíveis a partir de ${timeStr} para todas as ${totalDisciplines} disciplinas do aluno. Falta o horário ${reqTime}.`,
+          );
+        }
         if (slot.vagas <= 0) {
           throw new BadRequestException(
-            `O slot de horário ${slot.hora.slice(0, 5)} já está esgotado.`,
+            `O horário ${reqTime} já está com as vagas esgotadas.`,
           );
         }
       }
 
-      // Decrement slot vacancies by 1
-      for (const slot of slots) {
+      // Decrement slot vacancies by 1 for all required consecutive slots
+      for (const reqTime of requiredTimes) {
+        const slot = matchedTimeMap.get(reqTime)!;
         await tx
           .update(opcaos)
           .set({ vagas: slot.vagas - 1, updatedAt: new Date() })

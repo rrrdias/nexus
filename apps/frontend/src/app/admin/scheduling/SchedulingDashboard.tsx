@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -45,18 +45,18 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  Printer
+  Printer,
+  AlertCircle,
+  X
 } from "lucide-react"
 import { AttendanceListDialog } from "./AttendanceListDialog"
-
-function getExamEndTime(startTime: string, disciplinesCount: number): string {
-  if (!startTime) return ""
-  const [h, m] = startTime.split(':').map(Number)
-  const totalMinutes = h * 60 + m + disciplinesCount * 30
-  const endH = Math.floor(totalMinutes / 60) % 24
-  const endM = totalMinutes % 60
-  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
-}
+import { ExamDateCalendar } from "./ExamDateCalendar"
+import {
+  calculateDatesStatus,
+  filterValidStartSlots,
+  normalizeDateStr,
+  getExamEndTime
+} from "@/lib/scheduling-utils"
 
 export function SchedulingDashboard({ 
   locals, 
@@ -102,10 +102,11 @@ export function SchedulingDashboard({
   
   const [selectedLocal, setSelectedLocal] = useState("")
   const [selectedDate, setSelectedDate] = useState("")
-  const [availableSlots, setAvailableSlots] = useState<any[]>([])
-  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [poloOptions, setPoloOptions] = useState<any[]>([])
+  const [poloOptionsLoading, setPoloOptionsLoading] = useState(false)
   const [selectedSlotId, setSelectedSlotId] = useState("")
   const [submittingBooking, setSubmittingBooking] = useState(false)
+  const [modalError, setModalError] = useState<string>("")
 
   // Import states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -262,48 +263,90 @@ export function SchedulingDashboard({
   // Handle student profile hydration in booking form
   const handleSearchStudent = async () => {
     if (!modalMatricula.trim()) {
+      setModalError("Digite a matrícula do estudante.")
       showToast("Digite a matrícula do estudante.", "error")
       return
     }
     setProfileLoading(true)
     setStudentProfile(null)
-    setAvailableSlots([])
+    setSelectedLocal("")
+    setSelectedDate("")
+    setPoloOptions([])
     setSelectedSlotId("")
+    setModalError("")
     try {
       const profile = await getStudentProfile(modalMatricula, modalPeriodo)
       setStudentProfile(profile)
       showToast(`Estudante ${profile.nome} carregado com sucesso!`, "success")
     } catch (err: any) {
-      showToast(err.message || "Estudante não encontrado no banco sincronizado.", "error")
+      const errMsg = err.message || "Estudante não encontrado no banco sincronizado."
+      setModalError(errMsg)
+      showToast(errMsg, "error")
     } finally {
       setProfileLoading(false)
     }
   }
 
-  // Load timeslots based on campus & date selection
+  // Load all polo options whenever campus selection changes
   useEffect(() => {
-    const loadSlots = async () => {
-      if (!selectedLocal || !selectedDate) return
-      setSlotsLoading(true)
+    if (!selectedLocal) {
+      setPoloOptions([])
+      setSelectedDate("")
       setSelectedSlotId("")
+      return
+    }
+    const loadPoloOptions = async () => {
+      setPoloOptionsLoading(true)
+      setSelectedDate("")
+      setSelectedSlotId("")
+      setModalError("")
       try {
-        const slots = await getOptions({ localId: selectedLocal, data: selectedDate, apenasDisponiveis: true })
-        setAvailableSlots(slots)
+        const options = await getOptions({ localId: selectedLocal })
+        setPoloOptions(Array.isArray(options) ? options : [])
       } catch (err: any) {
-        showToast("Erro ao carregar horários disponíveis.", "error")
+        showToast("Erro ao carregar opções do polo selecionado.", "error")
+        setPoloOptions([])
       } finally {
-        setSlotsLoading(false)
+        setPoloOptionsLoading(false)
       }
     }
-    loadSlots()
-  }, [selectedLocal, selectedDate])
+    loadPoloOptions()
+  }, [selectedLocal])
+
+  const disciplinesCount = studentProfile?.totalDisciplinas || 1
+
+  // Compute interactive calendar status indicators for every date
+  const datesStatus = useMemo(() => {
+    return calculateDatesStatus(poloOptions, disciplinesCount)
+  }, [poloOptions, disciplinesCount])
+
+  // Filter valid starting timeslots for selected date
+  // Rule: only slots that can accommodate all consecutive disciplines with vacancies > 0 and are not in past
+  const availableSlots = useMemo(() => {
+    if (!selectedDate || !poloOptions.length) return []
+    const slotsOnDate = poloOptions.filter(
+      (opt) => normalizeDateStr(opt.data) === selectedDate
+    )
+    return filterValidStartSlots(
+      slotsOnDate,
+      disciplinesCount,
+      selectedDate
+    )
+  }, [selectedDate, poloOptions, disciplinesCount])
+
+  // Reset selected slot when selected date changes
+  useEffect(() => {
+    setSelectedSlotId("")
+  }, [selectedDate])
 
   const handleConfirmNewBooking = async () => {
     if (!selectedSlotId) {
+      setModalError("Selecione um horário disponível para a prova.")
       showToast("Selecione um horário disponível para a prova.", "error")
       return
     }
     setSubmittingBooking(true)
+    setModalError("")
     try {
       const res = await createBooking({
         opcaoId: selectedSlotId,
@@ -318,14 +361,19 @@ export function SchedulingDashboard({
         setStudentProfile(null)
         setSelectedLocal("")
         setSelectedDate("")
-        setAvailableSlots([])
+        setPoloOptions([])
         setSelectedSlotId("")
+        setModalError("")
         refreshData()
       } else {
-        showToast(res.error || "Erro ao criar agendamento.", "error")
+        const errMsg = res.error || "Erro ao criar agendamento."
+        setModalError(errMsg)
+        showToast(errMsg, "error")
       }
     } catch (err: any) {
-      showToast(err.message || "Erro ao criar agendamento.", "error")
+      const errMsg = err.message || "Erro ao criar agendamento."
+      setModalError(errMsg)
+      showToast(errMsg, "error")
     } finally {
       setSubmittingBooking(false)
     }
@@ -481,7 +529,7 @@ export function SchedulingDashboard({
     <div className="space-y-6 relative">
       {/* Toast Alert Banner */}
       {toast.type && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-lg border text-white transition-all flex items-center gap-3 ${
+        <div className={`fixed top-4 right-4 z-[9999] p-4 rounded-xl shadow-lg border text-white transition-all flex items-center gap-3 ${
           toast.type === "success" ? "bg-green-dark border-green-brand" : "bg-[#E53935] border-[#D32F2F]"
         }`}>
           <span className="font-semibold text-sm">{toast.message}</span>
@@ -577,7 +625,7 @@ export function SchedulingDashboard({
             <DialogTrigger render={<Button className="bg-green-dark hover:bg-green-brand text-white gap-2" />}>
               <PlusCircle className="w-4 h-4" /> Novo Agendamento
             </DialogTrigger>
-            <DialogContent className="sm:max-w-xl md:max-w-2xl p-0 gap-0 overflow-hidden border border-slate-200/90 shadow-2xl rounded-2xl bg-white">
+            <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-3xl p-0 gap-0 overflow-hidden border border-slate-200/90 shadow-2xl rounded-2xl bg-white">
               {/* Header Fixo */}
               <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between bg-white select-none">
                 <div className="flex items-center gap-3.5 pr-8">
@@ -597,6 +645,23 @@ export function SchedulingDashboard({
               
               {/* Corpo Rolável */}
               <div className="px-6 py-5 max-h-[calc(85vh-140px)] overflow-y-auto overflow-x-hidden space-y-5 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-200 hover:[&::-webkit-scrollbar-thumb]:bg-slate-300">
+                {/* Inline Error Alert inside modal */}
+                {modalError && (
+                  <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                      <span>{modalError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setModalError("")}
+                      className="text-red-500 hover:text-red-800 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 {/* 1. Student Fetch */}
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
@@ -607,7 +672,10 @@ export function SchedulingDashboard({
                     <Input 
                       placeholder="Digite a Matrícula do Aluno" 
                       value={modalMatricula}
-                      onChange={(e) => setModalMatricula(e.target.value)}
+                      onChange={(e) => {
+                        setModalMatricula(e.target.value)
+                        if (modalError) setModalError("")
+                      }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchStudent(); } }}
                       className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs flex-1"
                     />
@@ -678,74 +746,120 @@ export function SchedulingDashboard({
                       <div className="flex-1 h-[1px] bg-slate-100" />
                     </div>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                          Campus / Polo <span className="text-red-500">*</span>
-                        </Label>
-                        <select 
-                          className="w-full h-10 text-sm border border-slate-200 rounded-xl px-3 bg-white text-slate-800 focus:outline-none focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
-                          value={selectedLocal}
-                          onChange={(e) => setSelectedLocal(e.target.value)}
-                        >
-                          <option value="">Selecione o polo...</option>
-                          {locals.map((l: any) => (
-                            <option key={l.id} value={l.id}>{l.nome}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          Data da Prova <span className="text-red-500">*</span>
-                        </Label>
-                        <Input 
-                          type="date"
-                          value={selectedDate}
-                          onChange={(e) => setSelectedDate(e.target.value)}
-                          className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
-                        />
-                      </div>
+                    {/* Campus Selector */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        Campus / Polo <span className="text-red-500">*</span>
+                      </Label>
+                      <select 
+                        className="w-full h-10 text-sm border border-slate-200 rounded-xl px-3 bg-white text-slate-800 focus:outline-none focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs cursor-pointer"
+                        value={selectedLocal}
+                        onChange={(e) => setSelectedLocal(e.target.value)}
+                      >
+                        <option value="">Selecione o polo...</option>
+                        {locals.map((l: any) => (
+                          <option key={l.id} value={l.id}>{l.nome}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    {/* 4. Slot Selector */}
-                    {selectedLocal && selectedDate && (
-                      <div className="space-y-2 pt-2">
-                        <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          Horários Iniciais Disponíveis <span className="text-red-500">*</span>
-                        </Label>
-                        {slotsLoading ? (
-                          <div className="text-center py-6 text-xs text-[#9AA0AC] flex items-center justify-center gap-2 bg-slate-50 rounded-xl border border-slate-100">
-                            <RefreshCw className="w-4 h-4 animate-spin text-navy" /> Carregando horários e capacidade de vagas...
-                          </div>
-                        ) : availableSlots.length === 0 ? (
-                          <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-800 text-xs">
-                            Nenhum horário com capacidade suficiente de vagas disponível para esta data e polo.
+                    {/* Interactive Calendar with Vacancy Legend */}
+                    {selectedLocal && (
+                      <div className="space-y-2 pt-1 animate-in fade-in">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            Data da Prova <span className="text-red-500">*</span>
+                          </Label>
+                          {selectedDate && (
+                            <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                              Data selecionada: {selectedDate.split("-").reverse().join("/")}
+                            </span>
+                          )}
+                        </div>
+
+                        {poloOptionsLoading ? (
+                          <div className="text-center py-10 text-xs text-[#9AA0AC] flex items-center justify-center gap-2 bg-slate-50 rounded-2xl border border-slate-100">
+                            <RefreshCw className="w-4 h-4 animate-spin text-navy" />
+                            Carregando calendário de datas e vagas do polo...
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-44 overflow-y-auto p-1 [scrollbar-width:thin]">
-                            {availableSlots.map((slot) => (
-                              <button
-                                key={slot.id}
-                                type="button"
-                                onClick={() => setSelectedSlotId(slot.id)}
-                                className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center cursor-pointer ${
-                                  selectedSlotId === slot.id
-                                    ? "bg-navy text-white border-navy shadow-md ring-2 ring-navy/20"
-                                    : "bg-white text-navy border-slate-200 hover:border-navy/40 hover:bg-slate-50 shadow-2xs"
-                                }`}
-                              >
-                                <span className="font-bold text-sm flex items-center gap-1 font-mono">
-                                  <Clock className="w-3.5 h-3.5" /> {slot.hora?.slice(0, 5)}
-                                </span>
-                                <span className={`text-[10px] mt-1 font-medium ${selectedSlotId === slot.id ? "text-white/80" : "text-emerald-700 font-semibold"}`}>
-                                  {slot.vagas} vagas
-                                </span>
-                              </button>
-                            ))}
+                          <ExamDateCalendar
+                            selectedDate={selectedDate}
+                            onSelectDate={(dt) => {
+                              setSelectedDate(dt)
+                              setModalError("")
+                            }}
+                            datesStatus={datesStatus}
+                            disciplinesCount={disciplinesCount}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* 4. Filtered Valid Start Slots (accommodates all disciplines, not in past) */}
+                    {selectedLocal && selectedDate && (
+                      <div className="space-y-2 pt-2 animate-in fade-in">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <Label className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            Horários Iniciais Disponíveis <span className="text-red-500">*</span>
+                          </Label>
+                          <span className="text-[11px] text-[#5F6775]">
+                            Apenas horários com capacidade para {disciplinesCount} disciplina(s) ({disciplinesCount * 30} min)
+                          </span>
+                        </div>
+
+                        {availableSlots.length === 0 ? (
+                          <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-800 text-xs flex items-start gap-2.5 animate-in fade-in">
+                            <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                            <div>
+                              <p className="font-bold">Nenhum horário inicial com capacidade suficiente para esta data</p>
+                              <p className="text-[11px] text-amber-700 mt-0.5">
+                                Não há sequência contínua de horários com vagas disponíveis para as {disciplinesCount} disciplinas do aluno ({disciplinesCount * 30} min) nesta data ou os horários já passaram hoje. Por favor, selecione outra data destacada em verde no calendário acima.
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-56 overflow-y-auto p-1 [scrollbar-width:thin]">
+                            {availableSlots.map((slot) => {
+                              const startTime = slot.hora?.slice(0, 5)
+                              const endTime = getExamEndTime(startTime, disciplinesCount)
+                              const isSelected = selectedSlotId === slot.id
+
+                              return (
+                                <button
+                                  key={slot.id}
+                                  type="button"
+                                  onClick={() => setSelectedSlotId(slot.id)}
+                                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
+                                    isSelected
+                                      ? "bg-navy text-white border-navy shadow-md ring-2 ring-navy/20 scale-[1.01]"
+                                      : "bg-white text-navy border-slate-200 hover:border-navy/40 hover:bg-slate-50 shadow-2xs"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-1 w-full">
+                                    <span className="font-bold text-sm font-mono flex items-center gap-1">
+                                      <Clock className="w-3.5 h-3.5" /> {startTime}
+                                    </span>
+                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                      isSelected ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    }`}>
+                                      {slot.vagas} vaga{slot.vagas !== 1 ? "s" : ""}
+                                    </span>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t border-slate-100/60 flex items-center justify-between text-[11px]">
+                                    <span className={isSelected ? "text-white/80" : "text-slate-500"}>
+                                      Até {endTime}
+                                    </span>
+                                    <span className={`text-[10px] font-bold ${isSelected ? "text-white/90" : "text-navy"}`}>
+                                      {disciplinesCount * 30} min
+                                    </span>
+                                  </div>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
                       </div>
