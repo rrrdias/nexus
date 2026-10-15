@@ -197,7 +197,7 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
       {/* Cabeçalho da Página */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 select-none">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-1 rounded-md bg-navy text-white text-[10px] font-extrabold uppercase tracking-wider">
@@ -217,7 +217,7 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
       </div>
 
       {/* Grid de 4 Cards de Métricas Consolidadas Ricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 select-none">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         
         {/* Card 1: Panorama de Matrículas & Acesso */}
         <Card className="border-t-4 border-navy shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -230,7 +230,7 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
             </CardHeader>
             <CardContent className="pt-2">
               <div className="flex items-center gap-3">
-                <div className="flex flex-col items-center justify-center shrink-0 w-20 h-20 bg-slate-50 border border-slate-200/80 rounded-2xl select-none">
+                <div className="flex flex-col items-center justify-center shrink-0 w-20 h-20 bg-slate-50 border border-slate-200/80 rounded-2xl">
                   <span className="text-2xl font-black text-navy font-mono leading-none">
                     {total_records >= 1000 ? `${(total_records / 1000).toFixed(1)}k` : total_records}
                   </span>

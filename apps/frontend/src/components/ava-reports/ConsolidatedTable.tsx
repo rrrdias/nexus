@@ -251,7 +251,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center shadow-sm select-none">
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center shadow-sm">
         <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
         <h3 className="text-base font-extrabold text-navy">Nenhum registro encontrado</h3>
         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
@@ -263,9 +263,9 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden select-none">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden select-text">
+        <div className="overflow-x-auto select-text">
+          <table className="w-full text-left text-xs border-collapse select-text">
             <thead>
               <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold text-navy uppercase tracking-wider">
                 <th className="py-4 px-4 min-w-[280px]">Aluno / Contato</th>
@@ -337,12 +337,46 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                           </div>
                           
                           <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-slate-500">
-                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/80 text-slate-700 font-bold">
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/80 text-slate-700 font-bold inline-flex items-center gap-1 select-text">
                               ID: {row.matricula || row.usuario || '-'}
+                              {(row.matricula || row.usuario) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCopy(row.matricula || row.usuario || '', `mat-${row.id}`)
+                                  }}
+                                  className="text-slate-400 hover:text-navy cursor-pointer transition-colors p-0.5 rounded"
+                                  title="Copiar ID / Matrícula"
+                                >
+                                  {copiedId === `mat-${row.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              )}
                             </span>
                             
                             {phoneFormatted && (
-                              <span className="text-slate-600 font-medium">📞 {phoneFormatted}</span>
+                              <span className="text-slate-600 font-medium inline-flex items-center gap-1 select-text">
+                                📞 {phoneFormatted}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleCopy(phoneFormatted, `phone-${row.id}`)
+                                  }}
+                                  className="text-slate-400 hover:text-navy cursor-pointer transition-colors p-0.5 rounded"
+                                  title="Copiar Telefone"
+                                >
+                                  {copiedId === `phone-${row.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </span>
                             )}
                           </div>
 

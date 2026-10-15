@@ -243,21 +243,21 @@ export function NotasTable({ data, institution }: { data: any[], institution?: s
 
   return (
     <>
-      <div className="overflow-auto">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-auto select-text">
+        <table className="w-full text-left border-collapse select-text">
           <thead>
             <tr className="bg-[#F4F5F7] border-b border-gray-200">
               {headers.map(h => (
                 <th
                   key={h}
-                  className="px-3 py-2.5 text-[9px] font-bold text-[#9AA0AC] uppercase tracking-wider whitespace-nowrap"
+                  className="px-3 py-2.5 text-[9px] font-bold text-[#9AA0AC] uppercase tracking-wider whitespace-nowrap select-text"
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="select-text">
             {data.map((row, idx) => {
               const phone = row.userPhone1 || null
               const waUrl = buildWhatsAppUrl(phone, row.studentName || row.aluno)
