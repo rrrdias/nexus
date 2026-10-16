@@ -1,12 +1,5 @@
-import { getProgressData } from "@/app/actions/ava-reports"
-import { DashboardProgresso } from "@/components/ava-reports/DashboardProgresso"
+import { redirect } from "next/navigation"
 
-export default async function ProgressoUniegoPage(props: { searchParams: Promise<any> }) {
-  const searchParams = await props.searchParams
-  const page = parseInt(searchParams.page) || 1
-  const size = parseInt(searchParams.size) || 30
-  
-  const metrics = await getProgressData(page, size, { ...searchParams, sourceInstitution: 'uniego' })
-
-  return <DashboardProgresso title="Progresso dos Alunos - Disciplinas Online UNIEGO" metrics={metrics} institution="uniego" />
+export default function ProgressoUniegoRedirectPage() {
+  redirect("/relatorios/consolidado/uniego")
 }

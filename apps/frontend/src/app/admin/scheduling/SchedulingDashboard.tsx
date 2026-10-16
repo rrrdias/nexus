@@ -275,9 +275,15 @@ export function SchedulingDashboard({
     setSelectedSlotId("")
     setModalError("")
     try {
-      const profile = await getStudentProfile(modalMatricula, modalPeriodo)
-      setStudentProfile(profile)
-      showToast(`Estudante ${profile.nome} carregado com sucesso!`, "success")
+      const res = await getStudentProfile(modalMatricula, modalPeriodo)
+      if (!res.success || !res.data) {
+        const errMsg = res.error || "Estudante não encontrado no banco sincronizado."
+        setModalError(errMsg)
+        showToast(errMsg, "error")
+        return
+      }
+      setStudentProfile(res.data)
+      showToast(`Estudante ${res.data.nome} carregado com sucesso!`, "success")
     } catch (err: any) {
       const errMsg = err.message || "Estudante não encontrado no banco sincronizado."
       setModalError(errMsg)
@@ -710,7 +716,12 @@ export function SchedulingDashboard({
                         {studentProfile.nome?.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-navy text-sm truncate">{studentProfile.nome}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-navy text-sm truncate">{studentProfile.nome}</p>
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {studentProfile.modalidade || "Graduação EaD"}
+                          </Badge>
+                        </div>
                         <p className="text-xs text-[#5F6775] truncate mt-0.5">{studentProfile.email}</p>
                         {studentProfile.telefone && (
                           <p className="text-xs text-[#5F6775] mt-0.5 font-mono">📞 {studentProfile.telefone}</p>
@@ -720,7 +731,7 @@ export function SchedulingDashboard({
 
                     <div className="border-t border-slate-200/80 pt-3">
                       <p className="text-xs font-bold text-navy uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                        <BookOpen className="w-3.5 h-3.5 text-green-dark" /> Disciplinas Vinculadas ({studentProfile.totalDisciplinas})
+                        <BookOpen className="w-3.5 h-3.5 text-green-dark" /> Disciplinas Regulares ({studentProfile.totalDisciplinas})
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {studentProfile.disciplinas.map((disc: string, idx: number) => (
@@ -730,7 +741,7 @@ export function SchedulingDashboard({
                         ))}
                       </div>
                       <p className="text-[11px] text-[#5F6775] italic mt-2.5">
-                        * O sistema reservará automaticamente {studentProfile.totalDisciplinas} blocos consecutivos de 30 minutos ({studentProfile.totalDisciplinas * 30} min no total).
+                        * Apenas disciplinas da categoria REGULARES são agendadas ({studentProfile.totalDisciplinas} bloco{studentProfile.totalDisciplinas !== 1 ? "s" : ""} consecutivo{studentProfile.totalDisciplinas !== 1 ? "s" : ""} de 30 min • {studentProfile.totalDisciplinas * 30} min no total).
                       </p>
                     </div>
                   </div>

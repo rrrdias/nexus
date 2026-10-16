@@ -26,7 +26,10 @@ export function normalizeName(name: string): string {
 export function isDateString(val: string | null | undefined): boolean {
   if (!val) return false
   const clean = val.trim()
-  return clean.includes("/") || /^\d{2,4}-\d{2}-\d{2}/.test(clean)
+  return (
+    /^\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/.test(clean) ||
+    /^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2})?)?$/.test(clean)
+  )
 }
 
 export function isValidGrade(val: string | null | undefined): boolean {
@@ -40,12 +43,27 @@ export function isValidGrade(val: string | null | undefined): boolean {
 
 export function parseActivities(raw: string | null | undefined): Activity[] {
   if (!raw) return []
-  return raw.split("|").map(item => {
+  const rawItems = raw.split("|")
+  const firstPartsCount = rawItems[0] ? rawItems[0].split(":").length : 0
+
+  return rawItems.map((item, idx): Activity | null => {
     const parts = item.split(":")
+    // Ignora fragmentos truncados pelo limite do GROUP_CONCAT que não possuem separador ':'
+    if (parts.length < 2) {
+      return null
+    }
+
+    const isLastItem = rawItems.length > 1 && idx === rawItems.length - 1
     const nome = parts[0]?.trim() || ""
-    const second = parts[1]?.trim() || "-"
+    const rawSecond = parts[1]?.trim() || ""
+    const second = rawSecond || "-"
     const third = parts[2]?.trim() || "-"
     const fourth = parts[3]?.trim() || "-"
+
+    // Ignora itens de 2 partes com 2º campo vazio (ex: "APS7:") ou último item truncado no meio do 2º campo em listas de 3+ partes
+    if (parts.length === 2 && (!rawSecond || (isLastItem && firstPartsCount >= 3))) {
+      return null
+    }
 
     // Formato 4 partes: Nome : Nota : NotaMax : Data
     if (parts.length >= 4) {
@@ -62,24 +80,27 @@ export function parseActivities(raw: string | null | undefined): Activity[] {
       }
     }
 
-    // Formato 3 partes: (Nome : Status : Data) ou (Nome : Nota : NotaMax)
+    // Formato 3 partes: (Nome : Status : Data), (Nome : Nota : Data) ou (Nome : Nota : NotaMax)
     if (parts.length === 3) {
+      if (isLastItem && firstPartsCount >= 4 && !isDateString(third)) {
+        return null
+      }
+      const hasGrade = isValidGrade(second)
       if (isDateString(third)) {
         return {
           nome,
-          status: second || "Pendente",
-          nota: null,
+          status: hasGrade ? "Avaliado" : (second === "-" ? "Pendente" : second),
+          nota: hasGrade ? second : null,
           notaMax: null,
           data: third,
         }
       }
 
-      const hasGrade = isValidGrade(second)
       return {
         nome,
         status: hasGrade ? "Avaliado" : (second === "-" ? "Pendente" : second),
         nota: hasGrade ? second : null,
-        notaMax: isValidGrade(third) ? third : "100",
+        notaMax: (!isLastItem && isValidGrade(third)) ? third : null,
         data: "-",
       }
     }
@@ -100,25 +121,25 @@ export function parseActivities(raw: string | null | undefined): Activity[] {
         nome,
         status: "Avaliado",
         nota: second,
-        notaMax: "100",
+        notaMax: null,
         data: "-",
       }
     }
 
     return {
       nome,
-      status: second || "Pendente",
+      status: second === "-" ? "Pendente" : second,
       nota: null,
       notaMax: null,
       data: "-",
     }
-  }).filter(a => a.nome)
+  }).filter((a): a is Activity => Boolean(a && a.nome))
 }
 
 /**
  * Classifica rigorosamente em qual Fase (1, 2 ou 3) a atividade pertence.
  */
-export function classifyActivityPhase(name: string): 1 | 2 | 3 {
+export function classifyActivityPhase(name: string, fallbackPhase: 1 | 2 | 3 = 1): 1 | 2 | 3 {
   const norm = normalizeName(name)
 
   // 1. Verificações / Provas / VAs explícitas
@@ -141,8 +162,8 @@ export function classifyActivityPhase(name: string): 1 | 2 | 3 {
     return 1 // APS 1 a 6
   }
 
-  // 3. Unidades Temáticas / Fixações (UT 01 a 04 = Fase 1, UT 05 a 08 = Fase 2, UT 09 a 12 = Fase 3)
-  const matchUnit = norm.match(/(?:unidade\s+tematica|unidade|ut|fixacao\s*-\s*unidade\s+tematica)\s*(\d+)/i)
+  // 3. Unidades Temáticas / Fixações / Daily Semanas (01 a 04 = Fase 1, 05 a 08 = Fase 2, 09+ = Fase 3)
+  const matchUnit = norm.match(/(?:unidade\s+tematica|unidade|ut|fixacao\s*-\s*unidade\s+tematica|daily\s*-\s*semana(?:\s*-)?)\s*(\d+)/i)
   if (matchUnit && matchUnit[1]) {
     const unitNum = parseInt(matchUnit[1], 10)
     if (unitNum >= 9) return 3
@@ -159,13 +180,13 @@ export function classifyActivityPhase(name: string): 1 | 2 | 3 {
     return 1
   }
 
-  return 1
+  return fallbackPhase
 }
 
 export function isEvaluativeActivity(name: string): boolean {
   const norm = normalizeName(name)
 
-  // Materiais de estudo / leitura puros que NÃO compõem nota
+  // Materiais de estudo / leitura / instruções puros que NÃO compõem nota
   if (
     (norm.startsWith("unidade tematica") || norm.startsWith("unidade ") || norm.startsWith("ut ")) &&
     !norm.includes("fixacao") &&
@@ -173,7 +194,14 @@ export function isEvaluativeActivity(name: string): boolean {
   ) {
     return false
   }
-  if (norm.includes("guia de estudo") || norm.includes("apresentacao") || norm.includes("plano de ensino") || norm.includes("material")) {
+  if (
+    norm.includes("guia de estudo") ||
+    norm.includes("apresentacao da disciplina") ||
+    norm.includes("plano de ensino") ||
+    norm.includes("instrucoes para atividade") ||
+    norm.includes("normas para producao") ||
+    norm.includes("material")
+  ) {
     return false
   }
 
@@ -193,6 +221,18 @@ export function isEvaluativeActivity(name: string): boolean {
     norm.includes("questionario") ||
     norm.includes("quiz") ||
     norm.includes("trabalho") ||
-    norm.includes("aulas ao vivo")
+    norm.includes("aulas ao vivo") ||
+    norm.includes("daily") ||
+    norm.includes("tarefa") ||
+    norm.includes("atividade") ||
+    norm.includes("relatorio") ||
+    norm.includes("depoimento") ||
+    norm.includes("poster") ||
+    norm.includes("anexo") ||
+    norm.includes("caso") ||
+    norm.includes("envio") ||
+    norm.includes("poste aqui") ||
+    norm.includes("envie aqui")
   )
 }
+

@@ -33,13 +33,19 @@ export async function updateLocal(id: string, data: Partial<{ nome: string; ende
 }
 
 export async function getOptions(filters: { localId?: string; data?: string; apenasDisponiveis?: boolean; incluirInativos?: boolean } = {}) {
-  const params = new URLSearchParams();
-  if (filters.localId) params.append('localId', filters.localId);
-  if (filters.data) params.append('data', filters.data);
-  if (filters.apenasDisponiveis) params.append('apenasDisponiveis', 'true');
-  if (filters.incluirInativos) params.append('incluirInativos', 'true');
-  
-  return fetchFromApi(`/api/scheduling/options?${params.toString()}`, { method: 'GET' });
+  try {
+    const params = new URLSearchParams();
+    if (filters.localId) params.append('localId', filters.localId);
+    if (filters.data) params.append('data', filters.data);
+    if (filters.apenasDisponiveis) params.append('apenasDisponiveis', 'true');
+    if (filters.incluirInativos) params.append('incluirInativos', 'true');
+    
+    const res = await fetchFromApi(`/api/scheduling/options?${params.toString()}`, { method: 'GET' });
+    return Array.isArray(res) ? res : [];
+  } catch (err: any) {
+    console.error('[getOptions Action Error]:', err?.message);
+    return [];
+  }
 }
 
 export async function createOption(data: { localId: string; data: string; horaInicio: string; horaFim: string; vagas: number }) {
@@ -61,7 +67,12 @@ export async function updateOption(id: string, data: Partial<{ vagas: number; st
 }
 
 export async function getStudentProfile(matricula: string, periodo: string) {
-  return fetchFromApi(`/api/scheduling/profile/${matricula}/${periodo}`, { method: 'GET' });
+  try {
+    const data = await fetchFromApi(`/api/scheduling/profile/${matricula}/${periodo}`, { method: 'GET' });
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Estudante não encontrado no banco sincronizado.' };
+  }
 }
 
 export async function getBookings(filters: {

@@ -265,6 +265,111 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
         service.getStudentProfile('9999999', '2026-1'),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should REJECT students from non-EaD AVA institutions (uni, uniego, raizes, eefn)', async () => {
+      queryResult = [
+        {
+          sourceInstitution: 'uniego',
+          aluno: 'Adriel Miranda',
+          usuario: 'adriel@nexus.edu.br',
+          userPhone1: '62999991111',
+          curso: 'Anatomia Humana',
+          subcategoria: 'REGULARES',
+        },
+      ];
+
+      await expect(
+        service.getStudentProfile('G2610162', '2026-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should filter only REGULARES disciplines when subcategoria is populated', async () => {
+      queryResult = [
+        {
+          sourceInstitution: 'ead',
+          aluno: 'Maria Silva',
+          usuario: 'maria.silva@nexus.edu.br',
+          userPhone1: '62999998888',
+          curso: 'Direito Civil I',
+          subcategoria: 'REGULARES',
+        },
+        {
+          sourceInstitution: 'ead',
+          aluno: 'Maria Silva',
+          usuario: 'maria.silva@nexus.edu.br',
+          userPhone1: '62999998888',
+          curso: 'Projeto de Extensão I',
+          subcategoria: 'EXTENSÃO',
+        },
+        {
+          sourceInstitution: 'ead',
+          aluno: 'Maria Silva',
+          usuario: 'maria.silva@nexus.edu.br',
+          userPhone1: '62999998888',
+          curso: 'Ambientação EaD',
+          subcategoria: 'AMBIENTAÇÃO',
+        },
+      ];
+
+      const profile = await service.getStudentProfile('2026001', '2026-1');
+      expect(profile.disciplinas).toEqual(['Direito Civil I']);
+      expect(profile.totalDisciplinas).toBe(1);
+      expect(profile.modalidade).toBe('Graduação EaD');
+      expect(profile.categoria).toBe('REGULARES');
+    });
+
+    it('should REJECT when EaD student only has non-REGULARES disciplines', async () => {
+      queryResult = [
+        {
+          sourceInstitution: 'ead',
+          aluno: 'João Silva',
+          usuario: 'joao@nexus.edu.br',
+          userPhone1: '62999990000',
+          curso: 'Estágio Supervisionado I',
+          subcategoria: 'ESTÁGIO',
+        },
+      ];
+
+      await expect(
+        service.getStudentProfile('2026009', '2026-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should REJECT Lyceum students with non-EaD short turno codes (NOT, MAT, VES, SEMI, POS) or non-EaD cursoInstituicao', async () => {
+      queryResult = [];
+      db.limit.mockResolvedValue([
+        {
+          id: 'discente-presencial-1',
+          matricula: '2310154',
+          nome: 'Lucas',
+          sobrenome: 'Almeida',
+          turno: 'NOT',
+          cursoInstituicao: 'UniEVANGÉLICA',
+        },
+      ]);
+
+      await expect(
+        service.getStudentProfile('2310154', '2026-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should REJECT Semipresencial (-SEMI) courses in AVA ead institution', async () => {
+      queryResult = [
+        {
+          sourceInstitution: 'ead',
+          aluno: 'Aluno Semi',
+          usuario: 'semi@nexus.edu.br',
+          userPhone1: '62999990000',
+          curso: 'BROMATOLOGIA E TECNOLOGIA DE ALIMENTOS – M128T01-SEMI20262',
+          cursoPerfil: 'Farmácia - SEMI',
+          subcategoria: null,
+        },
+      ];
+
+      await expect(
+        service.getStudentProfile('D2520144', '2026-2'),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('Fase 4: getAttendanceList()', () => {

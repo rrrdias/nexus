@@ -383,6 +383,84 @@ export class SchedulingService implements OnModuleInit {
     return updated;
   }
 
+  private isRegularAvaDiscipline(
+    curso: string | null | undefined,
+    subcategoria?: string | null,
+  ): boolean {
+    if (!curso || !curso.trim()) return false;
+
+    if (subcategoria && subcategoria.trim() !== '') {
+      const normSub = subcategoria
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase();
+      return normSub.includes('REGULAR');
+    }
+
+    const normCurso = curso
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase();
+
+    const nonRegularPatterns = [
+      'ESTAGIO',
+      'EXTENSAO',
+      'EXTENSIONISTA',
+      'AMBIENTACAO',
+      'NIVELAMENTO',
+      'ATIVIDADE COMPLEMENTAR',
+      'ATIVIDADES COMPLEMENTARES',
+      'TRABALHO DE CONCLUSAO',
+      'PRATICA PEDAGOGICA',
+      'SEMINARIO INTEGRADOR',
+      'ATIVIDADES INTERDISCIPLINARES',
+      'ATIVIDADE INTERDISCIPLINAR',
+      'PRATICA CONTABIL',
+      'PROJETO INTEGRADOR',
+    ];
+
+    return !nonRegularPatterns.some((pattern) => normCurso.includes(pattern));
+  }
+
+  private isNonEadLyceumModality(discente: {
+    turno?: string | null;
+    cursoInstituicao?: string | null;
+    cursoNome?: string | null;
+    nomeUnidadeFisica?: string | null;
+  }): boolean {
+    if (
+      discente.cursoInstituicao &&
+      discente.cursoInstituicao.trim() !== ''
+    ) {
+      const normInst = discente.cursoInstituicao
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase();
+      if (!normInst.includes('EAD')) {
+        return true;
+      }
+    }
+
+    if (discente.turno && discente.turno.trim() !== '') {
+      const normTurno = discente.turno
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase();
+      if (
+        !normTurno.includes('EAD') &&
+        !normTurno.includes('DISTANCIA') &&
+        !normTurno.includes('VIRTUAL')
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // 3. Student Profile Query (Hybrid: AVA Reports with Academic / Lyceum Fallback)
   async getStudentProfile(matricula: string, periodo: string) {
     const trimmedMatricula = matricula.trim();
@@ -400,21 +478,52 @@ export class SchedulingService implements OnModuleInit {
       );
 
     if (studentRecords.length > 0) {
-      const studentName = studentRecords[0].aluno;
-      const email = studentRecords[0].usuario;
-      const phone = studentRecords[0].userPhone1;
-      const disciplines = studentRecords.map((r) => r.curso).filter(Boolean);
+      // Restrição 1: Apenas alunos da Graduação EaD (sourceInstitution = 'ead' e não Semipresencial -SEMI)
+      const eadRecords = studentRecords.filter((r) => {
+        const isEadInst =
+          !r.sourceInstitution ||
+          r.sourceInstitution.trim().toLowerCase() === 'ead';
+        const isSemipresencial =
+          Boolean(r.curso && /-SEMI\d{4}/i.test(r.curso)) ||
+          Boolean(r.cursoPerfil && /\bSEMI\b/i.test(r.cursoPerfil));
+        return isEadInst && !isSemipresencial;
+      });
 
-      if (disciplines.length > 0) {
-        return {
-          matricula: trimmedMatricula,
-          nome: studentName,
-          email,
-          telefone: phone,
-          disciplinas: disciplines,
-          totalDisciplinas: disciplines.length,
-        };
+      if (eadRecords.length === 0) {
+        throw new BadRequestException(
+          'Apenas alunos da Graduação EaD podem realizar o agendamento de provas. A matrícula informada pertence a outra modalidade.',
+        );
       }
+
+      // Restrição 2: Apenas disciplinas da categoria REGULARES
+      const regularRecords = eadRecords.filter((r) =>
+        this.isRegularAvaDiscipline(r.curso, (r as any).subcategoria),
+      );
+
+      const disciplines = Array.from(
+        new Set(regularRecords.map((r) => r.curso).filter(Boolean)),
+      ) as string[];
+
+      if (disciplines.length === 0) {
+        throw new BadRequestException(
+          'O estudante não possui disciplinas na categoria REGULARES disponíveis para agendamento neste período.',
+        );
+      }
+
+      const studentName = eadRecords[0].aluno;
+      const email = eadRecords[0].usuario;
+      const phone = eadRecords[0].userPhone1;
+
+      return {
+        matricula: trimmedMatricula,
+        nome: studentName,
+        email,
+        telefone: phone,
+        modalidade: 'Graduação EaD',
+        categoria: 'REGULARES',
+        disciplinas: disciplines,
+        totalDisciplinas: disciplines.length,
+      };
     }
 
     // 2. Fallback to Lyceum Academic tables (academic_discente, academic_matricula, academic_turma)
@@ -431,6 +540,12 @@ export class SchedulingService implements OnModuleInit {
       .limit(1);
 
     if (discente) {
+      if (this.isNonEadLyceumModality(discente)) {
+        throw new BadRequestException(
+          'Apenas alunos da Graduação EaD podem realizar o agendamento de provas. A matrícula informada pertence a outra modalidade.',
+        );
+      }
+
       const enrollments = await this.db
         .select({
           nomeDisciplina: academicTurma.nomeDisciplina,
@@ -450,27 +565,41 @@ export class SchedulingService implements OnModuleInit {
           ),
         );
 
-      const disciplines = Array.from(
-        new Set(
-          enrollments
-            .map((e) => e.nomeDisciplina || e.disciplina || e.turma)
-            .filter(Boolean),
-        ),
-      ) as string[];
+      if (enrollments.length > 0) {
+        const allRawDisciplines = Array.from(
+          new Set(
+            enrollments
+              .map((e) => e.nomeDisciplina || e.disciplina || e.turma)
+              .filter(Boolean),
+          ),
+        ) as string[];
 
-      if (disciplines.length > 0) {
-        const fullName =
-          discente.nomeSocial ||
-          `${discente.nome || ''} ${discente.sobrenome || ''}`.trim() ||
-          'Estudante Não Identificado';
-        return {
-          matricula: discente.matricula || trimmedMatricula,
-          nome: fullName,
-          email: discente.email || discente.usuario || '',
-          telefone: discente.telefone || '',
-          disciplinas: disciplines,
-          totalDisciplinas: disciplines.length,
-        };
+        const disciplines = allRawDisciplines.filter((d) =>
+          this.isRegularAvaDiscipline(d, null),
+        );
+
+        if (allRawDisciplines.length > 0 && disciplines.length === 0) {
+          throw new BadRequestException(
+            'O estudante não possui disciplinas na categoria REGULARES disponíveis para agendamento neste período.',
+          );
+        }
+
+        if (disciplines.length > 0) {
+          const fullName =
+            discente.nomeSocial ||
+            `${discente.nome || ''} ${discente.sobrenome || ''}`.trim() ||
+            'Estudante Não Identificado';
+          return {
+            matricula: discente.matricula || trimmedMatricula,
+            nome: fullName,
+            email: discente.email || discente.usuario || '',
+            telefone: discente.telefone || '',
+            modalidade: 'Graduação EaD',
+            categoria: 'REGULARES',
+            disciplinas: disciplines,
+            totalDisciplinas: disciplines.length,
+          };
+        }
       }
     }
 

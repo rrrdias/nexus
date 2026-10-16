@@ -80,17 +80,28 @@ export function ActivityListDialog({
   const f2Map = new Map<string, Activity>()
   const f3Map = new Map<string, Activity>()
 
+  const isCompletedStatus = (status: string | null | undefined, data?: string | null) => {
+    const s = (status || "").toLowerCase()
+    return (
+      s.includes("conclu") ||
+      s.includes("feito") ||
+      s.includes("avaliad") ||
+      s.includes("realiz") ||
+      Boolean(data && data !== "-")
+    )
+  }
+
   const addOrMerge = (map: Map<string, Activity>, act: Activity) => {
     const key = normalizeName(act.nome)
     if (!map.has(key)) {
       map.set(key, act)
     } else {
       const existing = map.get(key)!
-      const isActDone = act.status && !act.status.toLowerCase().includes("pend") && !act.status.toLowerCase().includes("sem")
-      const isExistingDone = existing.status && !existing.status.toLowerCase().includes("pend") && !existing.status.toLowerCase().includes("sem")
+      const isActDone = isCompletedStatus(act.status, act.data)
+      const isExistingDone = isCompletedStatus(existing.status, existing.data)
       map.set(key, {
         nome: existing.nome || act.nome,
-        status: isActDone ? act.status : (isExistingDone ? existing.status : act.status || existing.status),
+        status: isActDone ? act.status : (isExistingDone ? existing.status : (existing.status && existing.status !== "-" ? existing.status : act.status)),
         nota: null,
         notaMax: null,
         data: (act.data && act.data !== "-") ? act.data : existing.data,

@@ -181,25 +181,58 @@ export function DashboardAva({ data, session, greeting }: { data: any, session: 
               Monitore o progresso dos alunos e a distribuição das notas por fases e cursos em tempo real para ações pedagógicas proativas.
             </p>
             
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <Link 
                 href="/relatorios/consolidado/ead"
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group cursor-pointer"
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
                   <BookOpen className="w-4 h-4 text-blue-600" />
-                  <span className="text-xs font-bold text-navy group-hover:text-indigo-600 transition-colors">Relatório Acadêmico — EaD</span>
+                  <span className="text-xs font-bold text-navy group-hover:text-indigo-600 transition-colors">Consolidado — EaD</span>
                 </div>
                 <ArrowUpRight className="w-3.5 h-3.5 text-[#9AA0AC] group-hover:text-indigo-600 transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>
 
               <Link 
                 href="/relatorios/consolidado/uni"
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-green-200 hover:bg-green-50/20 transition-all group cursor-pointer"
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-green-200 hover:bg-green-50/20 transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
                   <Users className="w-4 h-4 text-[#27AE60]" />
-                  <span className="text-xs font-bold text-navy group-hover:text-green-700 transition-colors">Relatório Acadêmico — Online Uni</span>
+                  <span className="text-xs font-bold text-navy group-hover:text-green-700 transition-colors">Consolidado — Online Uni</span>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#9AA0AC] group-hover:text-green-700 transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+
+              <Link 
+                href="/relatorios/consolidado/uniego"
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-green-200 hover:bg-green-50/20 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-[#27AE60]" />
+                  <span className="text-xs font-bold text-navy group-hover:text-green-700 transition-colors">Consolidado — Online UNIEGO</span>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#9AA0AC] group-hover:text-green-700 transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+
+              <Link 
+                href="/relatorios/consolidado/raizes"
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-green-200 hover:bg-green-50/20 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-[#27AE60]" />
+                  <span className="text-xs font-bold text-navy group-hover:text-green-700 transition-colors">Consolidado — Online Raízes</span>
+                </div>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#9AA0AC] group-hover:text-green-700 transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+
+              <Link 
+                href="/relatorios/consolidado/eefn"
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:border-green-200 hover:bg-green-50/20 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-[#27AE60]" />
+                  <span className="text-xs font-bold text-navy group-hover:text-green-700 transition-colors">Consolidado — Online EEFN</span>
                 </div>
                 <ArrowUpRight className="w-3.5 h-3.5 text-[#9AA0AC] group-hover:text-green-700 transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>

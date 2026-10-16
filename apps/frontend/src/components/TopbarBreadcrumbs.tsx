@@ -22,8 +22,8 @@ export function TopbarBreadcrumbs() {
     // Custom mapping for friendly Portuguese names
     const segmentMap: Record<string, string> = {
       relatorios: "AVA Reports",
-      progresso: "Progresso",
-      notas: "Notas",
+      consolidado: "Consolidado",
+      ead: "EaD",
       eefn: "EEFN",
       raizes: "Raízes",
       uni: "UNI",

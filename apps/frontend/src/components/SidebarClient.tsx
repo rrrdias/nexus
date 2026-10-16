@@ -18,9 +18,6 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isReportsOpen, setIsReportsOpen] = useState(false)
-  const [isConsolidatedOpen, setIsConsolidatedOpen] = useState(false)
-  const [isProgressOpen, setIsProgressOpen] = useState(false)
-  const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [isSchedulingOpen, setIsSchedulingOpen] = useState(false)
   const [isAcademicOpen, setIsAcademicOpen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -38,15 +35,6 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
     }
     if (pathname.startsWith('/relatorios')) {
       setIsReportsOpen(true)
-      if (pathname.startsWith('/relatorios/consolidado')) {
-        setIsConsolidatedOpen(true)
-      }
-      if (pathname.startsWith('/relatorios/progresso')) {
-        setIsProgressOpen(true)
-      }
-      if (pathname.startsWith('/relatorios/notas')) {
-        setIsNotesOpen(true)
-      }
     }
     if (pathname.startsWith('/admin/scheduling')) {
       setIsSchedulingOpen(true)
@@ -65,9 +53,6 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
     if (nextState) {
       // Recolhendo: fecha submenu imediatamente para evitar ghost hover
       setIsReportsOpen(false)
-      setIsConsolidatedOpen(false)
-      setIsProgressOpen(false)
-      setIsNotesOpen(false)
       setIsSchedulingOpen(false)
       setIsAcademicOpen(false)
       setJustCollapsed(true)
@@ -216,6 +201,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                       Relatório Acadêmico AVA
                     </div>
                     <div className="px-2 py-1 space-y-1">
+                      <Link href="/relatorios" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        Visão Geral
+                      </Link>
                       <Link href="/relatorios/consolidado/ead" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/relatorios/consolidado/ead' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
                         EaD
                       </Link>
@@ -240,6 +228,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                       isReportsOpen && !isTransitioning ? "max-h-[300px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
                     }`}
                   >
+                    <Link href="/relatorios" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/relatorios' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
+                      Visão Geral
+                    </Link>
                     <Link href="/relatorios/consolidado/ead" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/relatorios/consolidado/ead' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
                       EaD
                     </Link>

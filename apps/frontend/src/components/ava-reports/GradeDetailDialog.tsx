@@ -46,6 +46,9 @@ interface GradeDetailDialogProps {
   listaFase1?: string | null
   listaFase2?: string | null
   listaFase3?: string | null
+  notasListaFase1?: string | null
+  notasListaFase2?: string | null
+  notasListaFase3?: string | null
   listaNotas?: string | null
 }
 
@@ -76,6 +79,9 @@ export function GradeDetailDialog({
   listaFase1,
   listaFase2,
   listaFase3,
+  notasListaFase1,
+  notasListaFase2,
+  notasListaFase3,
   listaNotas,
 }: GradeDetailDialogProps) {
   const isSinglePhase = faseActive === "fase1" || faseActive === "fase2" || faseActive === "fase3"
@@ -134,55 +140,127 @@ export function GradeDetailDialog({
   const nRef = parseNum(referenceNota)
   const isAprovado = nRef >= 6.0 || nRef >= 60
 
-  const allGradedActivities = parseActivities(listaNotas)
   const rawF1 = parseActivities(listaFase1)
   const rawF2 = parseActivities(listaFase2)
   const rawF3 = parseActivities(listaFase3)
-  
+
+  const allGradedActivities: Array<{ act: Activity; sourcePhase?: 1 | 2 | 3 }> = [
+    ...parseActivities(notasListaFase1).map(act => ({ act, sourcePhase: 1 as const })),
+    ...parseActivities(notasListaFase2).map(act => ({ act, sourcePhase: 2 as const })),
+    ...parseActivities(notasListaFase3).map(act => ({ act, sourcePhase: 3 as const })),
+    ...parseActivities(listaNotas).map(act => ({ act })),
+  ]
+
   // Mapas normalizados para agrupar todas as atividades dentro das 3 Fases com matching flexível
   const f1Map = new Map<string, Activity>()
   const f2Map = new Map<string, Activity>()
   const f3Map = new Map<string, Activity>()
 
-  const addOrMergeToMap = (map: Map<string, Activity>, act: Activity) => {
-    const key = normalizeName(act.nome)
+  // Índice autoritativo de qual fase cada atividade do progresso pertence (mesmo se o nome for atípico)
+  const authoritativeProgressMap = new Map<string, { phase: 1 | 2 | 3; act: Activity }>()
+  rawF1.forEach(a => authoritativeProgressMap.set(normalizeName(a.nome), { phase: 1, act: a }))
+  rawF2.forEach(a => authoritativeProgressMap.set(normalizeName(a.nome), { phase: 2, act: a }))
+  rawF3.forEach(a => authoritativeProgressMap.set(normalizeName(a.nome), { phase: 3, act: a }))
+
+  const isCompletedStatus = (status: string | null | undefined) => {
+    if (!status) return false
+    const s = status.trim().toLowerCase()
+    if (!s || s === "-" || s.includes("pend") || s.includes("sem") || s.includes("nunca")) return false
+    return s.includes("conclu") || s.includes("feito") || s.includes("realiz") || s.includes("avaliad")
+  }
+
+  const addOrMergeToMap = (map: Map<string, Activity>, act: Activity, overrideKey?: string) => {
+    const key = overrideKey || normalizeName(act.nome)
     if (!map.has(key)) {
       map.set(key, act)
     } else {
       const existing = map.get(key)!
-      const isActDone = act.status && !act.status.toLowerCase().includes("pend") && !act.status.toLowerCase().includes("sem")
-      const isExistingDone = existing.status && !existing.status.toLowerCase().includes("pend") && !existing.status.toLowerCase().includes("sem")
+      const isActDone = isCompletedStatus(act.status)
+      const isExistingDone = isCompletedStatus(existing.status)
 
       map.set(key, {
-        nome: existing.nome || act.nome,
-        status: isActDone ? act.status : (isExistingDone ? existing.status : act.status || existing.status),
-        nota: act.nota || existing.nota,
-        notaMax: act.notaMax || existing.notaMax,
-        data: (act.data && act.data !== "-") ? act.data : existing.data,
+        nome: existing.nome.length >= act.nome.length ? existing.nome : act.nome,
+        status: isActDone ? act.status : (isExistingDone ? existing.status : (existing.status && existing.status !== "-" ? existing.status : act.status)),
+        nota: existing.nota || act.nota,
+        notaMax: existing.notaMax || act.notaMax,
+        data: (existing.data && existing.data !== "-") ? existing.data : act.data,
       })
     }
   }
 
-  // 1. Popula cada fase com as atividades estruturadas pelo Moodle para aquela fase
+  const findPrefixMatchInMap = (map: Map<string, Activity>, key: string): string | null => {
+    if (key.length < 4) return null
+    for (const existingKey of map.keys()) {
+      if (existingKey.startsWith(key)) {
+        const nextChar = existingKey.slice(key.length, key.length + 1)
+        if (!/^\d$/.test(nextChar)) return existingKey
+      } else if (key.startsWith(existingKey)) {
+        const nextChar = key.slice(existingKey.length, existingKey.length + 1)
+        if (!/^\d$/.test(nextChar)) return existingKey
+      }
+    }
+    return null
+  }
+
+  // 1. Popula cada fase com as atividades estruturadas pelo progresso do Moodle (mdl_course_sections)
   // Filtrando para manter apenas atividades avaliativas / com nota
   rawF1.filter(a => isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== "-")).forEach(act => addOrMergeToMap(f1Map, act))
   rawF2.filter(a => isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== "-")).forEach(act => addOrMergeToMap(f2Map, act))
   rawF3.filter(a => isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== "-")).forEach(act => addOrMergeToMap(f3Map, act))
 
-  // 2. Reconcilia as notas detalhadas vindas de listaNotas nas fases onde cada atividade já está alocada
-  allGradedActivities.forEach(act => {
+  const hasAuthoritativePhases = authoritativeProgressMap.size > 0
+
+  // 2. Reconcilia as notas detalhadas vindas de notasListaFase1..3 e listaNotas nas fases reais onde cada atividade está alocada
+  allGradedActivities.forEach(({ act, sourcePhase }) => {
     if (!isEvaluativeActivity(act.nome) && (act.nota === null || act.nota === "-")) return
 
     const key = normalizeName(act.nome)
+
+    // Match exato em alguma das fases reais do curso
     if (f1Map.has(key)) {
-      addOrMergeToMap(f1Map, act)
-    } else if (f2Map.has(key)) {
-      addOrMergeToMap(f2Map, act)
-    } else if (f3Map.has(key)) {
-      addOrMergeToMap(f3Map, act)
-    } else {
-      // Fallback somente para atividades que não estavam em nenhuma lista de fase específica
-      const phase = classifyActivityPhase(act.nome)
+      addOrMergeToMap(f1Map, act, key)
+      return
+    }
+    if (f2Map.has(key)) {
+      addOrMergeToMap(f2Map, act, key)
+      return
+    }
+    if (f3Map.has(key)) {
+      addOrMergeToMap(f3Map, act, key)
+      return
+    }
+
+    // Se a atividade consta no progresso bruto mas ainda não entrou no mapa por nome atípico, usa a fase real do progresso
+    const authEntry = authoritativeProgressMap.get(key)
+    if (authEntry) {
+      const targetMap = authEntry.phase === 1 ? f1Map : authEntry.phase === 2 ? f2Map : f3Map
+      addOrMergeToMap(targetMap, authEntry.act, key)
+      addOrMergeToMap(targetMap, act, key)
+      return
+    }
+
+    // Match por prefixo seguro (protege contra nomes truncados sem colidir ex: APS1 com APS10)
+    const p1 = findPrefixMatchInMap(f1Map, key)
+    if (p1) {
+      addOrMergeToMap(f1Map, act, p1)
+      return
+    }
+    const p2 = findPrefixMatchInMap(f2Map, key)
+    if (p2) {
+      addOrMergeToMap(f2Map, act, p2)
+      return
+    }
+    const p3 = findPrefixMatchInMap(f3Map, key)
+    if (p3) {
+      addOrMergeToMap(f3Map, act, p3)
+      return
+    }
+
+    // Se já temos fases autoritativas do progresso, só adicionamos atividade inédita se ela tiver nota lançada ou for Exame Final / Substitutiva
+    const hasGrade = act.nota !== null && act.nota !== "-"
+    const isExam = key.includes("exame") || key.includes("substitutiva")
+    if (!hasAuthoritativePhases || hasGrade || isExam) {
+      const phase = classifyActivityPhase(act.nome, sourcePhase || 1)
       if (phase === 1) addOrMergeToMap(f1Map, act)
       else if (phase === 2) addOrMergeToMap(f2Map, act)
       else addOrMergeToMap(f3Map, act)
@@ -232,7 +310,7 @@ export function GradeDetailDialog({
     }
   }
 
-  const renderActivityItem = (activity: Activity, idx: number, phaseNota: string) => {
+  const renderActivityItem = (activity: Activity, idx: number) => {
     const lowerStatus = activity.status.toLowerCase()
     const isConcluido = lowerStatus.includes("conclu") || lowerStatus.includes("feito") || lowerStatus.includes("realiz") || lowerStatus.includes("avaliad") || (activity.nota !== null && activity.nota !== "-")
     const isEval = isEvaluativeActivity(activity.nome)
@@ -284,12 +362,6 @@ export function GradeDetailDialog({
             <div className="flex flex-col items-end">
               <span className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-800 font-mono font-black text-sm shadow-2xs">
                 Nota: {activity.nota} {activity.notaMax ? `/ ${activity.notaMax}` : ""}
-              </span>
-            </div>
-          ) : isEval && isConcluido && phaseNota && phaseNota !== "-" && phaseNota !== "null" ? (
-            <div className="flex flex-col items-end">
-              <span className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 font-mono font-bold text-xs" title="Nota consolidada da etapa avaliativa">
-                Nota: {phaseNota}
               </span>
             </div>
           ) : (
@@ -362,7 +434,7 @@ export function GradeDetailDialog({
           </div>
         ) : (
           <div className="space-y-2.5 pt-1">
-            {activities.map((a, i) => renderActivityItem(a, i, nota))}
+            {activities.map((a, i) => renderActivityItem(a, i))}
           </div>
         )}
       </div>

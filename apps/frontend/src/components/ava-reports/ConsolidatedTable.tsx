@@ -156,6 +156,9 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     listaFase1?: string | null
     listaFase2?: string | null
     listaFase3?: string | null
+    notasListaFase1?: string | null
+    notasListaFase2?: string | null
+    notasListaFase3?: string | null
     listaNotas?: string | null
   }>({
     open: false,
@@ -174,10 +177,13 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
     fase2Prog: "",
     fase3Prog: "",
     progTotal: "",
-    listaFase1: null as string | null,
-    listaFase2: null as string | null,
-    listaFase3: null as string | null,
-    listaNotas: null as string | null | undefined,
+    listaFase1: null,
+    listaFase2: null,
+    listaFase3: null,
+    notasListaFase1: null,
+    notasListaFase2: null,
+    notasListaFase3: null,
+    listaNotas: null,
   })
 
   const handleCopy = (text: string, id: string) => {
@@ -232,10 +238,13 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
       fase2Prog: row.progressoFase2,
       fase3Prog: row.progressoFase3,
       progTotal: row.progressoTotal,
-      listaFase1: [row.progressoListaFase1, row.notasListaFase1, row.listaFase1].filter(Boolean).join("|"),
-      listaFase2: [row.progressoListaFase2, row.notasListaFase2, row.listaFase2].filter(Boolean).join("|"),
-      listaFase3: [row.progressoListaFase3, row.notasListaFase3, row.listaFase3].filter(Boolean).join("|"),
-      listaNotas: row.listaNotas,
+      listaFase1: row.progressoListaFase1 || row.listaFase1 || null,
+      listaFase2: row.progressoListaFase2 || row.listaFase2 || null,
+      listaFase3: row.progressoListaFase3 || row.listaFase3 || null,
+      notasListaFase1: row.notasListaFase1 || null,
+      notasListaFase2: row.notasListaFase2 || null,
+      notasListaFase3: row.notasListaFase3 || null,
+      listaNotas: row.listaNotas || null,
     })
   }
 
@@ -596,6 +605,9 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
         listaFase1={gradeDialogState.listaFase1}
         listaFase2={gradeDialogState.listaFase2}
         listaFase3={gradeDialogState.listaFase3}
+        notasListaFase1={gradeDialogState.notasListaFase1}
+        notasListaFase2={gradeDialogState.notasListaFase2}
+        notasListaFase3={gradeDialogState.notasListaFase3}
         listaNotas={gradeDialogState.listaNotas}
       />
     </>

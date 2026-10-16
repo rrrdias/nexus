@@ -58,6 +58,7 @@ export class AvaSyncService implements OnModuleInit {
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase2 text;
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_fase3 text;
         ALTER TABLE ava_grades_report ADD COLUMN IF NOT EXISTS lista_notas text;
+        ALTER TABLE ava_progress_report ADD COLUMN IF NOT EXISTS subcategoria text;
 
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_grades ON ava_grades_report ("sourceInstitution", user_id, course_id);
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_progress ON ava_progress_report ("sourceInstitution", aluno_id, curso);
@@ -78,6 +79,7 @@ export class AvaSyncService implements OnModuleInit {
           "email" text,
           "user_phone1" text,
           "periodo" text,
+          "subcategoria" text,
           "curso" text,
           "curso_perfil" text,
           "periodo_perfil" text,
@@ -103,6 +105,8 @@ export class AvaSyncService implements OnModuleInit {
           "lista_notas" text,
           "updatedAt" timestamp DEFAULT now() NOT NULL
         );
+
+        ALTER TABLE ava_consolidated_report ADD COLUMN IF NOT EXISTS subcategoria text;
 
         CREATE UNIQUE INDEX IF NOT EXISTS unq_ava_consolidated ON ava_consolidated_report ("sourceInstitution", aluno_id, curso);
         CREATE INDEX IF NOT EXISTS idx_ava_consolidated_inst_period ON ava_consolidated_report ("sourceInstitution", periodo);
@@ -155,6 +159,7 @@ export class AvaSyncService implements OnModuleInit {
           "email",
           "user_phone1",
           "periodo",
+          "subcategoria",
           "curso",
           "curso_perfil",
           "periodo_perfil",
@@ -190,6 +195,7 @@ export class AvaSyncService implements OnModuleInit {
           g.user_email,
           p.user_phone1,
           p.periodo,
+          p.subcategoria,
           p.curso,
           p.curso_perfil,
           p.periodo_perfil,
@@ -232,6 +238,7 @@ export class AvaSyncService implements OnModuleInit {
           "email" = EXCLUDED."email",
           "user_phone1" = EXCLUDED."user_phone1",
           "periodo" = EXCLUDED."periodo",
+          "subcategoria" = EXCLUDED."subcategoria",
           "curso_perfil" = EXCLUDED."curso_perfil",
           "periodo_perfil" = EXCLUDED."periodo_perfil",
           "unidade_fisica" = EXCLUDED."unidade_fisica",
@@ -749,10 +756,15 @@ export class AvaSyncService implements OnModuleInit {
               aluno: item.aluno,
               matricula: String(item.matricula || ''),
               userPhone1: item.user_phone1 || null,
-              periodo: item.periodo,
+              periodo: item.periodo || item.Periodo,
+              subcategoria:
+                item.subcategoria ||
+                item.Subcategoria ||
+                item.categoria ||
+                null,
               enrolmentStatus: item.enrolment_status,
               lastaccess: item.lastaccess,
-              curso: String(item.curso || ''),
+              curso: String(item.curso || item.Curso || ''),
               fase1: String(item.fase1 || ''),
               fase2: String(item.fase2 || ''),
               fase3: String(item.fase3 || ''),
@@ -793,6 +805,7 @@ export class AvaSyncService implements OnModuleInit {
                 matricula: sql`EXCLUDED."matricula"`,
                 userPhone1: sql`EXCLUDED."user_phone1"`,
                 periodo: sql`EXCLUDED."periodo"`,
+                subcategoria: sql`EXCLUDED."subcategoria"`,
                 enrolmentStatus: sql`EXCLUDED."enrolment_status"`,
                 lastaccess: sql`EXCLUDED."lastaccess"`,
                 fase1: sql`EXCLUDED."fase1"`,
