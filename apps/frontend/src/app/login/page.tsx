@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input"
 import { signIn } from "@/auth"
 import { AuthError } from "next-auth"
 import { redirect } from "next/navigation"
+import { BarChart3, CalendarCheck, GraduationCap } from "lucide-react"
 
 export default async function LoginPage({
   searchParams,
@@ -38,16 +39,50 @@ export default async function LoginPage({
         </div>
 
         {/* Texto Central */}
-        <div className="relative z-10 max-w-lg mt-[-10%]">
-          <div className="inline-block px-3 py-1 mb-6 rounded-full bg-white/5 border border-white/10 text-green-brand text-xs font-bold tracking-wider uppercase">
-            Plataforma Integrada
+        <div className="relative z-10 max-w-lg my-auto py-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 mb-6 rounded-full bg-white/5 border border-white/10 text-green-brand text-xs font-bold tracking-wider uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-brand animate-pulse" />
+            Sistemas Integrados Tecnologias Educacionais
           </div>
-          <h1 className="text-4xl lg:text-5xl font-extrabold text-white leading-tight tracking-tight mb-6">
-             Sistemas Integrados<br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-brand to-teal">Tecnologias Educacionais</span>
+          <h1 className="text-4xl lg:text-5xl font-extrabold text-white leading-tight tracking-tight mb-8">
+            Inteligência de Dados &<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-brand to-teal">
+              Soluções Educacionais
+            </span>
           </h1>
-          <p className="text-white/70 text-lg leading-relaxed">
-            Plataforma de Sistemas Integrados de Tecnologias Educacionais.
-          </p>
+
+          {/* Cards dos Módulos (Visual) */}
+          <div className="grid grid-cols-1 gap-2.5 max-w-md">
+            <div className="flex items-center gap-3.5 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm transition-all hover:border-green-brand/30 hover:bg-white/[0.06]">
+              <div className="w-9 h-9 rounded-lg bg-green-brand/10 border border-green-brand/20 flex items-center justify-center text-green-brand shrink-0">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-white tracking-tight">Relatórios AVA</h3>
+                <p className="text-xs text-white/50 truncate">Progresso e notas consolidadas em tempo real</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3.5 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm transition-all hover:border-teal/30 hover:bg-white/[0.06]">
+              <div className="w-9 h-9 rounded-lg bg-teal/10 border border-teal/20 flex items-center justify-center text-teal shrink-0">
+                <CalendarCheck className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-white tracking-tight">Agendamento</h3>
+                <p className="text-xs text-white/50 truncate">Gestão de polos, vagas e provas presenciais</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3.5 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-sm transition-all hover:border-blue/30 hover:bg-white/[0.06]">
+              <div className="w-9 h-9 rounded-lg bg-blue/10 border border-blue/20 flex items-center justify-center text-blue shrink-0">
+                <GraduationCap className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-white tracking-tight">Gestão Acadêmica</h3>
+                <p className="text-xs text-white/50 truncate">Integração Lyceum, turmas e controle de discentes</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Rodapé Esquerdo */}
