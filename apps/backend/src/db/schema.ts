@@ -24,6 +24,7 @@ export const users = pgTable(
     password: text('password'),
     isActive: boolean('isActive').default(true),
     userid: text('userid').unique(), // Ex: u2501234
+    lastLoginAt: timestamp('lastLoginAt', { mode: 'date' }),
   },
   (t) => [index('idx_user_is_active').on(t.isActive)],
 );
@@ -110,14 +111,22 @@ export const auditLogs = pgTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     userId: text('userId')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references(() => users.id, { onDelete: 'set null' }),
+    userEmail: text('userEmail'),
+    userName: text('userName'),
     action: text('action').notNull(),
+    category: text('category').default('SYSTEM').notNull(), // 'AUTH' | 'USERS' | 'GROUPS' | 'SCHEDULING' | 'AVA_SYNC' | 'SYSTEM'
+    status: text('status').default('SUCCESS').notNull(), // 'SUCCESS' | 'FAILURE' | 'WARNING'
     ipAddress: text('ipAddress'),
     userAgent: text('userAgent'),
+    details: text('details'),
     timestamp: timestamp('timestamp', { mode: 'date' }).defaultNow().notNull(),
   },
-  (t) => [index('idx_audit_log_user_timestamp').on(t.userId, t.timestamp)],
+  (t) => [
+    index('idx_audit_log_user_timestamp').on(t.userId, t.timestamp),
+    index('idx_audit_log_category').on(t.category),
+    index('idx_audit_log_timestamp').on(t.timestamp),
+  ],
 );
 
 // ==========================================

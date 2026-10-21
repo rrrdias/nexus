@@ -186,6 +186,30 @@ export function ConsolidatedFilters({
                 </select>
               </div>
 
+              {/* Curso / Graduação */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Curso / Graduação</label>
+                {uniqueCursos && uniqueCursos.length > 0 ? (
+                  <select
+                    value={filters.curso}
+                    onChange={(e) => setFilters(prev => ({ ...prev, curso: e.target.value }))}
+                    className="w-full text-xs rounded-lg border border-gray-2 bg-gray-50 p-2 text-gray-8 focus:outline-none focus:border-green-brand"
+                  >
+                    <option value="">Todos os Cursos</option>
+                    {uniqueCursos.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    placeholder="Filtrar por nome do curso..."
+                    value={filters.curso}
+                    onChange={(e) => setFilters(prev => ({ ...prev, curso: e.target.value }))}
+                    className="w-full text-xs rounded-lg border border-gray-2 bg-gray-50 p-2 text-gray-8 h-9"
+                  />
+                )}
+              </div>
+
               {/* Status de Matrícula */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Status da Matrícula</label>

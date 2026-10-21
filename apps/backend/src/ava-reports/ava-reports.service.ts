@@ -10,6 +10,7 @@ import { DB_CONNECTION } from '../db/db.provider';
 
 import {
   eq,
+  ne,
   ilike,
   and,
   inArray,
@@ -1011,7 +1012,16 @@ export class AvaReportsService {
         ilike(avaConsolidatedReport.usuario, `%${filters.usuario}%`),
       );
     if (filters.curso)
-      conditions.push(ilike(avaConsolidatedReport.curso, `%${filters.curso}%`));
+      conditions.push(
+        or(
+          ilike(avaConsolidatedReport.curso, `%${filters.curso}%`),
+          ilike(avaConsolidatedReport.cursoPerfil, `%${filters.curso}%`),
+        ),
+      );
+    if (filters.curso_perfil)
+      conditions.push(
+        ilike(avaConsolidatedReport.cursoPerfil, `%${filters.curso_perfil}%`),
+      );
     if (filters.unidade_fisica)
       conditions.push(
         ilike(
@@ -1042,6 +1052,7 @@ export class AvaReportsService {
           ilike(avaConsolidatedReport.matricula, s),
           ilike(avaConsolidatedReport.usuario, s),
           ilike(avaConsolidatedReport.curso, s),
+          ilike(avaConsolidatedReport.cursoPerfil, s),
         ),
       );
     }
@@ -1482,19 +1493,21 @@ export class AvaReportsService {
                   and(
                     eq(avaConsolidatedReport.sourceInstitution, institution),
                     isNotNull(avaConsolidatedReport.periodo),
+                    ne(avaConsolidatedReport.periodo, ''),
                   ),
                 )
                 .orderBy(desc(avaConsolidatedReport.periodo)),
               this.db
-                .selectDistinct({ value: avaConsolidatedReport.curso })
+                .selectDistinct({ value: avaConsolidatedReport.cursoPerfil })
                 .from(avaConsolidatedReport)
                 .where(
                   and(
                     eq(avaConsolidatedReport.sourceInstitution, institution),
-                    isNotNull(avaConsolidatedReport.curso),
+                    isNotNull(avaConsolidatedReport.cursoPerfil),
+                    ne(avaConsolidatedReport.cursoPerfil, ''),
                   ),
                 )
-                .orderBy(avaConsolidatedReport.curso),
+                .orderBy(avaConsolidatedReport.cursoPerfil),
               this.db
                 .selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
                 .from(avaConsolidatedReport)
@@ -1502,19 +1515,39 @@ export class AvaReportsService {
                   and(
                     eq(avaConsolidatedReport.sourceInstitution, institution),
                     isNotNull(avaConsolidatedReport.unidadeFisica),
+                    ne(avaConsolidatedReport.unidadeFisica, ''),
                   ),
                 )
                 .orderBy(avaConsolidatedReport.unidadeFisica),
             ],
           );
 
+          let cursosList = uniqueCursos
+            .map((c) => c.value)
+            .filter(Boolean) as string[];
+
+          if (cursosList.length === 0) {
+            const fallbackCursos = await this.db
+              .selectDistinct({ value: avaConsolidatedReport.curso })
+              .from(avaConsolidatedReport)
+              .where(
+                and(
+                  eq(avaConsolidatedReport.sourceInstitution, institution),
+                  isNotNull(avaConsolidatedReport.curso),
+                  ne(avaConsolidatedReport.curso, ''),
+                ),
+              )
+              .orderBy(avaConsolidatedReport.curso);
+            cursosList = fallbackCursos
+              .map((c) => c.value)
+              .filter(Boolean) as string[];
+          }
+
           return {
             periodos: uniquePeriodos
               .map((p) => p.value)
               .filter(Boolean) as string[],
-            cursos: uniqueCursos
-              .map((c) => c.value)
-              .filter(Boolean) as string[],
+            cursos: cursosList,
             polos: uniquePolos.map((u) => u.value).filter(Boolean) as string[],
           };
         },
@@ -1530,19 +1563,21 @@ export class AvaReportsService {
           and(
             eq(avaConsolidatedReport.sourceInstitution, institution),
             isNotNull(avaConsolidatedReport.periodo),
+            ne(avaConsolidatedReport.periodo, ''),
           ),
         )
         .orderBy(desc(avaConsolidatedReport.periodo)),
       this.db
-        .selectDistinct({ value: avaConsolidatedReport.curso })
+        .selectDistinct({ value: avaConsolidatedReport.cursoPerfil })
         .from(avaConsolidatedReport)
         .where(
           and(
             eq(avaConsolidatedReport.sourceInstitution, institution),
-            isNotNull(avaConsolidatedReport.curso),
+            isNotNull(avaConsolidatedReport.cursoPerfil),
+            ne(avaConsolidatedReport.cursoPerfil, ''),
           ),
         )
-        .orderBy(avaConsolidatedReport.curso),
+        .orderBy(avaConsolidatedReport.cursoPerfil),
       this.db
         .selectDistinct({ value: avaConsolidatedReport.unidadeFisica })
         .from(avaConsolidatedReport)
@@ -1550,14 +1585,36 @@ export class AvaReportsService {
           and(
             eq(avaConsolidatedReport.sourceInstitution, institution),
             isNotNull(avaConsolidatedReport.unidadeFisica),
+            ne(avaConsolidatedReport.unidadeFisica, ''),
           ),
         )
         .orderBy(avaConsolidatedReport.unidadeFisica),
     ]);
 
+    let cursosList = uniqueCursos
+      .map((c) => c.value)
+      .filter(Boolean) as string[];
+
+    if (cursosList.length === 0) {
+      const fallbackCursos = await this.db
+        .selectDistinct({ value: avaConsolidatedReport.curso })
+        .from(avaConsolidatedReport)
+        .where(
+          and(
+            eq(avaConsolidatedReport.sourceInstitution, institution),
+            isNotNull(avaConsolidatedReport.curso),
+            ne(avaConsolidatedReport.curso, ''),
+          ),
+        )
+        .orderBy(avaConsolidatedReport.curso);
+      cursosList = fallbackCursos
+        .map((c) => c.value)
+        .filter(Boolean) as string[];
+    }
+
     return {
       periodos: uniquePeriodos.map((p) => p.value).filter(Boolean) as string[],
-      cursos: uniqueCursos.map((c) => c.value).filter(Boolean) as string[],
+      cursos: cursosList,
       polos: uniquePolos.map((u) => u.value).filter(Boolean) as string[],
     };
   }

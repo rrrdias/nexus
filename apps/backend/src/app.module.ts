@@ -17,6 +17,7 @@ import { AcademicModule } from './academic/academic.module';
 import { JobsModule } from './jobs/jobs.module';
 import { HealthModule } from './health/health.module';
 import { CacheModule } from './cache/cache.module';
+import { AuditModule } from './audit/audit.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -36,6 +37,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     AcademicModule,
     JobsModule,
     HealthModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [

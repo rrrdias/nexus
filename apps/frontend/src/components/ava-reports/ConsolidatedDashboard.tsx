@@ -230,24 +230,26 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
             </CardHeader>
             <CardContent className="pt-2">
               <div className="flex items-center gap-3">
-                <div className="flex flex-col items-center justify-center shrink-0 w-20 h-20 bg-slate-50 border border-slate-200/80 rounded-2xl">
-                  <span className="text-2xl font-black text-navy font-mono leading-none">
-                    {total_records >= 1000 ? `${(total_records / 1000).toFixed(1)}k` : total_records}
+                <div className="flex flex-col items-center justify-center shrink-0 w-20 h-20 bg-slate-50 border border-slate-200/80 rounded-2xl shadow-2xs">
+                  <span className="text-[19px] font-black text-navy font-mono leading-none tracking-tight">
+                    {total_alunos_unicos.toLocaleString('pt-BR')}
                   </span>
-                  <span className="text-[7px] font-bold text-[#9AA0AC] uppercase mt-1 tracking-wider">MATRÍCULAS</span>
+                  <span className="text-[7.5px] font-extrabold text-[#9AA0AC] uppercase mt-1.5 tracking-wider">
+                    ALUNOS
+                  </span>
                 </div>
                 <div className="flex-1 space-y-1.5 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500 font-medium">Alunos Únicos:</span>
-                    <strong className="text-navy font-mono font-bold">{total_alunos_unicos.toLocaleString('pt-BR')}</strong>
+                    <span className="text-slate-500 font-medium">Matrículas Ativas:</span>
+                    <strong className="text-navy font-mono font-bold">{total_records.toLocaleString('pt-BR')}</strong>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 font-medium">Disciplinas:</span>
-                    <strong className="text-navy font-mono font-bold">{total_disciplinas}</strong>
+                    <strong className="text-navy font-mono font-bold">{total_disciplinas.toLocaleString('pt-BR')}</strong>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 font-medium">Sem Acesso:</span>
-                    <strong className="text-rose-600 font-mono font-bold">{no_access_count} ({percentNoAccess}%)</strong>
+                    <strong className="text-rose-600 font-mono font-bold">{no_access_count.toLocaleString('pt-BR')} ({percentNoAccess}%)</strong>
                   </div>
                 </div>
               </div>
@@ -255,7 +257,7 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
           </div>
           <div className="px-5 py-2 border-t border-slate-100 flex justify-between items-center bg-slate-50/50 text-[10px]">
             <span className="text-slate-400 font-semibold uppercase tracking-wider">Total Geral</span>
-            <span className="font-mono font-black text-navy">{total_records.toLocaleString('pt-BR')} registros</span>
+            <span className="font-mono font-black text-navy">{total_records.toLocaleString('pt-BR')} matrículas</span>
           </div>
         </Card>
 

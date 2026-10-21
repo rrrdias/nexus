@@ -17,6 +17,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { hashPassword } from './password.util';
 import { CacheService } from '../cache/cache.service';
 import { RbacGuard } from '../auth/rbac.guard';
+import { AuditService } from '../audit/audit.service';
 
 type SessionUser = {
   id?: string;
@@ -29,6 +30,7 @@ export class UsersService {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
     @Optional() private readonly cacheService?: CacheService,
+    @Optional() private readonly auditService?: AuditService,
   ) {}
 
   private assertSuperAdmin(user?: SessionUser) {
@@ -151,6 +153,19 @@ export class UsersService {
       }
     });
 
+    await this.auditService?.record({
+      userId: userSession.id,
+      action: 'USER_CREATED',
+      category: 'USERS',
+      status: 'SUCCESS',
+      details: {
+        targetName: name.trim(),
+        targetEmail: email.trim(),
+        targetUserid: userid?.trim() || null,
+        groupIds,
+      },
+    });
+
     return { success: true };
   }
 
@@ -194,6 +209,19 @@ export class UsersService {
     }
     RbacGuard.clearCache(userId);
 
+    await this.auditService?.record({
+      userId: userSession.id,
+      action: 'USER_UPDATED',
+      category: 'USERS',
+      status: 'SUCCESS',
+      details: {
+        targetUserId: userId,
+        targetName: name.trim(),
+        targetEmail: email.trim(),
+        isActive: updateData.isActive,
+      },
+    });
+
     return { success: true };
   }
 
@@ -210,6 +238,17 @@ export class UsersService {
     }
     RbacGuard.clearCache(userId);
 
+    await this.auditService?.record({
+      userId: userSession.id,
+      action: 'USER_STATUS_TOGGLED',
+      category: 'USERS',
+      status: 'SUCCESS',
+      details: {
+        targetUserId: userId,
+        isActive,
+      },
+    });
+
     return { success: true };
   }
 
@@ -221,6 +260,16 @@ export class UsersService {
       await this.cacheService.del(`rbac:user:${userId}:modules`);
     }
     RbacGuard.clearCache(userId);
+
+    await this.auditService?.record({
+      userId: userSession.id,
+      action: 'USER_DELETED',
+      category: 'USERS',
+      status: 'SUCCESS',
+      details: {
+        targetUserId: userId,
+      },
+    });
 
     return { success: true };
   }

@@ -1,19 +1,28 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject, Optional, UnauthorizedException } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { users, userGroups, groups } from '../db/schema';
 import { eq, or } from 'drizzle-orm';
 import { verifyPassword } from '../users/password.util';
 import { JwtService } from '@nestjs/jwt';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
     private jwtService: JwtService,
+    @Optional() private readonly auditService?: AuditService,
   ) {}
 
-  async login(login: string, pass: string) {
+  async login(
+    login: string,
+    pass: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ) {
+    const ipAddress = context?.ipAddress;
+    const userAgent = context?.userAgent;
+
     const userResult = await this.db
       .select()
       .from(users)
@@ -21,16 +30,47 @@ export class AuthService {
       .limit(1);
 
     if (userResult.length === 0) {
+      await this.auditService?.record({
+        userEmail: login,
+        action: 'LOGIN_FAILED',
+        category: 'AUTH',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        details: 'Usuário não encontrado',
+      });
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const user = userResult[0];
     const isMatch = await verifyPassword(pass, user.password as string);
     if (!isMatch) {
+      await this.auditService?.record({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: 'LOGIN_FAILED',
+        category: 'AUTH',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        details: 'Senha incorreta',
+      });
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
     if (!user.isActive) {
+      await this.auditService?.record({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: 'LOGIN_BLOCKED',
+        category: 'AUTH',
+        status: 'FAILURE',
+        ipAddress,
+        userAgent,
+        details: 'Tentativa de login com conta desativada',
+      });
       throw new UnauthorizedException('Usuário inativo');
     }
 
@@ -45,6 +85,21 @@ export class AuthService {
     );
 
     const groupNames = adminGroups.map((g) => g.group.name);
+
+    await this.auditService?.record({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      action: 'LOGIN',
+      category: 'AUTH',
+      status: 'SUCCESS',
+      ipAddress,
+      userAgent,
+      details: {
+        isSuperAdmin,
+        groups: groupNames,
+      },
+    });
 
     const payload = {
       sub: user.id,

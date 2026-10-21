@@ -29,16 +29,16 @@ export function getDefaultPeriod() {
 export function getAcademicPhaseDates() {
   return {
     fase1: {
-      inicio: parseDate(process.env.NEXUS_FASE1_START, '2026-02-13'),
-      fim: parseDate(process.env.NEXUS_FASE1_END, '2026-03-29'),
+      inicio: parseDate(process.env.NEXUS_FASE1_START, '2026-08-01'),
+      fim: parseDate(process.env.NEXUS_FASE1_END, '2026-09-23'),
     },
     fase2: {
-      inicio: parseDate(process.env.NEXUS_FASE2_START, '2026-03-30'),
-      fim: parseDate(process.env.NEXUS_FASE2_END, '2026-05-11'),
+      inicio: parseDate(process.env.NEXUS_FASE2_START, '2026-09-24'),
+      fim: parseDate(process.env.NEXUS_FASE2_END, '2026-11-01'),
     },
     fase3: {
-      inicio: parseDate(process.env.NEXUS_FASE3_START, '2026-05-12'),
-      fim: parseDate(process.env.NEXUS_FASE3_END, '2026-06-19'),
+      inicio: parseDate(process.env.NEXUS_FASE3_START, '2026-11-02'),
+      fim: parseDate(process.env.NEXUS_FASE3_END, '2026-12-19'),
     },
   };
 }
