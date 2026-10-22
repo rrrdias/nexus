@@ -716,23 +716,21 @@ export function StudentBookingWizard({
               </div>
             </div>
 
-            {/* Checkbox Termos */}
-            <div className="p-4 bg-emerald-50/50 border border-emerald-200/80 rounded-xl flex items-start gap-3">
+            {/* Checkbox Termos de Ciência */}
+            <label
+              htmlFor="terms"
+              className="p-4 sm:p-5 bg-emerald-50/70 hover:bg-emerald-50 border border-emerald-200/90 rounded-2xl flex items-start gap-3.5 cursor-pointer transition-colors shadow-sm"
+            >
               <Checkbox
                 id="terms"
                 checked={agreedTerms}
                 onCheckedChange={(checked) => setAgreedTerms(!!checked)}
-                className="mt-0.5 data-[state=checked]:bg-[#2DCE6C] data-[state=checked]:border-[#2DCE6C] data-[state=checked]:text-[#0A192F]"
+                className="mt-0.5 shrink-0 data-[state=checked]:bg-[#2DCE6C] data-[state=checked]:border-[#2DCE6C] data-[state=checked]:text-[#0A192F]"
               />
-              <Label
-                htmlFor="terms"
-                className="text-xs text-slate-700 leading-relaxed cursor-pointer font-normal"
-              >
-                Declaro que estou ciente das normas de aplicação de provas da{" "}
-                <strong>UniEVANGÉLICA</strong>, comprometendo-me a comparecer ao polo
-                com documento oficial original com foto e antecedência de 15 minutos.
-              </Label>
-            </div>
+              <span className="block text-xs sm:text-sm text-slate-700 leading-relaxed select-none">
+                Declaro que estou ciente das normas de realização das provas presenciais, comprometendo-me a comparecer ao polo com documento oficial original com foto e antecedência de 15 minutos.
+              </span>
+            </label>
 
             {/* Botões Voltar / Confirmar Reserva */}
             <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
