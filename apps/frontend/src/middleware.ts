@@ -7,8 +7,38 @@ export default auth((req) => {
 
   const isOnApiAuth = pathname.includes('/api/auth')
   const isOnLogin = pathname === '/login' || pathname === '/nexus/login' || pathname.endsWith('/login')
+  const isPublicRoute =
+    pathname.includes('/agendamento') ||
+    pathname.includes('/api/public') ||
+    pathname.includes('/loadingpage') ||
+    pathname.includes('/landingpage')
 
   if (isOnApiAuth) return
+
+  // Tratamento da rota pública de agendamento de provas com sessão de 30 minutos
+  if (isPublicRoute) {
+    if (pathname.includes('/agendamento')) {
+      const urlMat =
+        req.nextUrl.searchParams.get('matricula')?.trim() ||
+        req.nextUrl.searchParams.get('userid')?.trim()
+      const existingCookie = req.cookies.get('nexus_student_session')?.value?.trim()
+
+      const activeMatricula = urlMat || existingCookie
+
+      if (activeMatricula) {
+        const res = NextResponse.next()
+        res.cookies.set('nexus_student_session', activeMatricula, {
+          maxAge: 30 * 60, // 30 minutos em segundos (1800s)
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+        })
+        return res
+      }
+    }
+    return
+  }
 
   // Não autenticado tentando acessar rota protegida -> manda para /nexus/login
   if (!isLoggedIn && !isOnLogin) {

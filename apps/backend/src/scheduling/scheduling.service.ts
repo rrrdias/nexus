@@ -1,6 +1,7 @@
 import {
   Injectable,
   Inject,
+  Optional,
   BadRequestException,
   NotFoundException,
   UnauthorizedException,
@@ -9,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { getDefaultPeriod } from '../config/app-config';
+import { AuditService } from '../audit/audit.service';
 import {
   eq,
   ne,
@@ -112,6 +115,7 @@ function getNowInSaoPaulo(referenceDate: Date = new Date()): {
 export class SchedulingService implements OnModuleInit {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
+    @Optional() private readonly auditService?: AuditService,
   ) {}
 
   async onModuleInit() {
@@ -466,13 +470,13 @@ export class SchedulingService implements OnModuleInit {
     const trimmedMatricula = matricula.trim();
     const trimmedPeriodo = periodo.trim();
 
-    // 1. Try local AVA Progress Report table
+    // 1. Try local AVA Progress Report table (case-insensitive for matricula)
     const studentRecords = await this.db
       .select()
       .from(avaProgressReport)
       .where(
         and(
-          eq(avaProgressReport.matricula, trimmedMatricula),
+          ilike(avaProgressReport.matricula, trimmedMatricula),
           eq(avaProgressReport.periodo, trimmedPeriodo),
         ),
       );
@@ -510,12 +514,13 @@ export class SchedulingService implements OnModuleInit {
         );
       }
 
+      const canonicalMatricula = eadRecords[0].matricula || trimmedMatricula.toUpperCase();
       const studentName = eadRecords[0].aluno;
       const email = eadRecords[0].usuario;
       const phone = eadRecords[0].userPhone1;
 
       return {
-        matricula: trimmedMatricula,
+        matricula: canonicalMatricula,
         nome: studentName,
         email,
         telefone: phone,
@@ -532,9 +537,9 @@ export class SchedulingService implements OnModuleInit {
       .from(academicDiscente)
       .where(
         or(
-          eq(academicDiscente.matricula, trimmedMatricula),
-          eq(academicDiscente.usuario, trimmedMatricula),
-          eq(academicDiscente.id, trimmedMatricula),
+          ilike(academicDiscente.matricula, trimmedMatricula),
+          ilike(academicDiscente.usuario, trimmedMatricula),
+          ilike(academicDiscente.id, trimmedMatricula),
         ),
       )
       .limit(1);
@@ -629,7 +634,7 @@ export class SchedulingService implements OnModuleInit {
         .from(agendamentosMatricula)
         .where(
           and(
-            eq(agendamentosMatricula.matricula, matricula),
+            ilike(agendamentosMatricula.matricula, profile.matricula),
             eq(agendamentosMatricula.periodo, periodo),
             eq(agendamentosMatricula.status, 'ativo'),
             isNull(agendamentosMatricula.deletedAt),
@@ -1385,5 +1390,258 @@ export class SchedulingService implements OnModuleInit {
 
       return { success: true, imported, errors, total: rows.length };
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fluxo Público do Estudante (Sem necessidade de login com conta Nexus)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Obtém os dados completos do fluxo do estudante:
+   * - Perfil e elegibilidade (Graduação EaD, disciplinas regulares)
+   * - Agendamento ativo (caso já tenha agendado)
+   * - Lista de polos disponíveis para seleção
+   */
+  async getStudentFlow(matricula: string, periodo?: string) {
+    if (!matricula || !matricula.trim()) {
+      throw new BadRequestException('A matrícula é obrigatória.');
+    }
+    const trimmedMatricula = matricula.trim();
+    let targetPeriod = (periodo && periodo.trim()) || '';
+
+    // Se o período não foi explicitado na URL, tenta encontrar se o aluno possui disciplinas no período padrão (2026-2)
+    // ou no período mais recente com registros cadastrados
+    let profile: any;
+    if (!targetPeriod) {
+      const defaultPeriod = getDefaultPeriod();
+      try {
+        profile = await this.getStudentProfile(trimmedMatricula, defaultPeriod);
+        targetPeriod = defaultPeriod;
+      } catch (err: any) {
+        // Se der 404 no período padrão, busca se tem outro período com dados
+        const [recentPeriodRecord] = await this.db
+          .select({ periodo: avaProgressReport.periodo })
+          .from(avaProgressReport)
+          .where(ilike(avaProgressReport.matricula, trimmedMatricula))
+          .orderBy(desc(avaProgressReport.periodo))
+          .limit(1);
+
+        if (recentPeriodRecord?.periodo && recentPeriodRecord.periodo !== defaultPeriod) {
+          targetPeriod = recentPeriodRecord.periodo;
+          profile = await this.getStudentProfile(trimmedMatricula, targetPeriod);
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      profile = await this.getStudentProfile(trimmedMatricula, targetPeriod);
+    }
+
+    // Consulta se já possui agendamento ativo ou concluído no período
+    const activeBookings = await this.db
+      .select({
+        id: agendamentosMatricula.id,
+        matricula: agendamentosMatricula.matricula,
+        status: agendamentosMatricula.status,
+        descricao: agendamentosMatricula.descricao,
+        data: agendamentosMatricula.data,
+        periodo: agendamentosMatricula.periodo,
+        createdAt: agendamentosMatricula.createdAt,
+        opcaoId: opcaos.id,
+        hora: opcaos.hora,
+        opcaoData: opcaos.data,
+        localId: locals.id,
+        localNome: locals.nome,
+        localEndereco: locals.endereco,
+        localTelefone: locals.telefone,
+        linkLocal: locals.linkLocal,
+      })
+      .from(agendamentosMatricula)
+      .leftJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
+      .leftJoin(locals, eq(opcaos.localId, locals.id))
+      .where(
+        and(
+          ilike(agendamentosMatricula.matricula, profile.matricula),
+          eq(agendamentosMatricula.periodo, targetPeriod),
+          or(
+            eq(agendamentosMatricula.status, 'ativo'),
+            eq(agendamentosMatricula.status, 'concluido'),
+          ),
+          isNull(agendamentosMatricula.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    const activeBooking = activeBookings[0] || null;
+
+    // Polos ativos para seleção
+    const localsList = await this.listLocals(false);
+
+    return {
+      student: profile,
+      activeBooking,
+      locals: localsList,
+      periodo: targetPeriod,
+    };
+  }
+
+  /**
+   * Lista opções/horários com vagas disponíveis para um polo específico,
+   * excluindo datas passadas e horários já ultrapassados hoje no fuso de Brasília.
+   */
+  async getAvailableSlots(localId: string, periodo?: string) {
+    if (!localId) {
+      throw new BadRequestException('O local é obrigatório.');
+    }
+
+    const options = await this.db
+      .select({
+        id: opcaos.id,
+        localId: opcaos.localId,
+        localNome: locals.nome,
+        data: opcaos.data,
+        hora: opcaos.hora,
+        vagas: opcaos.vagas,
+        status: opcaos.status,
+      })
+      .from(opcaos)
+      .innerJoin(locals, eq(opcaos.localId, locals.id))
+      .where(
+        and(
+          eq(opcaos.localId, localId),
+          eq(opcaos.status, true),
+          sql`${opcaos.vagas} > 0`,
+        ),
+      )
+      .orderBy(opcaos.data, opcaos.hora);
+
+    const { dateStr: todayStr, currentMinutes } = getNowInSaoPaulo();
+
+    // Filtra horários futuros no fuso de Brasília
+    const availableSlots = options.filter((opt) => {
+      const optDateStr =
+        opt.data instanceof Date
+          ? opt.data.toISOString().slice(0, 10)
+          : String(opt.data).slice(0, 10);
+
+      if (optDateStr < todayStr) return false;
+      if (optDateStr === todayStr) {
+        const [optHour, optMin] = opt.hora.split(':').map(Number);
+        const optMinutes = optHour * 60 + (optMin || 0);
+        if (optMinutes <= currentMinutes) return false;
+      }
+      return true;
+    });
+
+    return availableSlots;
+  }
+
+  /**
+   * Cancelamento de agendamento pelo próprio aluno, liberando as vagas
+   */
+  async cancelStudentBooking(bookingId: string, matricula: string) {
+    const [booking] = await this.db
+      .select()
+      .from(agendamentosMatricula)
+      .where(eq(agendamentosMatricula.id, bookingId))
+      .limit(1);
+
+    if (!booking) {
+      throw new NotFoundException('Agendamento não encontrado.');
+    }
+
+    if (
+      booking.matricula.trim().toLowerCase() !== matricula.trim().toLowerCase()
+    ) {
+      throw new BadRequestException(
+        'Este agendamento não pertence à matrícula informada.',
+      );
+    }
+
+    if (booking.status === 'concluido' || booking.status === 'ausente') {
+      throw new BadRequestException(
+        'Agendamentos já concluídos ou com presença registrada não podem ser cancelados.',
+      );
+    }
+
+    const result = await this.cancelBooking(bookingId);
+
+    await this.auditService?.record({
+      action: 'EXAM_BOOKING_CANCELLED_BY_STUDENT',
+      category: 'SCHEDULING',
+      status: 'SUCCESS',
+      userEmail: matricula,
+      details: { bookingId, matricula },
+    });
+
+    return result;
+  }
+
+  /**
+   * Remarcação de agendamento pelo aluno (troca de polo, data ou horário)
+   */
+  async rescheduleStudentBooking(
+    bookingId: string,
+    matricula: string,
+    newOpcaoId: string,
+    periodo: string,
+  ) {
+    const [booking] = await this.db
+      .select()
+      .from(agendamentosMatricula)
+      .where(eq(agendamentosMatricula.id, bookingId))
+      .limit(1);
+
+    if (!booking) {
+      throw new NotFoundException('Agendamento não encontrado.');
+    }
+
+    if (
+      booking.matricula.trim().toLowerCase() !== matricula.trim().toLowerCase()
+    ) {
+      throw new BadRequestException(
+        'Este agendamento não pertence à matrícula informada.',
+      );
+    }
+
+    if (booking.status === 'concluido' || booking.status === 'ausente') {
+      throw new BadRequestException(
+        'Agendamentos já concluídos ou com presença registrada não podem ser alterados.',
+      );
+    }
+
+    // Libera a vaga do agendamento antigo
+    await this.cancelBooking(bookingId);
+
+    try {
+      // Reserva o novo horário
+      const newBooking = await this.createBooking({
+        opcaoId: newOpcaoId,
+        matricula,
+        periodo,
+      });
+
+      await this.auditService?.record({
+        action: 'EXAM_BOOKING_RESCHEDULED_BY_STUDENT',
+        category: 'SCHEDULING',
+        status: 'SUCCESS',
+        userEmail: matricula,
+        details: { oldBookingId: bookingId, newOpcaoId, matricula, periodo },
+      });
+
+      return newBooking;
+    } catch (err: any) {
+      // Em caso de falha no novo agendamento, restaura o agendamento anterior
+      try {
+        await this.createBooking({
+          opcaoId: booking.opcaoId,
+          matricula,
+          periodo,
+        });
+      } catch {
+        // Silencioso se não conseguir reverter
+      }
+      throw err;
+    }
   }
 }

@@ -51,12 +51,29 @@ const nextConfig: NextConfig = {
         basePath: false,
         permanent: false,
       },
+      {
+        source: "/agendamento",
+        destination: "/nexus/agendamento",
+        basePath: false,
+        permanent: false,
+      },
+      {
+        source: "/loadingpage",
+        destination: "/nexus/agendamento",
+        basePath: false,
+        permanent: false,
+      },
+      {
+        source: "/landingpage",
+        destination: "/nexus/agendamento",
+        basePath: false,
+        permanent: false,
+      },
     ];
   },
   experimental: {
     cpus: 2,
   },
 };
-
 
 export default nextConfig;

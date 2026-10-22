@@ -68,7 +68,7 @@ services:
       NEXUS_FASE2_END: 2026-11-01
       NEXUS_FASE3_START: 2026-11-02
       NEXUS_FASE3_END: 2026-12-19
-    command: sh -c "cd apps/backend && npx drizzle-kit push --force && node dist/main.js"
+    command: sh -c "cd apps/backend && (printf 'no\n' | npx drizzle-kit push || true) && node dist/main.js"
 
 
   frontend:
