@@ -230,10 +230,10 @@ export default async function AdminLogsPage(props: { searchParams: Promise<any> 
                       {/* Data / Hora */}
                       <td className="px-5 py-3.5 whitespace-nowrap">
                         <div className="font-semibold text-slate-800 text-xs">
-                          {logDate.toLocaleDateString("pt-BR")}
+                          {logDate.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                         </div>
                         <div className="font-mono text-[11px] text-slate-400">
-                          {logDate.toLocaleTimeString("pt-BR")}
+                          {logDate.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                         </div>
                       </td>
 

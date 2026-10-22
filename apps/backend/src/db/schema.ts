@@ -24,7 +24,7 @@ export const users = pgTable(
     password: text('password'),
     isActive: boolean('isActive').default(true),
     userid: text('userid').unique(), // Ex: u2501234
-    lastLoginAt: timestamp('lastLoginAt', { mode: 'date' }),
+    lastLoginAt: timestamp('lastLoginAt', { withTimezone: true, mode: 'date' }),
   },
   (t) => [index('idx_user_is_active').on(t.isActive)],
 );
@@ -120,7 +120,7 @@ export const auditLogs = pgTable(
     ipAddress: text('ipAddress'),
     userAgent: text('userAgent'),
     details: text('details'),
-    timestamp: timestamp('timestamp', { mode: 'date' }).defaultNow().notNull(),
+    timestamp: timestamp('timestamp', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
   },
   (t) => [
     index('idx_audit_log_user_timestamp').on(t.userId, t.timestamp),

@@ -24,6 +24,14 @@ export class AuditService implements OnModuleInit {
         ALTER TABLE "audit_log" ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'SUCCESS';
         ALTER TABLE "audit_log" ADD COLUMN IF NOT EXISTS "details" text;
         ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "lastLoginAt" timestamp;
+        DO $$ BEGIN
+          ALTER TABLE "audit_log" ALTER COLUMN "timestamp" TYPE timestamptz USING "timestamp" AT TIME ZONE 'UTC';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END $$;
+        DO $$ BEGIN
+          ALTER TABLE "user" ALTER COLUMN "lastLoginAt" TYPE timestamptz USING "lastLoginAt" AT TIME ZONE 'UTC';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END $$;
         CREATE INDEX IF NOT EXISTS "idx_audit_log_category" ON "audit_log" ("category");
         CREATE INDEX IF NOT EXISTS "idx_audit_log_timestamp" ON "audit_log" ("timestamp" DESC);
       `);
@@ -207,7 +215,11 @@ export class AuditService implements OnModuleInit {
     });
 
     return queryResult.data.map((l) => ({
-      Data: l.timestamp ? new Date(l.timestamp).toLocaleString('pt-BR') : '-',
+      Data: l.timestamp
+        ? new Date(l.timestamp).toLocaleString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+          })
+        : '-',
       Usuario: l.userName || 'Sistema / Anônimo',
       Email: l.userEmail || '-',
       Categoria: l.category,

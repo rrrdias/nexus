@@ -1,9 +1,10 @@
 # apps/frontend/Dockerfile
 FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat tzdata
+ENV TZ=America/Sao_Paulo
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy workspace package.json and lock files

@@ -98,7 +98,11 @@ export function AuditLogDetailDialog({ log }: AuditLogDetailDialogProps) {
                 <Clock className="w-3 h-3 text-slate-400" /> Data e Horário
               </span>
               <p className="text-slate-700 font-medium">
-                {log.timestamp ? new Date(log.timestamp).toLocaleString("pt-BR") : "-"}
+                {log.timestamp
+                  ? new Date(log.timestamp).toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                    })
+                  : "-"}
               </p>
             </div>
             <div>
