@@ -15,21 +15,29 @@ export async function getLocals(options: { todos?: boolean } = {}) {
 }
 
 export async function createLocal(data: { nome: string; endereco: string; linkLocal?: string; telefone?: string }) {
-  const res = await fetchFromApi('/api/scheduling/locals', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi('/api/scheduling/locals', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erro ao cadastrar polo." };
+  }
 }
 
 export async function updateLocal(id: string, data: Partial<{ nome: string; endereco: string; linkLocal: string; telefone: string; status: boolean }>) {
-  const res = await fetchFromApi(`/api/scheduling/locals/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi(`/api/scheduling/locals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erro ao atualizar polo." };
+  }
 }
 
 export async function getOptions(filters: { localId?: string; data?: string; apenasDisponiveis?: boolean; incluirInativos?: boolean } = {}) {
@@ -49,21 +57,29 @@ export async function getOptions(filters: { localId?: string; data?: string; ape
 }
 
 export async function createOption(data: { localId: string; data: string; horaInicio: string; horaFim: string; vagas: number }) {
-  const res = await fetchFromApi('/api/scheduling/options', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi('/api/scheduling/options', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erro ao criar horários e vagas." };
+  }
 }
 
 export async function updateOption(id: string, data: Partial<{ vagas: number; status: boolean }>) {
-  const res = await fetchFromApi(`/api/scheduling/options/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  });
-  revalidatePath("/admin/scheduling");
-  return res;
+  try {
+    const res = await fetchFromApi(`/api/scheduling/options/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    revalidatePath("/admin/scheduling");
+    return { success: true, data: res };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erro ao atualizar horário." };
+  }
 }
 
 export async function getStudentProfile(matricula: string, periodo: string) {

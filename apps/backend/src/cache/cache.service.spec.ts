@@ -59,4 +59,20 @@ describe('CacheService', () => {
     expect(res2).toEqual(['mod1', 'mod2']);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('should enforce LRU bounded capacity and evict least recently used items', async () => {
+    for (let i = 0; i < 500; i++) {
+      await service.set(`item:${i}`, { id: i });
+    }
+    expect(service.getMemoryCacheSize()).toBe(500);
+
+    const item0 = await service.get('item:0');
+    expect(item0).toEqual({ id: 0 });
+
+    await service.set('item:500', { id: 500 });
+    expect(service.getMemoryCacheSize()).toBe(500);
+
+    expect(await service.get('item:0')).toEqual({ id: 0 });
+    expect(await service.get('item:1')).toBeNull();
+  });
 });

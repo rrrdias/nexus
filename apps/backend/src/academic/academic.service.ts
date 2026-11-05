@@ -43,6 +43,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   private static readonly ACCESS_CACHE_TTL_MS = 60_000;
 
   private pool: sql.ConnectionPool | null = null;
+  private mssqlConfig: sql.config | null = null;
+  private isConnecting: boolean = false;
   private dbPrefix: string = '';
 
   // Track schema columns for dynamic search building
@@ -137,6 +139,44 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+
+  private async createAndConnectPool(): Promise<sql.ConnectionPool | null> {
+    if (!this.mssqlConfig) return null;
+    if (this.isConnecting) {
+      while (this.isConnecting) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return this.pool;
+    }
+
+    this.isConnecting = true;
+    try {
+      if (this.pool) {
+        try {
+          await this.pool.close();
+        } catch {
+          // ignore
+        }
+      }
+
+      const pool = new sql.ConnectionPool(this.mssqlConfig);
+      // Listener global de erro para evitar que desconexoes derrubem o processo Node.js
+      pool.on('error', (err) => {
+        console.error('[Lyceum DB Pool Error]:', err?.message || err);
+      });
+
+      await pool.connect();
+      console.log('[Lyceum DB] Connected to SQL Server successfully!');
+      this.pool = pool;
+      return pool;
+    } catch (err: any) {
+      console.error('[Lyceum DB] Connection failed:', err?.message || err);
+      return null;
+    } finally {
+      this.isConnecting = false;
+    }
+  }
+
   async onModuleInit() {
     // Load Prefix for Linked Server if configured
     this.dbPrefix = process.env.LYCEUM_DB_PREFIX || '';
@@ -165,7 +205,8 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     };
 
     try {
-      this.pool = await new sql.ConnectionPool(config).connect();
+      this.mssqlConfig = config;
+      this.pool = await this.createAndConnectPool();
       console.log('[Lyceum DB] Connected to SQL Server successfully!');
 
       // Load available views and columns dynamically
@@ -720,9 +761,24 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     return data;
   }
 
-  getSqlPool() {
-    if (!this.pool) throw new Error('Lyceum database not connected.');
+  getSqlPool(): sql.ConnectionPool {
+    if (!this.pool || !this.pool.connected) {
+      this.createAndConnectPool().catch(() => {});
+      throw new Error('Banco de dados Lyceum desconectado. Tentativa de reconexao iniciada.');
+    }
     return this.pool;
+  }
+
+  async getConnectedSqlPool(): Promise<sql.ConnectionPool> {
+    if (this.pool && this.pool.connected) {
+      return this.pool;
+    }
+    console.warn('[Lyceum DB] Pool desconectado. Tentando reconexao automatica com o Lyceum...');
+    const pool = await this.createAndConnectPool();
+    if (!pool || !pool.connected) {
+      throw new Error('Banco de dados Lyceum temporariamente indisponivel. Tente novamente em instantes.');
+    }
+    return pool;
   }
 
   getDbPrefix() {

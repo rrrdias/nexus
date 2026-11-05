@@ -87,7 +87,7 @@ describe('Auth & RBAC (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 
   it('GET /api/health - deve ser acessível publicamente sem token (200 OK)', async () => {
     const response = await request(app.getHttpServer())

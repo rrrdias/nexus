@@ -93,14 +93,20 @@ export function LocalsManagement({ initialLocals }: { initialLocals: any[] }) {
         telefone: telefone.trim() || undefined
       }
 
-      if (modalMode === "create") {
-        await createLocal(payload)
-        showToast("Polo criado com sucesso!", "success")
-      } else {
-        await updateLocal(selectedLocalId, payload)
-        showToast("Polo atualizado com sucesso!", "success")
-      }
-      setIsModalOpen(false)
+      let res: any;
+      if (modalMode === "create") {
+        res = await createLocal(payload)
+      } else {
+        res = await updateLocal(selectedLocalId, payload)
+      }
+
+      if (res && res.success === false) {
+        showToast(res.error || "Erro ao salvar polo.", "error")
+        return
+      }
+
+      showToast(modalMode === "create" ? "Polo criado com sucesso!" : "Polo atualizado com sucesso!", "success")
+      setIsModalOpen(false)
       refreshData()
     } catch (err: any) {
       showToast(err.message || "Erro ao salvar polo.", "error")
@@ -116,8 +122,12 @@ export function LocalsManagement({ initialLocals }: { initialLocals: any[] }) {
 
     setLoading(true)
     try {
-      await updateLocal(local.id, { status: !local.status })
-      showToast(`Polo ${local.status ? "desativado" : "ativado"} com sucesso!`, "success")
+      const res: any = await updateLocal(local.id, { status: !local.status })
+      if (res && res.success === false) {
+        showToast(res.error || "Erro ao alterar status do polo.", "error")
+        return
+      }
+      showToast(`Polo ${local.status ? "desativado" : "ativado"} com sucesso!`, "success")
       refreshData()
     } catch (err: any) {
       showToast(err.message || "Erro ao alterar status do polo.", "error")

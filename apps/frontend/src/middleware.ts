@@ -1,7 +1,11 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
+import {
+  createStudentSessionToken,
+  verifyStudentSessionToken,
+} from "@/lib/student-session"
 
-export default auth((req) => {
+export default auth(async (req) => {
   const isLoggedIn = !!req.auth
   const pathname = req.nextUrl.pathname
 
@@ -13,9 +17,18 @@ export default auth((req) => {
     pathname.includes('/loadingpage') ||
     pathname.includes('/landingpage')
 
+  // Ignora completamente recursos estáticos e internos do Next.js (CSS, JS, Fontes, Imagens)
+  if (
+    pathname.includes('/_next') ||
+    pathname.startsWith('/static') ||
+    /\.(css|js|map|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i.test(pathname)
+  ) {
+    return
+  }
+
   if (isOnApiAuth) return
 
-  // Tratamento da rota pública de agendamento de provas com sessão de 30 minutos
+  // Tratamento da rota pública de agendamento de provas com sessão segura HMAC de 30 minutos
   if (isPublicRoute) {
     if (pathname.includes('/agendamento')) {
       const urlMat =
@@ -23,11 +36,11 @@ export default auth((req) => {
         req.nextUrl.searchParams.get('userid')?.trim()
       const existingCookie = req.cookies.get('nexus_student_session')?.value?.trim()
 
-      const activeMatricula = urlMat || existingCookie
-
-      if (activeMatricula) {
+      if (urlMat) {
+        // Nova sessão iniciada ou alternada a partir da URL
+        const token = await createStudentSessionToken(urlMat)
         const res = NextResponse.next()
-        res.cookies.set('nexus_student_session', activeMatricula, {
+        res.cookies.set('nexus_student_session', token, {
           maxAge: 30 * 60, // 30 minutos em segundos (1800s)
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
@@ -35,6 +48,16 @@ export default auth((req) => {
           path: '/',
         })
         return res
+      }
+
+      if (existingCookie) {
+        const verifyRes = await verifyStudentSessionToken(existingCookie)
+        if (!verifyRes.valid) {
+          // Token inválido, adulterado ou expirado -> remove cookie
+          const res = NextResponse.next()
+          res.cookies.delete('nexus_student_session')
+          return res
+        }
       }
     }
     return

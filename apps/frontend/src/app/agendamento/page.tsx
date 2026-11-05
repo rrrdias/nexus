@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { cookies } from "next/headers"
 import { StudentSchedulingClient } from "./StudentSchedulingClient"
 import { RefreshCw } from "lucide-react"
+import { verifyStudentSessionToken } from "@/lib/student-session"
 
 export const metadata: Metadata = {
   title: "Agendamento de Provas Presenciais | UniEVANGÉLICA EaD",
@@ -37,8 +38,16 @@ export default async function AgendamentoPage({
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get("nexus_student_session")?.value
 
+  let cookieMatricula = ""
+  if (sessionCookie) {
+    const verification = await verifyStudentSessionToken(sessionCookie)
+    if (verification.valid && verification.matricula) {
+      cookieMatricula = verification.matricula
+    }
+  }
+
   const activeMatricula =
-    matricula?.trim() || userid?.trim() || sessionCookie?.trim() || ""
+    matricula?.trim() || userid?.trim() || cookieMatricula || ""
 
   return (
     <Suspense fallback={<LoadingFallback />}>

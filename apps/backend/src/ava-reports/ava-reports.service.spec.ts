@@ -20,7 +20,10 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
     };
 
     db = queryBuilder;
-    service = new AvaReportsService(db, { get: jest.fn(), set: jest.fn() } as any);
+    service = new AvaReportsService(db, {
+      get: jest.fn(),
+      set: jest.fn(),
+    } as any);
   });
 
   const superAdminUser = {

@@ -50,7 +50,7 @@ export function SlotsManagement({ locals }: { locals: any[] }) {
   const [selectedSlotId, setSelectedSlotId] = useState("")
   const [horaInicio, setHoraInicio] = useState("")
   const [horaFim, setHoraFim] = useState("")
-  const [vagas, setVagas] = useState(20)
+  const [vagas, setVagas] = useState<number | string>(20)
   const [submitting, setSubmitting] = useState(false)
 
   const showToast = (message: string, type: "success" | "error") => {
@@ -106,13 +106,14 @@ export function SlotsManagement({ locals }: { locals: any[] }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const vagasNum = vagas === "" ? NaN : Number(vagas)
     if (modalMode === "create") {
-      if (!horaInicio.trim() || !horaFim.trim() || vagas === undefined || vagas < 0) {
+      if (!horaInicio.trim() || !horaFim.trim() || isNaN(vagasNum) || vagasNum < 0) {
         showToast("Insira horários válidos e número de vagas maior ou igual a 0.", "error")
         return
       }
     } else {
-      if (vagas === undefined || vagas < 0) {
+      if (isNaN(vagasNum) || vagasNum < 0) {
         showToast("Insira um número de vagas maior ou igual a 0.", "error")
         return
       }
@@ -120,22 +121,28 @@ export function SlotsManagement({ locals }: { locals: any[] }) {
 
     setSubmitting(true)
     try {
-      if (modalMode === "create") {
-        await createOption({
-          localId: selectedLocal,
-          data: selectedDate,
-          horaInicio: horaInicio.trim(),
-          horaFim: horaFim.trim(),
-          vagas: Number(vagas)
-        })
-        showToast("Horário e vagas cadastrados com sucesso!", "success")
-      } else {
-        await updateOption(selectedSlotId, {
-          vagas: Number(vagas)
-        })
-        showToast("Vagas atualizadas com sucesso!", "success")
-      }
-      setIsModalOpen(false)
+      let res: any;
+      if (modalMode === "create") {
+        res = await createOption({
+          localId: selectedLocal,
+          data: selectedDate,
+          horaInicio: horaInicio.trim(),
+          horaFim: horaFim.trim(),
+          vagas: vagasNum
+        })
+      } else {
+        res = await updateOption(selectedSlotId, {
+          vagas: vagasNum
+        })
+      }
+
+      if (res && res.success === false) {
+        showToast(res.error || "Erro ao salvar horário.", "error")
+        return
+      }
+
+      showToast(modalMode === "create" ? "Horário e vagas cadastrados com sucesso!" : "Vagas atualizadas com sucesso!", "success")
+      setIsModalOpen(false)
       loadSlots()
     } catch (err: any) {
       showToast(err.message || "Erro ao salvar horário.", "error")
@@ -151,8 +158,12 @@ export function SlotsManagement({ locals }: { locals: any[] }) {
 
     setLoading(true)
     try {
-      await updateOption(slot.id, { status: !slot.status })
-      showToast(`Horário ${slot.status ? "desativado" : "ativado"} com sucesso!`, "success")
+      const res: any = await updateOption(slot.id, { status: !slot.status })
+      if (res && res.success === false) {
+        showToast(res.error || "Erro ao alterar status do horário.", "error")
+        return
+      }
+      showToast(`Horário ${slot.status ? "desativado" : "ativado"} com sucesso!`, "success")
       loadSlots()
     } catch (err: any) {
       showToast(err.message || "Erro ao alterar status do horário.", "error")
@@ -305,7 +316,15 @@ export function SlotsManagement({ locals }: { locals: any[] }) {
                       min="0"
                       placeholder="Ex: 20"
                       value={vagas}
-                      onChange={(e) => setVagas(Number(e.target.value))}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === "") {
+                          setVagas("")
+                        } else {
+                          const parsed = parseInt(val, 10)
+                          setVagas(isNaN(parsed) ? "" : parsed)
+                        }
+                      }}
                       required
                       className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
                     />

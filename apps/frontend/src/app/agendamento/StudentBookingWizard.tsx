@@ -74,6 +74,46 @@ export function StudentBookingWizard({
   onBookingCompleted,
 }: StudentBookingWizardProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
+
+  // Navegação sincronizada com a History API do navegador (para suporte ao botão voltar em smartphones)
+  const goToStep = (step: 1 | 2 | 3 | 4) => {
+    setCurrentStep(step)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      url.searchParams.set("step", String(step))
+      window.history.pushState({ step }, "", url.toString())
+    }
+  }
+
+  const handleBack = (targetStep: 1 | 2 | 3 | 4) => {
+    if (typeof window !== "undefined" && window.history.state?.step && window.history.state.step > targetStep) {
+      window.history.back()
+    } else {
+      goToStep(targetStep)
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    const initialStep = Number(params.get("step"))
+    if (!initialStep || initialStep === 1) {
+      const url = new URL(window.location.href)
+      url.searchParams.set("step", "1")
+      window.history.replaceState({ step: 1 }, "", url.toString())
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const targetStep = event.state?.step || Number(new URLSearchParams(window.location.search).get("step")) || 1
+      if (targetStep >= 1 && targetStep <= 4) {
+        setCurrentStep(targetStep as 1 | 2 | 3 | 4)
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
   const [selectedLocalId, setSelectedLocalId] = useState<string>("")
   const [slots, setSlots] = useState<AvailableSlot[]>([])
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false)
@@ -333,8 +373,8 @@ export function StudentBookingWizard({
             <div className="pt-2 flex justify-end">
               <Button
                 type="button"
-                onClick={() => setCurrentStep(2)}
-                className="bg-[#2DCE6C] hover:bg-[#22A857] text-[#0A192F] font-bold px-6 h-11 gap-2 shadow-md"
+                onClick={() => goToStep(2)}
+                className="bg-[#2DCE6C] hover:bg-[#22A857] text-[#0A192F] font-bold px-6 h-11 min-h-[44px] gap-2 shadow-md"
               >
                 Escolher Polo de Prova
                 <ArrowRight className="w-4 h-4" />
@@ -438,8 +478,8 @@ export function StudentBookingWizard({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setCurrentStep(1)}
-                className="gap-2 text-slate-600"
+                onClick={() => handleBack(1)}
+                className="gap-2 text-slate-600 min-h-[44px]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Voltar
@@ -448,8 +488,8 @@ export function StudentBookingWizard({
               <Button
                 type="button"
                 disabled={!selectedLocalId}
-                onClick={() => setCurrentStep(3)}
-                className="bg-[#2DCE6C] hover:bg-[#22A857] text-[#0A192F] font-bold px-6 h-11 gap-2 shadow-md"
+                onClick={() => goToStep(3)}
+                className="bg-[#2DCE6C] hover:bg-[#22A857] text-[#0A192F] font-bold px-6 h-11 min-h-[44px] gap-2 shadow-md"
               >
                 Escolher Data e Horário
                 <ArrowRight className="w-4 h-4" />
@@ -476,8 +516,8 @@ export function StudentBookingWizard({
               </div>
               <button
                 type="button"
-                onClick={() => setCurrentStep(2)}
-                className="text-emerald-700 hover:underline font-semibold"
+                onClick={() => goToStep(2)}
+                className="text-emerald-700 hover:underline font-semibold min-h-[44px] inline-flex items-center px-2"
               >
                 Alterar polo
               </button>
@@ -501,7 +541,7 @@ export function StudentBookingWizard({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setCurrentStep(2)}
+                    onClick={() => goToStep(2)}
                     className="border-amber-300 text-amber-900 hover:bg-amber-100"
                   >
                     Escolher Outro Polo
@@ -528,7 +568,7 @@ export function StudentBookingWizard({
                             setSelectedDate(dStr)
                             setSelectedSlotId("")
                           }}
-                          className={`px-4 py-2.5 rounded-xl border transition-all text-center min-w-[90px] ${
+                          className={`px-4 py-2.5 rounded-xl border transition-all text-center min-w-[90px] min-h-[48px] flex flex-col justify-center items-center ${
                             isSel
                               ? "bg-[#1C2B4A] text-white border-[#1C2B4A] shadow-md"
                               : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
@@ -569,7 +609,7 @@ export function StudentBookingWizard({
                             key={slot.id}
                             type="button"
                             onClick={() => setSelectedSlotId(slot.id)}
-                            className={`p-3.5 rounded-xl border text-left transition-all ${
+                            className={`p-3.5 rounded-xl border text-left transition-all min-h-[56px] min-w-[100px] flex flex-col justify-center ${
                               isSel
                                 ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/30 text-emerald-950 shadow-sm"
                                 : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
@@ -606,8 +646,8 @@ export function StudentBookingWizard({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setCurrentStep(2)}
-                className="gap-2 text-slate-600"
+                onClick={() => handleBack(2)}
+                className="gap-2 text-slate-600 min-h-[44px]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Voltar
@@ -616,8 +656,8 @@ export function StudentBookingWizard({
               <Button
                 type="button"
                 disabled={!selectedSlotId}
-                onClick={() => setCurrentStep(4)}
-                className="bg-[#2DCE6C] hover:bg-[#22A857] text-[#0A192F] font-bold px-6 h-11 gap-2 shadow-md"
+                onClick={() => goToStep(4)}
+                className="bg-[#2DCE6C] hover:bg-[#22A857] text-[#0A192F] font-bold px-6 h-11 min-h-[44px] gap-2 shadow-md"
               >
                 Avançar para Confirmação
                 <ArrowRight className="w-4 h-4" />
@@ -738,8 +778,8 @@ export function StudentBookingWizard({
                 type="button"
                 variant="outline"
                 disabled={submitting}
-                onClick={() => setCurrentStep(3)}
-                className="gap-2 text-slate-600"
+                onClick={() => handleBack(3)}
+                className="gap-2 text-slate-600 min-h-[44px]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Voltar

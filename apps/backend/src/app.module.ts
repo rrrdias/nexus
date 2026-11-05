@@ -1,4 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
@@ -18,6 +19,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { HealthModule } from './health/health.module';
 import { CacheModule } from './cache/cache.module';
 import { AuditModule } from './audit/audit.module';
+import { TutoriaModule } from './tutoria/tutoria.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -25,6 +27,13 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: 120,
+      },
+    ]),
     DbModule,
     CacheModule,
     AuthModule,
@@ -38,10 +47,15 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     JobsModule,
     HealthModule,
     AuditModule,
+    TutoriaModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

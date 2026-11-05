@@ -4,11 +4,14 @@ import {
   Post,
   Body,
   Query,
+  UseGuards,
   BadRequestException,
 } from '@nestjs/common';
 import { Public } from '../auth/public.decorator';
+import { Throttle } from '@nestjs/throttler';
 import { SchedulingService } from './scheduling.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { StudentSessionGuard } from './guards/student-session.guard';
 
 @Public()
 @Controller('api/public/scheduling')
@@ -18,7 +21,9 @@ export class PublicSchedulingController {
   /**
    * Endpoint público para o fluxo do estudante:
    * Retorna dados do aluno, elegibilidade, agendamento ativo e lista de polos.
+   * Protegido por StudentSessionGuard com validação de assinatura HMAC.
    */
+  @UseGuards(StudentSessionGuard)
   @Get('student-flow')
   async getStudentFlow(
     @Query('matricula') matricula?: string,
@@ -46,7 +51,9 @@ export class PublicSchedulingController {
 
   /**
    * Endpoint público para realizar a reserva de horário de prova.
+   * Protegido por StudentSessionGuard com validação de assinatura HMAC.
    */
+  @UseGuards(StudentSessionGuard)
   @Post('book')
   async createStudentBooking(@Body() dto: CreateBookingDto) {
     return this.schedulingService.createBooking(dto);
@@ -54,7 +61,9 @@ export class PublicSchedulingController {
 
   /**
    * Endpoint público para o aluno cancelar seu próprio agendamento ativo.
+   * Protegido por StudentSessionGuard com validação de assinatura HMAC.
    */
+  @UseGuards(StudentSessionGuard)
   @Post('cancel')
   async cancelStudentBooking(
     @Body() body: { bookingId: string; matricula: string },
@@ -70,7 +79,9 @@ export class PublicSchedulingController {
 
   /**
    * Endpoint público para o aluno remarcar (alterar) seu agendamento.
+   * Protegido por StudentSessionGuard com validação de assinatura HMAC.
    */
+  @UseGuards(StudentSessionGuard)
   @Post('reschedule')
   async rescheduleStudentBooking(
     @Body()

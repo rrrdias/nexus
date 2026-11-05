@@ -93,7 +93,7 @@ describe('Jobs & Async Sync (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 
   it('POST /api/academic/sync - deve enfileirar job de sincronização acadêmica', async () => {
     const token = jwtService.sign({

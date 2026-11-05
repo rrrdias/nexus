@@ -10,13 +10,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   StudentBooking,
   StudentProfile,
   LocalOption,
@@ -37,6 +30,7 @@ import {
   AlertCircle,
   X,
   CheckCircle,
+  ChevronDown,
 } from "lucide-react"
 
 interface RescheduleDialogProps {
@@ -195,7 +189,10 @@ export function RescheduleDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]"
+      >
         {/* Header */}
         <div className="bg-[#1C2B4A] text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -233,21 +230,26 @@ export function RescheduleDialog({
             <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">
               1. Selecione o Polo
             </Label>
-            <Select
-              value={selectedLocalId}
-              onValueChange={(val) => setSelectedLocalId(val || "")}
-            >
-              <SelectTrigger className="w-full bg-slate-50 border-slate-200 h-11 text-slate-800 font-medium">
-                <SelectValue placeholder="Selecione um polo" />
-              </SelectTrigger>
-              <SelectContent>
+            <div className="relative">
+              <select
+                id="select-polo-reschedule"
+                value={selectedLocalId}
+                onChange={(e) => setSelectedLocalId(e.target.value)}
+                className="w-full bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-xl h-11 px-3.5 pr-10 text-slate-800 text-sm font-semibold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none appearance-none cursor-pointer transition-colors"
+              >
+                <option value="" disabled>
+                  Selecione um polo
+                </option>
                 {locals.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id}>
+                  <option key={loc.id} value={loc.id} className="text-slate-800 py-1.5">
                     {loc.nome}
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-500">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
             {selectedLocal?.endereco && (
               <p className="text-xs text-slate-500 flex items-center gap-1.5 pt-1">
                 <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />

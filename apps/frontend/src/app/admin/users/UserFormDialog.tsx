@@ -75,15 +75,15 @@ export function UserFormDialog({
     selectedModules.forEach(id => formData.append("moduleIds", id))
 
     startTransition(async () => {
-      try {
-        if (mode === "create") {
-          await createUser(formData)
-        } else {
-          await updateUser(userId!, formData)
-        }
-        setOpen(false)
-      } catch (err: any) {
-        setError(err.message || "Erro ao salvar usuário.")
+      try {
+        const res = mode === "create" ? await createUser(formData) : await updateUser(userId!, formData)
+        if (res && !res.success) {
+          setError(res.error || "Erro ao salvar usuário.")
+          return
+        }
+        setOpen(false)
+      } catch (err: any) {
+        setError(err.message || "Erro ao salvar usuário.")
       }
     })
   }

@@ -94,7 +94,7 @@ describe('Observability & Health (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
-  });
+  }, 30000);
 
   it('GET /health - deve retornar status ok com verificação dos serviços (database, redis, lyceum)', async () => {
     const response = await request(app.getHttpServer())

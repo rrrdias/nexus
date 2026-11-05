@@ -1,6 +1,11 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
+import {
+  createStudentSessionToken,
+  verifyStudentSessionToken,
+} from "@/lib/student-session"
 
 export type ActionResult<T> =
   | { success: true; data: T }
@@ -109,15 +114,37 @@ export async function getPublicStudentFlow(
   periodo?: string
 ): Promise<ActionResult<StudentFlowData>> {
   try {
+    const normMat = matricula.trim().toUpperCase()
+    const cookieStore = await cookies()
+    const existingCookie = cookieStore.get("nexus_student_session")?.value
+
+    let sessionToken = existingCookie
+    const verification = await verifyStudentSessionToken(sessionToken, normMat)
+    if (!verification.valid) {
+      sessionToken = await createStudentSessionToken(normMat)
+      cookieStore.set("nexus_student_session", sessionToken, {
+        maxAge: 30 * 60,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      })
+    }
+
     const params = new URLSearchParams()
-    params.append("matricula", matricula.trim())
+    params.append("matricula", normMat)
     if (periodo && periodo.trim()) {
       params.append("periodo", periodo.trim())
     }
 
     const data = await fetchPublicApi<StudentFlowData>(
       `/api/public/scheduling/student-flow?${params.toString()}`,
-      { method: "GET" }
+      {
+        method: "GET",
+        headers: {
+          "X-Student-Session": sessionToken!,
+        },
+      }
     )
     return { success: true, data }
   } catch (err: any) {
@@ -164,9 +191,25 @@ export async function submitPublicBooking(data: {
   periodo: string
 }): Promise<ActionResult<any>> {
   try {
+    const normMat = data.matricula.trim().toUpperCase()
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get("nexus_student_session")?.value
+
+    const verification = await verifyStudentSessionToken(sessionToken, normMat)
+    if (!verification.valid) {
+      return {
+        success: false,
+        error:
+          "Sessão de agendamento inválida ou expirada. Recarregue a página informando sua matrícula.",
+      }
+    }
+
     const res = await fetchPublicApi("/api/public/scheduling/book", {
       method: "POST",
-      body: JSON.stringify(data),
+      headers: {
+        "X-Student-Session": sessionToken!,
+      },
+      body: JSON.stringify({ ...data, matricula: normMat }),
     })
     revalidatePath("/agendamento")
     revalidatePath("/nexus/agendamento")
@@ -187,9 +230,25 @@ export async function cancelPublicBooking(
   matricula: string
 ): Promise<ActionResult<any>> {
   try {
+    const normMat = matricula.trim().toUpperCase()
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get("nexus_student_session")?.value
+
+    const verification = await verifyStudentSessionToken(sessionToken, normMat)
+    if (!verification.valid) {
+      return {
+        success: false,
+        error:
+          "Sessão de agendamento inválida ou não autorizada para esta matrícula.",
+      }
+    }
+
     const res = await fetchPublicApi("/api/public/scheduling/cancel", {
       method: "POST",
-      body: JSON.stringify({ bookingId, matricula }),
+      headers: {
+        "X-Student-Session": sessionToken!,
+      },
+      body: JSON.stringify({ bookingId, matricula: normMat }),
     })
     revalidatePath("/agendamento")
     revalidatePath("/nexus/agendamento")
@@ -212,9 +271,25 @@ export async function reschedulePublicBooking(data: {
   periodo: string
 }): Promise<ActionResult<any>> {
   try {
+    const normMat = data.matricula.trim().toUpperCase()
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get("nexus_student_session")?.value
+
+    const verification = await verifyStudentSessionToken(sessionToken, normMat)
+    if (!verification.valid) {
+      return {
+        success: false,
+        error:
+          "Sessão de agendamento inválida ou não autorizada para esta matrícula.",
+      }
+    }
+
     const res = await fetchPublicApi("/api/public/scheduling/reschedule", {
       method: "POST",
-      body: JSON.stringify(data),
+      headers: {
+        "X-Student-Session": sessionToken!,
+      },
+      body: JSON.stringify({ ...data, matricula: normMat }),
     })
     revalidatePath("/agendamento")
     revalidatePath("/nexus/agendamento")

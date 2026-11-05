@@ -10,6 +10,7 @@ import { StudentLandingPage } from "./StudentLandingPage"
 import { StudentLoadingPage } from "./StudentLoadingPage"
 import { StudentActiveBookingCard } from "./StudentActiveBookingCard"
 import { StudentBookingWizard } from "./StudentBookingWizard"
+import { StudentConfirmationPage } from "./StudentConfirmationPage"
 import { Button } from "@/components/ui/button"
 import {
   AlertCircle,
@@ -40,45 +41,57 @@ export function StudentSchedulingClient({
   )
   const [isDataReady, setIsDataReady] = useState<boolean>(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<"landing" | "wizard" | "details">("landing")
+  const [isRescheduleSuccess, setIsRescheduleSuccess] = useState<boolean>(false)
+  const [viewMode, setViewMode] = useState<
+    "landing" | "wizard" | "details" | "confirmation"
+  >("landing")
 
   // Consulta o fluxo do estudante
-  const loadFlow = useCallback(async (mat: string) => {
-    if (!mat || !mat.trim()) {
-      setShowLoadingScreen(false)
-      setIsDataReady(true)
-      return
-    }
-
-    setShowLoadingScreen(true)
-    setIsDataReady(false)
-    setErrorMessage(null)
-
-    try {
-      const res = await getPublicStudentFlow(mat.trim())
-      if (!res.success) {
-        setFlowData(null)
-        setErrorMessage(res.error)
-      } else {
-        setFlowData(res.data)
-        setCurrentMatricula(res.data.student.matricula || mat.trim().toUpperCase())
+  const loadFlow = useCallback(
+    async (mat: string, isInitial: boolean = false) => {
+      if (!mat || !mat.trim()) {
+        setShowLoadingScreen(false)
+        setIsDataReady(true)
+        return
       }
-    } catch (err: any) {
-      console.error("[StudentSchedulingClient] Erro ao carregar dados:", err)
-      setFlowData(null)
-      setErrorMessage(
-        err?.message ||
-          "Não foi possível localizar as informações para a matrícula informada."
-      )
-    } finally {
-      setIsDataReady(true)
-    }
-  }, [])
+
+      if (isInitial) {
+        setShowLoadingScreen(true)
+        setIsDataReady(false)
+      }
+      setErrorMessage(null)
+
+      try {
+        const res = await getPublicStudentFlow(mat.trim())
+        if (!res.success) {
+          setFlowData(null)
+          setErrorMessage(res.error)
+        } else {
+          setFlowData(res.data)
+          setCurrentMatricula(
+            res.data.student.matricula || mat.trim().toUpperCase()
+          )
+        }
+      } catch (err: any) {
+        console.error("[StudentSchedulingClient] Erro ao carregar dados:", err)
+        setFlowData(null)
+        setErrorMessage(
+          err?.message ||
+            "Não foi possível localizar as informações para a matrícula informada."
+        )
+      } finally {
+        if (isInitial) {
+          setIsDataReady(true)
+        }
+      }
+    },
+    []
+  )
 
   // Auto-consulta com a matrícula recebida
   useEffect(() => {
     if (urlMatricula && urlMatricula.trim()) {
-      loadFlow(urlMatricula.trim())
+      loadFlow(urlMatricula.trim(), true)
     }
   }, [urlMatricula, loadFlow])
 
@@ -237,9 +250,10 @@ export function StudentSchedulingClient({
                   student={flowData.student}
                   locals={flowData.locals}
                   periodo={flowData.periodo}
-                  onBookingCompleted={() => {
-                    loadFlow(currentMatricula)
-                    setViewMode("landing")
+                  onBookingCompleted={async () => {
+                    setIsRescheduleSuccess(false)
+                    await loadFlow(currentMatricula, false)
+                    setViewMode("confirmation")
                   }}
                 />
               </div>
@@ -262,12 +276,29 @@ export function StudentSchedulingClient({
                   student={flowData.student}
                   booking={flowData.activeBooking}
                   locals={flowData.locals}
-                  onReload={() => {
-                    loadFlow(currentMatricula)
+                  onReload={async () => {
+                    await loadFlow(currentMatricula, false)
                     setViewMode("landing")
+                  }}
+                  onRescheduleSuccess={async () => {
+                    setIsRescheduleSuccess(true)
+                    await loadFlow(currentMatricula, false)
+                    setViewMode("confirmation")
                   }}
                 />
               </div>
+            )}
+
+            {/* MODO 4: CONFIRMAÇÃO DO AGENDAMENTO (INICIAL OU REMARCAÇÃO) */}
+            {viewMode === "confirmation" && flowData.activeBooking && (
+              <StudentConfirmationPage
+                student={flowData.student}
+                booking={flowData.activeBooking}
+                locals={flowData.locals}
+                isReschedule={isRescheduleSuccess}
+                onViewBooking={() => setViewMode("details")}
+                onGoHome={() => setViewMode("landing")}
+              />
             )}
           </div>
         )}

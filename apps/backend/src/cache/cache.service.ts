@@ -16,6 +16,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
   private redisClient: Redis | null = null;
   private readonly memoryCache = new Map<string, MemoryCacheEntry>();
+  private readonly maxMemoryItems = 500;
   private isRedisAvailable = false;
 
   onModuleInit() {
@@ -104,6 +105,10 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       return null;
     }
 
+    // Atualiza a posição no LRU em caso de hit
+    this.memoryCache.delete(key);
+    this.memoryCache.set(key, entry);
+
     try {
       return JSON.parse(entry.value) as T;
     } catch {
@@ -129,20 +134,33 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    // Fallback em memória
+    // Fallback em memória com controle de limite estrito LRU
     const expiresAt =
       ttlSeconds && ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : null;
-    this.memoryCache.set(key, { value: stringified, expiresAt });
 
-    // Limpeza periódica se o mapa em memória crescer
-    if (this.memoryCache.size > 2000) {
+    if (this.memoryCache.has(key)) {
+      this.memoryCache.delete(key);
+    } else if (this.memoryCache.size >= this.maxMemoryItems) {
+      // 1. Limpa entradas expiradas primeiro
       const now = Date.now();
       for (const [k, v] of this.memoryCache.entries()) {
         if (v.expiresAt && now > v.expiresAt) {
           this.memoryCache.delete(k);
         }
       }
+
+      // 2. Despeja o item menos recentemente usado se ainda no limite
+      while (this.memoryCache.size >= this.maxMemoryItems) {
+        const oldestKey = this.memoryCache.keys().next().value;
+        if (oldestKey) {
+          this.memoryCache.delete(oldestKey);
+        } else {
+          break;
+        }
+      }
     }
+
+    this.memoryCache.set(key, { value: stringified, expiresAt });
   }
 
   async del(keyOrKeys: string | string[]): Promise<void> {
@@ -199,5 +217,9 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
 
     return fresh;
+  }
+
+  getMemoryCacheSize(): number {
+    return this.memoryCache.size;
   }
 }

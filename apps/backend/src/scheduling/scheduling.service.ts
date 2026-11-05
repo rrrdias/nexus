@@ -97,7 +97,8 @@ function getNowInSaoPaulo(referenceDate: Date = new Date()): {
   });
 
   const parts = formatter.formatToParts(referenceDate);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value || '00';
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value || '00';
   const year = get('year');
   const month = get('month');
   const day = get('day');
@@ -434,10 +435,7 @@ export class SchedulingService implements OnModuleInit {
     cursoNome?: string | null;
     nomeUnidadeFisica?: string | null;
   }): boolean {
-    if (
-      discente.cursoInstituicao &&
-      discente.cursoInstituicao.trim() !== ''
-    ) {
+    if (discente.cursoInstituicao && discente.cursoInstituicao.trim() !== '') {
       const normInst = discente.cursoInstituicao
         .trim()
         .normalize('NFD')
@@ -514,7 +512,8 @@ export class SchedulingService implements OnModuleInit {
         );
       }
 
-      const canonicalMatricula = eadRecords[0].matricula || trimmedMatricula.toUpperCase();
+      const canonicalMatricula =
+        eadRecords[0].matricula || trimmedMatricula.toUpperCase();
       const studentName = eadRecords[0].aluno;
       const email = eadRecords[0].usuario;
       const phone = eadRecords[0].userPhone1;
@@ -648,12 +647,12 @@ export class SchedulingService implements OnModuleInit {
         );
       }
 
-      // Fetch base slot and Lock it
+      // Fetch base slot metadata without premature lock to prevent circular wait deadlocks
       const [opcao] = await tx
         .select()
         .from(opcaos)
         .where(eq(opcaos.id, opcaoId))
-        .for('update');
+        .limit(1);
 
       if (!opcao)
         throw new NotFoundException('Horário base selecionado não encontrado.');
@@ -663,11 +662,14 @@ export class SchedulingService implements OnModuleInit {
       // Validate that booking is not in the past for today or earlier dates in Brazil timezone (America/Sao_Paulo)
       const timeStr = opcao.hora.slice(0, 5); // Format HH:MM
       const { dateStr: todayStr, currentMinutes } = getNowInSaoPaulo();
-      const slotDate = opcao.data instanceof Date ? opcao.data : new Date(opcao.data);
+      const slotDate =
+        opcao.data instanceof Date ? opcao.data : new Date(opcao.data);
       const slotDateStr = `${slotDate.getUTCFullYear()}-${String(slotDate.getUTCMonth() + 1).padStart(2, '0')}-${String(slotDate.getUTCDate()).padStart(2, '0')}`;
 
       if (slotDateStr < todayStr) {
-        throw new BadRequestException('Não é permitido agendar provas para datas passadas.');
+        throw new BadRequestException(
+          'Não é permitido agendar provas para datas passadas.',
+        );
       }
       if (slotDateStr === todayStr) {
         const slotMinutes = parseTimeToMinutes(timeStr);
@@ -681,7 +683,7 @@ export class SchedulingService implements OnModuleInit {
       // Calculate required consecutive slots (HH:MM)
       const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) => {
         const startMin = parseTimeToMinutes(timeStr);
-        const totalMin = ((startMin! + i * 30) % 1440 + 1440) % 1440;
+        const totalMin = (((startMin! + i * 30) % 1440) + 1440) % 1440;
         const h = Math.floor(totalMin / 60);
         const m = totalMin % 60;
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -786,8 +788,12 @@ export class SchedulingService implements OnModuleInit {
         const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) =>
           getNextTimeStr(timeStr, i),
         );
+        const allPossibleTimes = [
+          ...requiredTimes,
+          ...requiredTimes.map((t) => t.slice(0, 5)),
+        ];
 
-        // Fetch and Lock all matching slots
+        // Fetch and Lock all matching slots (supporting both HH:MM:00 and HH:MM formats)
         const slots = await tx
           .select()
           .from(opcaos)
@@ -795,7 +801,7 @@ export class SchedulingService implements OnModuleInit {
             and(
               eq(opcaos.localId, opcao.localId),
               eq(opcaos.data, opcao.data),
-              inArray(opcaos.hora, requiredTimes),
+              inArray(opcaos.hora, allPossibleTimes),
             ),
           )
           .orderBy(opcaos.hora)
@@ -1426,9 +1432,15 @@ export class SchedulingService implements OnModuleInit {
           .orderBy(desc(avaProgressReport.periodo))
           .limit(1);
 
-        if (recentPeriodRecord?.periodo && recentPeriodRecord.periodo !== defaultPeriod) {
+        if (
+          recentPeriodRecord?.periodo &&
+          recentPeriodRecord.periodo !== defaultPeriod
+        ) {
           targetPeriod = recentPeriodRecord.periodo;
-          profile = await this.getStudentProfile(trimmedMatricula, targetPeriod);
+          profile = await this.getStudentProfile(
+            trimmedMatricula,
+            targetPeriod,
+          );
         } else {
           throw err;
         }
@@ -1578,7 +1590,7 @@ export class SchedulingService implements OnModuleInit {
   }
 
   /**
-   * Remarcação de agendamento pelo aluno (troca de polo, data ou horário)
+   * Remarcação de agendamento pelo aluno de forma 100% atômica dentro de uma única transação Drizzle
    */
   async rescheduleStudentBooking(
     bookingId: string,
@@ -1586,40 +1598,205 @@ export class SchedulingService implements OnModuleInit {
     newOpcaoId: string,
     periodo: string,
   ) {
-    const [booking] = await this.db
-      .select()
-      .from(agendamentosMatricula)
-      .where(eq(agendamentosMatricula.id, bookingId))
-      .limit(1);
+    return this.db.transaction(async (tx) => {
+      // 1. Lock do agendamento atual com FOR UPDATE
+      const [booking] = await tx
+        .select()
+        .from(agendamentosMatricula)
+        .where(eq(agendamentosMatricula.id, bookingId))
+        .for('update');
 
-    if (!booking) {
-      throw new NotFoundException('Agendamento não encontrado.');
-    }
+      if (!booking) {
+        throw new NotFoundException('Agendamento não encontrado.');
+      }
 
-    if (
-      booking.matricula.trim().toLowerCase() !== matricula.trim().toLowerCase()
-    ) {
-      throw new BadRequestException(
-        'Este agendamento não pertence à matrícula informada.',
+      if (
+        booking.matricula.trim().toLowerCase() !== matricula.trim().toLowerCase()
+      ) {
+        throw new BadRequestException(
+          'Este agendamento não pertence à matrícula informada.',
+        );
+      }
+
+      if (booking.status === 'concluido' || booking.status === 'ausente') {
+        throw new BadRequestException(
+          'Agendamentos já concluídos ou com presença registrada não podem ser alterados.',
+        );
+      }
+
+      if (booking.status === 'cancelado') {
+        throw new BadRequestException(
+          'Este agendamento já está cancelado e não pode ser remarcado.',
+        );
+      }
+
+      if (booking.opcaoId === newOpcaoId) {
+        throw new BadRequestException(
+          'O novo horário selecionado é idêntico ao horário atualmente agendado.',
+        );
+      }
+
+      // 2. Consulta perfil do aluno e disciplinas regulares
+      const profile = await this.getStudentProfile(matricula, periodo);
+      const totalDisciplines = profile.disciplinas.length;
+      if (totalDisciplines === 0) {
+        throw new BadRequestException(
+          'Nenhuma disciplina regular encontrada para a matrícula informada.',
+        );
+      }
+
+      // 3. Consulta metadados do novo horário base
+      const [newOpcao] = await tx
+        .select()
+        .from(opcaos)
+        .where(eq(opcaos.id, newOpcaoId))
+        .limit(1);
+
+      if (!newOpcao) {
+        throw new NotFoundException('Novo horário selecionado não encontrado.');
+      }
+      if (!newOpcao.status) {
+        throw new BadRequestException(
+          'O novo horário selecionado está desativado.',
+        );
+      }
+
+      // 4. Validação de data e horário futuro
+      const newTimeStr = newOpcao.hora.slice(0, 5);
+      const { dateStr: todayStr, currentMinutes } = getNowInSaoPaulo();
+      const slotDate =
+        newOpcao.data instanceof Date ? newOpcao.data : new Date(newOpcao.data);
+      const slotDateStr = `${slotDate.getUTCFullYear()}-${String(slotDate.getUTCMonth() + 1).padStart(2, '0')}-${String(slotDate.getUTCDate()).padStart(2, '0')}`;
+
+      if (slotDateStr < todayStr) {
+        throw new BadRequestException(
+          'Não é permitido agendar provas para datas passadas.',
+        );
+      }
+      if (slotDateStr === todayStr) {
+        const slotMinutes = parseTimeToMinutes(newTimeStr);
+        if (slotMinutes !== null && slotMinutes <= currentMinutes) {
+          throw new BadRequestException(
+            `O horário ${newTimeStr} já passou para o dia de hoje. Selecione um horário futuro.`,
+          );
+        }
+      }
+
+      // 5. Cálculo dos horários consecutivos para o novo agendamento
+      const newRequiredTimes = Array.from(
+        { length: totalDisciplines },
+        (_, i) => {
+          const startMin = parseTimeToMinutes(newTimeStr);
+          const totalMin = (((startMin! + i * 30) % 1440) + 1440) % 1440;
+          const h = Math.floor(totalMin / 60);
+          const m = totalMin % 60;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        },
       );
-    }
+      const newAllPossibleTimes = [
+        ...newRequiredTimes,
+        ...newRequiredTimes.map((t) => `${t}:00`),
+      ];
 
-    if (booking.status === 'concluido' || booking.status === 'ausente') {
-      throw new BadRequestException(
-        'Agendamentos já concluídos ou com presença registrada não podem ser alterados.',
-      );
-    }
+      // 6. Lock ordenado dos novos slots necessários com FOR UPDATE
+      const newSlots = await tx
+        .select()
+        .from(opcaos)
+        .where(
+          and(
+            eq(opcaos.localId, newOpcao.localId),
+            eq(opcaos.data, newOpcao.data),
+            inArray(opcaos.hora, newAllPossibleTimes),
+            eq(opcaos.status, true),
+          ),
+        )
+        .orderBy(opcaos.hora)
+        .for('update');
 
-    // Libera a vaga do agendamento antigo
-    await this.cancelBooking(bookingId);
+      const newTimeMap = new Map<string, typeof newOpcao>();
+      for (const slot of newSlots) {
+        newTimeMap.set(slot.hora.slice(0, 5), slot);
+      }
 
-    try {
-      // Reserva o novo horário
-      const newBooking = await this.createBooking({
-        opcaoId: newOpcaoId,
-        matricula,
-        periodo,
-      });
+      for (const reqTime of newRequiredTimes) {
+        const slot = newTimeMap.get(reqTime);
+        if (!slot) {
+          throw new BadRequestException(
+            `Não há horários consecutivos suficientes disponíveis no novo polo a partir de ${newTimeStr} para todas as ${totalDisciplines} disciplinas. Falta o horário ${reqTime}.`,
+          );
+        }
+        if (slot.vagas <= 0) {
+          throw new BadRequestException(
+            `O horário ${reqTime} no novo polo já está com as vagas esgotadas.`,
+          );
+        }
+      }
+
+      // 7. Liberar vagas dos slots do agendamento anterior
+      const [oldOpcao] = await tx
+        .select()
+        .from(opcaos)
+        .where(eq(opcaos.id, booking.opcaoId))
+        .limit(1);
+
+      if (oldOpcao) {
+        const oldDisciplines = (booking.descricao || '')
+          .split(';')
+          .filter(Boolean);
+        const oldDisciplinesCount =
+          oldDisciplines.length > 0 ? oldDisciplines.length : totalDisciplines;
+        const oldTimeStr = oldOpcao.hora.slice(0, 5);
+        const oldRequiredTimes = Array.from(
+          { length: oldDisciplinesCount },
+          (_, i) => getNextTimeStr(oldTimeStr, i),
+        );
+        const oldAllPossibleTimes = [
+          ...oldRequiredTimes,
+          ...oldRequiredTimes.map((t) => t.slice(0, 5)),
+        ];
+
+        const oldSlots = await tx
+          .select()
+          .from(opcaos)
+          .where(
+            and(
+              eq(opcaos.localId, oldOpcao.localId),
+              eq(opcaos.data, oldOpcao.data),
+              inArray(opcaos.hora, oldAllPossibleTimes),
+            ),
+          )
+          .orderBy(opcaos.hora)
+          .for('update');
+
+        for (const slot of oldSlots) {
+          await tx
+            .update(opcaos)
+            .set({ vagas: slot.vagas + 1, updatedAt: new Date() })
+            .where(eq(opcaos.id, slot.id));
+        }
+      }
+
+      // 8. Decrementar vagas dos novos slots
+      for (const reqTime of newRequiredTimes) {
+        const slot = newTimeMap.get(reqTime)!;
+        await tx
+          .update(opcaos)
+          .set({ vagas: slot.vagas - 1, updatedAt: new Date() })
+          .where(eq(opcaos.id, slot.id));
+      }
+
+      // 9. Atualizar agendamento in-place
+      const [updatedBooking] = await tx
+        .update(agendamentosMatricula)
+        .set({
+          opcaoId: newOpcaoId,
+          data: newOpcao.data,
+          descricao: profile.disciplinas.join(';'),
+          status: 'ativo',
+          updatedAt: new Date(),
+        })
+        .where(eq(agendamentosMatricula.id, booking.id))
+        .returning();
 
       await this.auditService?.record({
         action: 'EXAM_BOOKING_RESCHEDULED_BY_STUDENT',
@@ -1629,19 +1806,11 @@ export class SchedulingService implements OnModuleInit {
         details: { oldBookingId: bookingId, newOpcaoId, matricula, periodo },
       });
 
-      return newBooking;
-    } catch (err: any) {
-      // Em caso de falha no novo agendamento, restaura o agendamento anterior
-      try {
-        await this.createBooking({
-          opcaoId: booking.opcaoId,
-          matricula,
-          periodo,
-        });
-      } catch {
-        // Silencioso se não conseguir reverter
-      }
-      throw err;
-    }
+      return {
+        ...updatedBooking,
+        studentName: profile.nome,
+        disciplines: profile.disciplinas,
+      };
+    });
   }
 }

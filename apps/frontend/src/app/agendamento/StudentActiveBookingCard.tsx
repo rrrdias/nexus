@@ -49,6 +49,7 @@ interface StudentActiveBookingCardProps {
   booking: StudentBooking
   locals: LocalOption[]
   onReload: () => void
+  onRescheduleSuccess?: () => void
 }
 
 function formatDatePtBr(dateVal: string | Date): string {
@@ -69,6 +70,7 @@ export function StudentActiveBookingCard({
   booking,
   locals,
   onReload,
+  onRescheduleSuccess,
 }: StudentActiveBookingCardProps) {
   const [isVoucherOpen, setIsVoucherOpen] = useState(false)
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
@@ -82,7 +84,6 @@ export function StudentActiveBookingCard({
     ? booking.disciplinasSnapshot
     : student.disciplinas || []
   const horaFim = getExamEndTime(horaInicio, disciplinas.length)
-  const protocolo = booking.protocolo || booking.id.slice(0, 8).toUpperCase()
   const isOnlinePolo = booking.localNome.toLowerCase().includes("belo horizonte")
 
   const handleCancel = async () => {
@@ -120,9 +121,6 @@ export function StudentActiveBookingCard({
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs uppercase font-extrabold tracking-wider px-2 py-0.5 rounded-full bg-[#2DCE6C]/20 text-[#2DCE6C] border border-[#2DCE6C]/30">
                     Agendamento Ativo
-                  </span>
-                  <span className="text-xs text-slate-300 font-mono">
-                    Protocolo #{protocolo}
                   </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-white mt-1">
@@ -321,7 +319,14 @@ export function StudentActiveBookingCard({
         student={student}
         booking={booking}
         locals={locals}
-        onSuccess={onReload}
+        onSuccess={() => {
+          setIsRescheduleOpen(false)
+          if (onRescheduleSuccess) {
+            onRescheduleSuccess()
+          } else {
+            onReload()
+          }
+        }}
       />
 
       {/* Confirmação de Cancelamento */}

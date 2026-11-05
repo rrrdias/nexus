@@ -110,8 +110,7 @@ export const auditLogs = pgTable(
     id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    userId: text('userId')
-      .references(() => users.id, { onDelete: 'set null' }),
+    userId: text('userId').references(() => users.id, { onDelete: 'set null' }),
     userEmail: text('userEmail'),
     userName: text('userName'),
     action: text('action').notNull(),
@@ -120,7 +119,9 @@ export const auditLogs = pgTable(
     ipAddress: text('ipAddress'),
     userAgent: text('userAgent'),
     details: text('details'),
-    timestamp: timestamp('timestamp', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+    timestamp: timestamp('timestamp', { withTimezone: true, mode: 'date' })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index('idx_audit_log_user_timestamp').on(t.userId, t.timestamp),
@@ -147,7 +148,7 @@ export const avaProgressReport = pgTable(
     aluno: text('aluno'),
     matricula: text('matricula'),
     userPhone1: text('user_phone1'),
-     periodo: text('periodo'),
+    periodo: text('periodo'),
     subcategoria: text('subcategoria'),
     enrolmentStatus: text('enrolment_status'),
     lastaccess: text('lastaccess'),
@@ -609,5 +610,196 @@ export const academicMatricula = pgTable(
     index('idx_ac_matricula_usuario').on(t.usuarioId),
     index('idx_ac_matricula_turma').on(t.turmaId),
     index('idx_ac_mat_turma_nivel_ativo').on(t.turmaId, t.nivel, t.ativo),
+  ],
+);
+
+// ==========================================
+// Módulo: Tutoria & Inteligência Pedagógica
+// ==========================================
+
+export const tutoriaLogsAtividades = pgTable(
+  'tutoria_logs_atividades',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sourceInstitution: text('sourceInstitution').notNull(), // Ex: 'ead', 'uni', 'faceg'
+    periodo: text('periodo').notNull(), // Ex: '2026-2'
+    disciplinaId: text('disciplina_id').notNull(),
+    disciplinaCodigo: text('disciplina_codigo'),
+    disciplinaNome: text('disciplina_nome'),
+    alunoId: text('aluno_id').notNull(),
+    matricula: text('matricula'),
+    alunoNome: text('aluno_nome'),
+    alunoEmail: text('aluno_email'),
+    unidadeTematicaNome: text('unidade_tematica_nome'),
+    atividadeId: text('atividade_id').notNull(),
+    tipoModulo: text('tipo_modulo'),
+    conteudoNome: text('conteudo_nome'),
+    qtdCliquesAcessos: integer('qtd_cliques_acessos').default(0),
+    tempoConteudoMinutos: text('tempo_conteudo_minutos').default('0'),
+    dataPrimeiroAcessoConteudo: text('data_primeiro_acesso_conteudo'),
+    dataUltimoAcessoConteudo: text('data_ultimo_acesso_conteudo'),
+    dataUltimoAcessoDisciplina: text('data_ultimo_acesso_disciplina'),
+    dataUltimoLogin: text('data_ultimo_login'),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('unq_tutoria_logs_atividades').on(
+      t.sourceInstitution,
+      t.periodo,
+      t.disciplinaId,
+      t.alunoId,
+      t.atividadeId,
+    ),
+    index('idx_tutoria_logs_inst_periodo').on(t.sourceInstitution, t.periodo),
+    index('idx_tutoria_logs_aluno_disc').on(t.alunoId, t.disciplinaId),
+    index('idx_tutoria_logs_mat_disc').on(t.matricula, t.disciplinaCodigo),
+    index('idx_tutoria_logs_fase').on(t.unidadeTematicaNome),
+    index('idx_tutoria_logs_aluno_trgm').using(
+      'gin',
+      t.alunoNome.op('gin_trgm_ops'),
+    ),
+    index('idx_tutoria_logs_mat_trgm').using(
+      'gin',
+      t.matricula.op('gin_trgm_ops'),
+    ),
+    index('idx_tutoria_logs_disc_trgm').using(
+      'gin',
+      t.disciplinaNome.op('gin_trgm_ops'),
+    ),
+  ],
+);
+
+export const tutoriaEngajamentoAluno = pgTable(
+  'tutoria_engajamento_aluno',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sourceInstitution: text('sourceInstitution').notNull(),
+    periodo: text('periodo').notNull(),
+    disciplinaId: text('disciplina_id').notNull(),
+    disciplinaCodigo: text('disciplina_codigo'),
+    disciplinaNome: text('disciplina_nome'),
+    alunoId: text('aluno_id').notNull(),
+    matricula: text('matricula'),
+    alunoNome: text('aluno_nome'),
+    alunoEmail: text('aluno_email'),
+
+    // Métricas calculadas
+    tempoTotalMinutos: text('tempo_total_minutos').default('0'),
+    tempoFase1Minutos: text('tempo_fase1_minutos').default('0'),
+    tempoFase2Minutos: text('tempo_fase2_minutos').default('0'),
+    tempoFase3Minutos: text('tempo_fase3_minutos').default('0'),
+    tempoApresentacaoMinutos: text('tempo_apresentacao_minutos').default('0'),
+    tempoOutrosMinutos: text('tempo_outros_minutos').default('0'),
+
+    totalCliques: integer('total_cliques').default(0),
+    totalAtividadesAcessadas: integer('total_atividades_acessadas').default(0),
+    tempoLeituraMinutos: text('tempo_leitura_minutos').default('0'), // page, book, resource, folder
+    tempoAvaliacoesMinutos: text('tempo_avaliacoes_minutos').default('0'), // quiz, assign
+
+    // Indicadores para a IA
+    grupoRiscoCalculado: text('grupo_risco_calculado'), // 'critico', 'atencao', 'procrastinacao', 'autonomo'
+    scoreEngajamento: text('score_engajamento'), // 0 - 100
+
+    // Datas agregadas de acesso
+    dataUltimoAcesso: text('data_ultimo_acesso'),
+    dataUltimoLogin: text('data_ultimo_login'),
+
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('unq_tutoria_engajamento_aluno').on(
+      t.sourceInstitution,
+      t.periodo,
+      t.disciplinaId,
+      t.alunoId,
+    ),
+    index('idx_tutoria_engaj_inst_periodo').on(t.sourceInstitution, t.periodo),
+    index('idx_tutoria_engaj_mat').on(t.matricula),
+    index('idx_tutoria_engaj_disc_cod').on(t.disciplinaCodigo),
+    index('idx_tutoria_engaj_grupo_risco').on(t.grupoRiscoCalculado),
+    index('idx_tutoria_engaj_aluno_trgm').using(
+      'gin',
+      t.alunoNome.op('gin_trgm_ops'),
+    ),
+  ],
+);
+
+export const tutoriaPlanosAcao = pgTable(
+  'tutoria_planos_acao',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sourceInstitution: text('sourceInstitution').default('ead').notNull(),
+    periodo: text('periodo').notNull(),
+    titulo: text('titulo').notNull(),
+    grupoTipo: text('grupo_tipo').notNull(), // 'critico', 'atencao', 'procrastinacao', 'autonomo'
+    disciplinaCodigo: text('disciplina_codigo'),
+
+    // Saída estruturada do CEIA Lumi 4B
+    diagnosticoIa: text('diagnostico_ia'),
+    pensamentoIa: text('pensamento_ia'), // Conteúdo da tag <think>...</think>
+    orientacoesTutor: text('orientacoes_tutor'),
+    templateMensagemWhatsapp: text('template_mensagem_whatsapp'),
+    templateMensagemEmail: text('template_mensagem_email'),
+
+    status: text('status').default('ativo').notNull(), // 'ativo', 'arquivado', 'concluido'
+    criadoPorId: text('criado_por_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('idx_tutoria_planos_periodo_grupo').on(t.periodo, t.grupoTipo),
+    index('idx_tutoria_planos_status').on(t.status),
+  ],
+);
+
+export const tutoriaAtendimentosKanban = pgTable(
+  'tutoria_atendimentos_kanban',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    planoAcaoId: text('plano_acao_id').references(() => tutoriaPlanosAcao.id, {
+      onDelete: 'cascade',
+    }),
+    sourceInstitution: text('sourceInstitution').default('ead').notNull(),
+    periodo: text('periodo').notNull(),
+    matricula: text('matricula').notNull(),
+    alunoNome: text('aluno_nome'),
+    alunoEmail: text('aluno_email'),
+    disciplinaCodigo: text('disciplina_codigo'),
+    disciplinaNome: text('disciplina_nome'),
+
+    // Status das colunas do Kanban:
+    // 'pendente', 'em_contato', 'aguardando_retorno', 'em_recuperacao', 'revertido', 'evadido'
+    statusKanban: text('status_kanban').default('pendente').notNull(),
+
+    tutorResponsavelId: text('tutor_responsavel_id').references(
+      () => users.id,
+      {
+        onDelete: 'set null',
+      },
+    ),
+    observacoes: text('observacoes'),
+    canalContatoUtilizado: text('canal_contato_utilizado'), // 'whatsapp', 'email', 'telefone', 'ava'
+    ultimoContatoEm: timestamp('ultimo_contato_em', { mode: 'date' }),
+    dataResolucao: timestamp('data_resolucao', { mode: 'date' }),
+
+    createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('idx_tutoria_kanban_status').on(t.statusKanban),
+    index('idx_tutoria_kanban_mat').on(t.matricula),
+    index('idx_tutoria_kanban_plano').on(t.planoAcaoId),
+    index('idx_tutoria_kanban_tutor').on(t.tutorResponsavelId),
+    index('idx_tutoria_kanban_periodo').on(t.periodo),
   ],
 );

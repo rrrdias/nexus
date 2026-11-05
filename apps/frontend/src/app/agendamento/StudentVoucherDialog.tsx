@@ -19,6 +19,16 @@ interface StudentVoucherDialogProps {
   booking: StudentBooking
 }
 
+function escapeHtml(str: string | number | null | undefined): string {
+  if (str === null || str === undefined) return ""
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+}
+
 function formatDatePtBr(dateVal: string | Date): string {
   const norm = normalizeDateStr(dateVal)
   if (!norm) return "—"
@@ -33,22 +43,26 @@ function formatDatePtBr(dateVal: string | Date): string {
 }
 
 function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): string {
-  const dataExtenso = formatDatePtBr(booking.data)
-  const horaInicio = booking.hora.slice(0, 5)
+  const dataExtenso = escapeHtml(formatDatePtBr(booking.data))
+  const horaInicio = escapeHtml(booking.hora.slice(0, 5))
   const disciplinas = booking.disciplinasSnapshot?.length
     ? booking.disciplinasSnapshot
     : student.disciplinas || []
-  const horaFim = getExamEndTime(horaInicio, disciplinas.length)
-  const emitDate = new Date().toLocaleString("pt-BR")
-  const protocolo = booking.protocolo || booking.id.slice(0, 8).toUpperCase()
+  const horaFim = escapeHtml(getExamEndTime(booking.hora.slice(0, 5), disciplinas.length))
+  const emitDate = escapeHtml(new Date().toLocaleString("pt-BR"))
   const isOnlinePolo = booking.localNome.toLowerCase().includes("belo horizonte")
+  const studentNome = escapeHtml(student.nome)
+  const studentMatricula = escapeHtml(student.matricula)
+  const bookingPeriodo = escapeHtml(booking.periodo.replace("-", "/"))
+  const localNome = escapeHtml(booking.localNome)
+  const localEndereco = escapeHtml(booking.localEndereco || "Conforme cadastro da unidade")
 
   const disciplinasHtml = disciplinas
     .map(
       (disc, idx) =>
         `<tr>
           <td style="padding: 8px 12px; border-bottom: 1px solid #E2E8F0; width: 40px; text-align: center; font-weight: bold; color: #1E293B;">${idx + 1}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${disc}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${escapeHtml(disc)}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #E2E8F0; width: 90px; text-align: center; color: #64748B;">30 min</td>
         </tr>`
     )
@@ -58,7 +72,7 @@ function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): 
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Comprovante de Agendamento - ${student.matricula}</title>
+  <title>Comprovante de Agendamento - ${studentMatricula}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -227,13 +241,11 @@ function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): 
 <body>
   <div class="header">
     <div>
-      <h1 class="institution-name">UniEVANGÉLICA</h1>
-      <p class="institution-sub">Pró-Reitoria de Graduação • Coordenação Geral EaD</p>
+      <h1 class="institution-name">UNIEVANGÉLICA|EAD</h1>
+      <p class="institution-sub">Coordenação Geral EaD</p>
       <div class="voucher-title">Comprovante de Agendamento de Prova Presencial</div>
     </div>
-    <div class="protocol-box">
-      <div class="protocol-label">Protocolo</div>
-      <div class="protocol-code">#${protocolo}</div>
+    <div style="text-align: right; align-self: flex-start; padding-top: 4px;">
       <span class="status-badge">Confirmado</span>
     </div>
   </div>
@@ -243,11 +255,11 @@ function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): 
     <div class="info-grid">
       <div class="info-item">
         <span class="info-label">Nome Completo</span>
-        <span class="info-value">${student.nome}</span>
+        <span class="info-value">${studentNome}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Matrícula</span>
-        <span class="info-value">${student.matricula}</span>
+        <span class="info-value">${studentMatricula}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Modalidade / Curso</span>
@@ -255,7 +267,7 @@ function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): 
       </div>
       <div class="info-item">
         <span class="info-label">Período Letivo</span>
-        <span class="info-value">${booking.periodo.replace("-", "/")}</span>
+        <span class="info-value">${bookingPeriodo}</span>
       </div>
     </div>
   </div>
@@ -265,7 +277,7 @@ function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): 
     <div class="info-grid">
       <div class="info-item">
         <span class="info-label">Polo / Unidade</span>
-        <span class="info-value">${booking.localNome}</span>
+        <span class="info-value">${localNome}</span>
       </div>
       <div class="info-item">
         <span class="info-label">Data da Prova</span>
@@ -277,7 +289,7 @@ function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): 
       </div>
       <div class="info-item">
         <span class="info-label">Endereço do Polo</span>
-        <span class="info-value">${booking.localEndereco || "Conforme cadastro da unidade"}</span>
+        <span class="info-value">${localEndereco}</span>
       </div>
     </div>
   </div>
@@ -313,7 +325,7 @@ function generateVoucherHtml(student: StudentProfile, booking: StudentBooking): 
   </div>
 
   <div class="footer">
-    <div>Emissão: ${emitDate} • Nexus Core</div>
+    <div>Emissão: ${emitDate}</div>
     <div>UniEVANGÉLICA • Sistema Integrado de Agendamento EaD</div>
   </div>
 </body>
@@ -345,24 +357,27 @@ export function StudentVoucherDialog({
       document.body.appendChild(iframe)
     }
 
-    const doc = iframe.contentWindow?.document
-    if (!doc) {
-      window.print()
-      return
-    }
-
-    doc.open()
-    doc.write(html)
-    doc.close()
-
-    setTimeout(() => {
+    let printed = false
+    const triggerPrint = () => {
+      if (printed) return
+      printed = true
       try {
         iframe.contentWindow?.focus()
         iframe.contentWindow?.print()
       } catch {
         window.print()
       }
-    }, 250)
+    }
+
+    iframe.onload = () => {
+      setTimeout(triggerPrint, 100)
+    }
+
+    // Secure HTML assignment using srcdoc instead of doc.write
+    iframe.srcdoc = html
+
+    // Fallback in case onload is not supported or delayed
+    setTimeout(triggerPrint, 600)
   }
 
   const dataExtenso = formatDatePtBr(booking.data)
@@ -371,12 +386,14 @@ export function StudentVoucherDialog({
     ? booking.disciplinasSnapshot
     : student.disciplinas || []
   const horaFim = getExamEndTime(horaInicio, disciplinas.length)
-  const protocolo = booking.protocolo || booking.id.slice(0, 8).toUpperCase()
   const isOnlinePolo = booking.localNome.toLowerCase().includes("belo horizonte")
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]"
+      >
         {/* Modal Header */}
         <div className="bg-[#1C2B4A] text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -388,7 +405,7 @@ export function StudentVoucherDialog({
                 Comprovante de Agendamento
               </DialogTitle>
               <p className="text-xs text-slate-300 mt-0.5">
-                Protocolo #{protocolo} • Período {booking.periodo.replace("-", "/")}
+                Período {booking.periodo.replace("-", "/")}
               </p>
             </div>
           </div>

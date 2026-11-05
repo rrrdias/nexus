@@ -110,9 +110,6 @@ export function StudentLandingPage({
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     Agendamento Ativo e Confirmado
                   </span>
-                  <span className="text-xs text-emerald-700 font-mono font-bold">
-                    Protocolo #{activeBooking.protocolo || activeBooking.id.slice(0, 8).toUpperCase()}
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">

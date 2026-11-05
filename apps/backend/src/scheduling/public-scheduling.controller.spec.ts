@@ -9,13 +9,23 @@ describe('PublicSchedulingController', () => {
   beforeEach(async () => {
     mockSchedulingService = {
       getStudentFlow: jest.fn().mockResolvedValue({
-        student: { matricula: 'G2610162', nome: 'Aluno Teste', disciplinas: ['DISCIPLINA 1'] },
+        student: {
+          matricula: 'G2610162',
+          nome: 'Aluno Teste',
+          disciplinas: ['DISCIPLINA 1'],
+        },
         activeBooking: null,
         locals: [{ id: 'loc-1', nome: 'Anápolis' }],
         periodo: '2026-2',
       }),
       getAvailableSlots: jest.fn().mockResolvedValue([
-        { id: 'opt-1', localId: 'loc-1', data: '2026-11-10', hora: '08:00:00', vagas: 10 },
+        {
+          id: 'opt-1',
+          localId: 'loc-1',
+          data: '2026-11-10',
+          hora: '08:00:00',
+          vagas: 10,
+        },
       ]),
       createBooking: jest.fn().mockResolvedValue({
         id: 'book-1',
@@ -42,7 +52,9 @@ describe('PublicSchedulingController', () => {
       ],
     }).compile();
 
-    controller = module.get<PublicSchedulingController>(PublicSchedulingController);
+    controller = module.get<PublicSchedulingController>(
+      PublicSchedulingController,
+    );
   });
 
   it('should be defined', () => {
@@ -51,7 +63,10 @@ describe('PublicSchedulingController', () => {
 
   it('should get student flow for given matricula', async () => {
     const res = await controller.getStudentFlow('G2610162', '2026-2');
-    expect(mockSchedulingService.getStudentFlow).toHaveBeenCalledWith('G2610162', '2026-2');
+    expect(mockSchedulingService.getStudentFlow).toHaveBeenCalledWith(
+      'G2610162',
+      '2026-2',
+    );
     expect(res.student.matricula).toBe('G2610162');
   });
 
@@ -61,7 +76,10 @@ describe('PublicSchedulingController', () => {
 
   it('should get available slots for a local', async () => {
     const res = await controller.getAvailableSlots('loc-1', '2026-2');
-    expect(mockSchedulingService.getAvailableSlots).toHaveBeenCalledWith('loc-1', '2026-2');
+    expect(mockSchedulingService.getAvailableSlots).toHaveBeenCalledWith(
+      'loc-1',
+      '2026-2',
+    );
     expect(res.length).toBe(1);
   });
 
@@ -80,7 +98,10 @@ describe('PublicSchedulingController', () => {
       bookingId: 'book-1',
       matricula: 'G2610162',
     });
-    expect(mockSchedulingService.cancelStudentBooking).toHaveBeenCalledWith('book-1', 'G2610162');
+    expect(mockSchedulingService.cancelStudentBooking).toHaveBeenCalledWith(
+      'book-1',
+      'G2610162',
+    );
     expect(res.status).toBe('cancelado');
   });
 

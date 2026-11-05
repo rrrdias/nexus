@@ -56,7 +56,7 @@ export class AcademicSyncService {
 
       this.logger.log(`Active periods to sync: ${activePeriods.join(', ')}`);
 
-      const lyceumPool = this.academicService.getSqlPool();
+      const lyceumPool = await this.academicService.getConnectedSqlPool();
       const prefix = this.academicService.getDbPrefix();
 
       // 1. Sync Turmas

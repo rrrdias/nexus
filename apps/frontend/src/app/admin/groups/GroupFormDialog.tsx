@@ -57,15 +57,15 @@ export function GroupFormDialog({
     selectedModules.forEach(id => formData.append("moduleIds", id))
 
     startTransition(async () => {
-      try {
-        if (mode === "create") {
-          await createGroup(formData)
-        } else {
-          await updateGroup(groupId!, formData)
-        }
-        setOpen(false)
-      } catch (err: any) {
-        setError(err.message || "Erro ao salvar grupo.")
+      try {
+        const res = mode === "create" ? await createGroup(formData) : await updateGroup(groupId!, formData)
+        if (res && !res.success) {
+          setError(res.error || "Erro ao salvar grupo.")
+          return
+        }
+        setOpen(false)
+      } catch (err: any) {
+        setError(err.message || "Erro ao salvar grupo.")
       }
     })
   }

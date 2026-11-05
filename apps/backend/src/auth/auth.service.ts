@@ -1,4 +1,9 @@
-import { Injectable, Inject, Optional, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { users, userGroups, groups } from '../db/schema';

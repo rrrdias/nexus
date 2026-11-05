@@ -198,7 +198,12 @@ export default async function DashboardPage() {
       )
     }
 
-    // C. Possui acesso a outros módulos (ex: backoffice) mas não ao AVA -> Mostrar página básica
+    // C. Possui acesso à Tutoria -> Redirecionar para o painel de Acompanhamento
+    if (allowedModules.some(m => m.slug === 'tutoria')) {
+      redirect("/tutoria")
+    }
+
+    // D. Possui acesso a outros módulos (ex: backoffice) mas não ao AVA -> Mostrar página básica
     return (
       <DashboardSemVinculo 
         session={session}
