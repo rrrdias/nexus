@@ -1193,6 +1193,7 @@ export class AvaReportsService {
           noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
           uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaConsolidatedReport.alunoId}, ''), ${avaConsolidatedReport.matricula}))`,
           uniqueDisciplines: sql<number>`count(distinct ${avaConsolidatedReport.curso})`,
+          lastSync: sql<string>`max(${avaConsolidatedReport.updatedAt})`,
         })
         .from(avaConsolidatedReport)
         .where(whereClause);
@@ -1201,12 +1202,23 @@ export class AvaReportsService {
       const sourceInstitution = filters.sourceInstitution || 'ead';
       const dropdowns = await this.getCachedDropdownOptions(sourceInstitution);
 
+      const now = new Date();
+      const nextSyncDate = new Date(now);
+      nextSyncDate.setHours(now.getHours() + 1, 0, 0, 0);
+
+      const rawLastSync = statsRes?.lastSync;
+      const lastSyncIso = rawLastSync
+        ? new Date(rawLastSync).toISOString()
+        : null;
+
       return {
         page,
         size,
         total_records,
         total_pages,
         data,
+        last_sync: lastSyncIso,
+        next_sync: nextSyncDate.toISOString(),
         average_progress: statsRes?.avgProgress
           ? Math.round(Number(statsRes.avgProgress))
           : 0,

@@ -166,6 +166,8 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
     unique_periodos = [DEFAULT_PERIOD, "2026-1", "2025-2"],
     unique_polos = [],
     unique_cursos = [],
+    last_sync = null,
+    next_sync = null,
   } = reportData || {}
 
   const instConfig = INSTITUTION_CONFIG[institution] || {
@@ -213,7 +215,12 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
           </p>
         </div>
 
-        <ConsolidatedActions filters={filters} institution={institution} />
+        <ConsolidatedActions
+          filters={filters}
+          institution={institution}
+          lastSync={last_sync}
+          nextSync={next_sync}
+        />
       </div>
 
       {/* Grid de 4 Cards de Métricas Consolidadas Ricas */}

@@ -81,8 +81,35 @@ export class JobsService {
     institution?: string;
     type?: 'grades' | 'progress';
   }): Promise<{ jobId: string; queue: string }> {
+    const activeJobs =
+      typeof this.avaQueue.getActive === 'function'
+        ? await this.avaQueue.getActive()
+        : [];
+    const waitingJobs =
+      typeof this.avaQueue.getWaiting === 'function'
+        ? await this.avaQueue.getWaiting()
+        : [];
+
+    const existingJob = [...activeJobs, ...waitingJobs].find((j) => {
+      const jInst = (j.data?.institution || '').toLowerCase();
+      const jType = (j.data?.type || '').toLowerCase();
+      const reqInst = (data.institution || '').toLowerCase();
+      const reqType = (data.type || '').toLowerCase();
+      return (
+        (jInst === reqInst || !jInst || !reqInst) &&
+        (jType === reqType || !jType || !reqType)
+      );
+    });
+
+    if (existingJob) {
+      this.logger.log(
+        `Reutilizando job de sincronização AVA já em andamento (${existingJob.id}) para ${data.institution || 'all'}/${data.type || 'all'}`,
+      );
+      return { jobId: existingJob.id as string, queue: QUEUE_AVA_SYNC };
+    }
+
     const job = await this.avaQueue.add(JOB_AVA_SYNC, data, {
-      attempts: 2,
+      attempts: 1,
       backoff: {
         type: 'exponential',
         delay: 3000,

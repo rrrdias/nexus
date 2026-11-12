@@ -137,6 +137,8 @@ export function ConsolidatedEadDashboard({ reportData, filters }: ConsolidatedEa
     unique_periodos = [DEFAULT_PERIOD, "2026-1", "2025-2"],
     unique_polos = [],
     unique_cursos = [],
+    last_sync = null,
+    next_sync = null,
   } = reportData || {}
 
   // Métricas auxiliares de porcentagem
@@ -178,7 +180,12 @@ export function ConsolidatedEadDashboard({ reportData, filters }: ConsolidatedEa
           </p>
         </div>
 
-        <ConsolidatedActions filters={filters} institution="ead" />
+        <ConsolidatedActions
+          filters={filters}
+          institution="ead"
+          lastSync={last_sync}
+          nextSync={next_sync}
+        />
       </div>
 
       {/* Grid de 4 Cards de Métricas Consolidadas Ricas */}

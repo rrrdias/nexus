@@ -23,6 +23,8 @@ describe('JobsService', () => {
     };
 
     avaQueue = {
+      getActive: jest.fn().mockResolvedValue([]),
+      getWaiting: jest.fn().mockResolvedValue([]),
       add: jest.fn().mockResolvedValue({ id: 'job-ava-456' }),
       getJob: jest.fn(),
     };
@@ -83,8 +85,23 @@ describe('JobsService', () => {
       expect(avaQueue.add).toHaveBeenCalledWith(
         JOB_AVA_SYNC,
         { institution: 'ead', type: 'grades' },
-        expect.objectContaining({ attempts: 2 }),
+        expect.objectContaining({ attempts: 1 }),
       );
+    });
+
+    it('should reuse existing AVA sync job if already active or waiting for the same institution and type', async () => {
+      avaQueue.getActive.mockResolvedValue([
+        { id: 'ava-existing-99', data: { institution: 'ead', type: 'grades' } },
+      ]);
+      const result = await service.addAvaSyncJob({
+        institution: 'ead',
+        type: 'grades',
+      });
+      expect(result).toEqual({
+        jobId: 'ava-existing-99',
+        queue: QUEUE_AVA_SYNC,
+      });
+      expect(avaQueue.add).not.toHaveBeenCalled();
     });
   });
 

@@ -10,7 +10,7 @@ interface AvaSyncJobData {
 }
 
 @Processor(QUEUE_AVA_SYNC, {
-  concurrency: 2,
+  concurrency: 1,
 })
 export class AvaSyncProcessor extends WorkerHost {
   private readonly logger = new Logger(AvaSyncProcessor.name);

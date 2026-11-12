@@ -1,4 +1,11 @@
-import { Injectable, Inject, Optional, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Optional,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { DB_CONNECTION } from '../db/db.provider';
 import { sql } from 'drizzle-orm';
 import { avaProgressReport, avaGradesReport } from '../db/schema';
@@ -44,10 +51,123 @@ async function processInChunks<T>(
 
 @Injectable()
 export class AvaSyncService implements OnModuleInit {
+  private readonly logger = new Logger(AvaSyncService.name);
+  private isAutoSyncRunning = false;
+  private readonly activeSyncs = new Set<string>();
+  private readonly lastAttTriggerMap = new Map<string, number>();
+  private static readonly ATT_COOLDOWN_MS = 55 * 60 * 1000; // 55 minutos de proteção contra disparo concorrente de SQL Adiado
+
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
     @Optional() private readonly cacheService?: CacheService,
   ) {}
+
+  @Cron(process.env.AVA_SYNC_CRON || '0 0 * * * *')
+  async handleScheduledAvaSync() {
+    if (this.isAutoSyncRunning) {
+      this.logger.warn(
+        '[AUTO-SYNC] Ciclo automático de sincronização AVA já está em execução. Ignorando disparo sobreposto.',
+      );
+      return;
+    }
+
+    this.isAutoSyncRunning = true;
+    const startTime = Date.now();
+    this.logger.log(
+      '[AUTO-SYNC] Iniciando sincronização automática em background do AVA (ciclo de 60 min)...',
+    );
+
+    const tasks = [
+      {
+        name: 'ead',
+        type: 'progress' as const,
+        get: process.env.MOODLE_EAD_PROGRESS_GET_URL,
+        att: process.env.MOODLE_EAD_PROGRESS_ATT_URL,
+      },
+      {
+        name: 'ead',
+        type: 'grades' as const,
+        get: process.env.MOODLE_EAD_GRADES_GET_URL,
+        att: process.env.MOODLE_EAD_GRADES_ATT_URL,
+      },
+      {
+        name: 'uni',
+        type: 'progress' as const,
+        get: process.env.MOODLE_UNI_PROGRESS_GET_URL,
+        att: process.env.MOODLE_UNI_PROGRESS_ATT_URL,
+      },
+      {
+        name: 'uni',
+        type: 'grades' as const,
+        get: process.env.MOODLE_UNI_GRADES_GET_URL,
+        att: process.env.MOODLE_UNI_GRADES_ATT_URL,
+      },
+      {
+        name: 'uniego',
+        type: 'progress' as const,
+        get: process.env.MOODLE_UNIEGO_PROGRESS_GET_URL,
+        att: process.env.MOODLE_UNIEGO_PROGRESS_ATT_URL,
+      },
+      {
+        name: 'uniego',
+        type: 'grades' as const,
+        get: process.env.MOODLE_UNIEGO_GRADES_GET_URL,
+        att: process.env.MOODLE_UNIEGO_GRADES_ATT_URL,
+      },
+      {
+        name: 'raizes',
+        type: 'progress' as const,
+        get: process.env.MOODLE_RAIZES_PROGRESS_GET_URL,
+        att: process.env.MOODLE_RAIZES_PROGRESS_ATT_URL,
+      },
+      {
+        name: 'raizes',
+        type: 'grades' as const,
+        get: process.env.MOODLE_RAIZES_GRADES_GET_URL,
+        att: process.env.MOODLE_RAIZES_GRADES_ATT_URL,
+      },
+      {
+        name: 'eefn',
+        type: 'progress' as const,
+        get: process.env.MOODLE_EEFN_PROGRESS_GET_URL,
+        att: process.env.MOODLE_EEFN_PROGRESS_ATT_URL,
+      },
+      {
+        name: 'eefn',
+        type: 'grades' as const,
+        get: process.env.MOODLE_EEFN_GRADES_GET_URL,
+        att: process.env.MOODLE_EEFN_GRADES_ATT_URL,
+      },
+      {
+        name: 'pos',
+        type: 'grades' as const,
+        get: process.env.MOODLE_POS_GRADES_GET_URL,
+        att: process.env.MOODLE_POS_GRADES_ATT_URL,
+      },
+    ];
+
+    try {
+      for (const task of tasks) {
+        if (!task.get) continue;
+        try {
+          if (task.type === 'progress') {
+            await this.syncProgress(task.name, task.get, task.att);
+          } else {
+            await this.syncGrades(task.name, task.get, task.att);
+          }
+        } catch (err: any) {
+          this.logger.error(
+            `[AUTO-SYNC] Erro na tarefa ${task.name}_${task.type}: ${err.message}`,
+          );
+        }
+      }
+      this.logger.log(
+        `[AUTO-SYNC] Ciclo automático concluído em ${Math.round((Date.now() - startTime) / 1000)}s.`,
+      );
+    } finally {
+      this.isAutoSyncRunning = false;
+    }
+  }
 
   async onModuleInit() {
     try {
@@ -285,7 +405,22 @@ export class AvaSyncService implements OnModuleInit {
     label: string,
   ): Promise<boolean> {
     if (!attUrl) return false;
+
+    const key = `${institution.toLowerCase()}_${label.toLowerCase()}`;
+    const lastTriggered = this.lastAttTriggerMap.get(key) || 0;
+    const now = Date.now();
+    if (now - lastTriggered < AvaSyncService.ATT_COOLDOWN_MS) {
+      const remainingMin = Math.ceil(
+        (AvaSyncService.ATT_COOLDOWN_MS - (now - lastTriggered)) / 60000,
+      );
+      console.log(
+        `[MOODLE] SQL Adiado para ${institution} (${label}) já foi disparado recentemente. Aguardando cooldown (${remainingMin} min restantes) para evitar sobrecarga no Moodle.`,
+      );
+      return true;
+    }
+
     try {
+      this.lastAttTriggerMap.set(key, now);
       console.log(
         `[MOODLE] Disparando comando de atualização de SQL Adiado para ${institution} (${label}): ${attUrl}`,
       );
@@ -315,6 +450,21 @@ export class AvaSyncService implements OnModuleInit {
         status: 'skipped',
         reason: 'URL missing',
       };
+
+    const syncKey = `${institution.toLowerCase()}_grades`;
+    if (this.activeSyncs.has(syncKey)) {
+      console.log(
+        `[SYNC] Sincronização de Notas ${institution} já está em andamento em segundo plano. Ignorando chamada concorrente.`,
+      );
+      return {
+        source: `${institution}_grades`,
+        status: 'queued',
+        reason:
+          'Sincronização de notas já está em andamento em segundo plano no servidor.',
+      };
+    }
+
+    this.activeSyncs.add(syncKey);
     console.log(`[SYNC] Iniciando Notas ${institution}...`);
     if (onProgress)
       await onProgress(
@@ -595,6 +745,8 @@ export class AvaSyncService implements OnModuleInit {
         status: 'error',
         reason: cleanReason,
       };
+    } finally {
+      this.activeSyncs.delete(syncKey);
     }
   }
 
@@ -610,6 +762,21 @@ export class AvaSyncService implements OnModuleInit {
         status: 'skipped',
         reason: 'URL missing',
       };
+
+    const syncKey = `${institution.toLowerCase()}_progress`;
+    if (this.activeSyncs.has(syncKey)) {
+      console.log(
+        `[SYNC] Sincronização de Progresso ${institution} já está em andamento em segundo plano. Ignorando chamada concorrente.`,
+      );
+      return {
+        source: `${institution}_progress`,
+        status: 'queued',
+        reason:
+          'Sincronização de progresso já está em andamento em segundo plano no servidor.',
+      };
+    }
+
+    this.activeSyncs.add(syncKey);
     console.log(`[SYNC] Iniciando Progresso ${institution}...`);
     if (onProgress)
       await onProgress(
@@ -875,6 +1042,8 @@ export class AvaSyncService implements OnModuleInit {
         status: 'error',
         reason: cleanReason,
       };
+    } finally {
+      this.activeSyncs.delete(syncKey);
     }
   }
 }
