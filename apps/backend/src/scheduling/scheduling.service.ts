@@ -773,6 +773,9 @@ export class SchedulingService implements OnModuleInit {
             studentName: profile.nome || (profile as any).aluno || 'Estudante',
             matricula: profile.matricula || matricula,
             poloNome,
+            poloEndereco: localRecord?.endereco || undefined,
+            poloTelefone: localRecord?.telefone || undefined,
+            linkLocal: localRecord?.linkLocal || undefined,
             data: opcao.data instanceof Date
               ? opcao.data.toLocaleDateString('pt-BR')
               : String(opcao.data),
@@ -780,6 +783,7 @@ export class SchedulingService implements OnModuleInit {
             sala: (opcao as any).sala || undefined,
             disciplinas: profile.disciplinas,
             periodo,
+            isReschedule: false,
           })
           .catch((err) => {
             console.error(
@@ -1833,6 +1837,49 @@ export class SchedulingService implements OnModuleInit {
         })
         .where(eq(agendamentosMatricula.id, booking.id))
         .returning();
+
+      // 10. Busca dados do novo polo para envio de e-mail de confirmação da remarcação
+      const [localRecord] = await tx
+        .select()
+        .from(locals)
+        .where(eq(locals.id, newOpcao.localId))
+        .limit(1);
+
+      const poloNome = localRecord?.nome || 'Polo de Apoio Presencial';
+      // E-mail de teste configurado para validação do fluxo de confirmação de agendamento
+      // Original: const studentEmail = (profile as any).email || (profile as any).usuario;
+      const studentEmail = 'rrrdias25@gmail.com';
+
+      if (
+        this.mailService &&
+        studentEmail &&
+        typeof studentEmail === 'string' &&
+        studentEmail.includes('@')
+      ) {
+        this.mailService
+          .sendSchedulingConfirmation(studentEmail.trim(), {
+            studentName: profile.nome || (profile as any).aluno || 'Estudante',
+            matricula: profile.matricula || matricula,
+            poloNome,
+            poloEndereco: localRecord?.endereco || undefined,
+            poloTelefone: localRecord?.telefone || undefined,
+            linkLocal: localRecord?.linkLocal || undefined,
+            data:
+              newOpcao.data instanceof Date
+                ? newOpcao.data.toLocaleDateString('pt-BR')
+                : String(newOpcao.data),
+            hora: newOpcao.hora ? newOpcao.hora.slice(0, 5) : '',
+            sala: (newOpcao as any).sala || undefined,
+            disciplinas: profile.disciplinas,
+            periodo,
+            isReschedule: true,
+          })
+          .catch((err) => {
+            console.error(
+              `[SchedulingService] Erro ao enviar e-mail de remarcação para ${studentEmail}: ${err.message}`,
+            );
+          });
+      }
 
       await this.auditService?.record({
         action: 'EXAM_BOOKING_RESCHEDULED_BY_STUDENT',

@@ -224,11 +224,15 @@ export interface SchedulingConfirmationParams {
   studentName: string;
   matricula: string;
   poloNome: string;
+  poloEndereco?: string;
+  poloTelefone?: string;
+  linkLocal?: string;
   data: string;
   hora: string;
   sala?: string;
   disciplinas?: string[];
   periodo?: string;
+  isReschedule?: boolean;
 }
 
 export function getSchedulingConfirmationTemplate(params: SchedulingConfirmationParams): {
@@ -236,15 +240,21 @@ export function getSchedulingConfirmationTemplate(params: SchedulingConfirmation
   html: string;
   text: string;
 } {
-  const subject = `Confirmação de Agendamento de Prova — Polo ${params.poloNome}`;
+  const subject = params.isReschedule
+    ? `Confirmação de Remarcação de Prova — Polo ${params.poloNome}`
+    : `Confirmação de Agendamento de Prova — Polo ${params.poloNome}`;
   const firstName = params.studentName?.split(' ')[0] || 'Estudante';
+  const heading = params.isReschedule ? 'Remarcação Confirmada!' : 'Agendamento Confirmado!';
+  const introText = params.isReschedule
+    ? 'Sua remarcação para a realização de provas presenciais foi registrada com sucesso no sistema institucional com os novos dados abaixo.'
+    : 'Seu agendamento para a realização de provas presenciais foi registrado com sucesso no sistema institucional.';
 
   const html = baseLayout(
     subject,
     `
-    <h1 class="title">Agendamento Confirmado!</h1>
+    <h1 class="title">${heading}</h1>
     <p>Olá, <strong>${firstName}</strong>,</p>
-    <p>Seu agendamento para a realização de provas presenciais foi registrado com sucesso no sistema institucional.</p>
+    <p>${introText}</p>
     
     <div class="info-card" style="border-left: 4px solid #22a857;">
       <div class="info-row">
@@ -259,6 +269,40 @@ export function getSchedulingConfirmationTemplate(params: SchedulingConfirmation
         <span class="info-label">Polo de Prova:</span>
         <span class="info-value">${params.poloNome}</span>
       </div>
+      ${
+        params.poloEndereco
+          ? `
+      <div class="info-row">
+        <span class="info-label">Endereço do Polo:</span>
+        <span class="info-value">${params.poloEndereco}</span>
+      </div>
+      `
+          : ''
+      }
+      ${
+        params.poloTelefone
+          ? `
+      <div class="info-row">
+        <span class="info-label">Telefone do Polo:</span>
+        <span class="info-value">${params.poloTelefone}</span>
+      </div>
+      `
+          : ''
+      }
+      ${
+        params.linkLocal
+          ? `
+      <div class="info-row">
+        <span class="info-label">Link / Localização do Polo:</span>
+        <span class="info-value">
+          <a href="${params.linkLocal}" target="_blank" rel="noopener noreferrer" style="color: #16a34a; font-weight: 700; text-decoration: underline; word-break: break-all;">
+            ${params.linkLocal}
+          </a>
+        </span>
+      </div>
+      `
+          : ''
+      }
       <div class="info-row">
         <span class="info-label">Data da Prova:</span>
         <span class="info-value">${params.data}</span>
@@ -290,6 +334,18 @@ export function getSchedulingConfirmationTemplate(params: SchedulingConfirmation
     </div>
 
     ${
+      params.linkLocal
+        ? `
+      <div style="text-align: center; margin: 20px 0;">
+        <a href="${params.linkLocal}" class="btn" target="_blank" rel="noopener noreferrer">
+          Acessar Localização / Link do Polo
+        </a>
+      </div>
+      `
+        : ''
+    }
+
+    ${
       params.disciplinas && params.disciplinas.length > 0
         ? `
       <h3 style="font-size: 15px; color: #1c2b4a; margin-top: 20px; margin-bottom: 8px;">Disciplinas a serem avaliadas:</h3>
@@ -311,7 +367,7 @@ export function getSchedulingConfirmationTemplate(params: SchedulingConfirmation
     `
   );
 
-  const text = `Olá, ${firstName}!\n\nSeu agendamento de prova presencial foi confirmado.\n\nMatrícula: ${params.matricula}\nPolo: ${params.poloNome}\nData: ${params.data}\nHorário: ${params.hora}\n${params.sala ? `Sala: ${params.sala}\n` : ''}\nCompareça com 20 minutos de antecedência portando documento com foto.\n\nSistemas TED - AEE`;
+  const text = `Olá, ${firstName}!\n\n${introText}\n\nMatrícula: ${params.matricula}\nPolo: ${params.poloNome}\n${params.poloEndereco ? `Endereço: ${params.poloEndereco}\n` : ''}${params.poloTelefone ? `Telefone: ${params.poloTelefone}\n` : ''}${params.linkLocal ? `Link do Polo: ${params.linkLocal}\n` : ''}Data: ${params.data}\nHorário: ${params.hora}\n${params.sala ? `Sala: ${params.sala}\n` : ''}\nCompareça com 20 minutos de antecedência portando documento com foto.\n\nSistemas TED - AEE`;
 
   return { subject, html, text };
 }
