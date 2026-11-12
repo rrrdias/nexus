@@ -1,6 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { CacheService } from '../cache/cache.service';
 import {
   systemModules,
   userGroups,
@@ -17,10 +18,24 @@ import { eq, inArray, sql, desc } from 'drizzle-orm';
 @Injectable()
 export class SystemService {
   private activeSessions = new Map<string, number>();
+  private static sidebarCache = new Map<
+    string,
+    { modules: any[]; timestamp: number }
+  >();
+  private static readonly SIDEBAR_CACHE_TTL_MS = 60_000;
 
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
+    @Optional() private readonly cacheService?: CacheService,
   ) {}
+
+  static clearSidebarCache(userId?: string) {
+    if (userId) {
+      SystemService.sidebarCache.delete(userId);
+    } else {
+      SystemService.sidebarCache.clear();
+    }
+  }
 
   recordUserActivity(userId: string) {
     this.activeSessions.set(userId, Date.now());
@@ -31,6 +46,12 @@ export class SystemService {
   }
 
   async getSidebarModules(userId: string) {
+    const now = Date.now();
+    const cached = SystemService.sidebarCache.get(userId);
+    if (cached && now - cached.timestamp < SystemService.SIDEBAR_CACHE_TTL_MS) {
+      return cached.modules;
+    }
+
     const [userGroupRecords, directAccess] = await Promise.all([
       this.db
         .select({ groupId: userGroups.groupId })
@@ -63,7 +84,15 @@ export class SystemService {
       ...directAccess.map((a) => a.module),
       ...groupAccess.map((a) => a.module),
     ];
-    return Array.from(new Map(allModules.map((m) => [m.id, m])).values());
+    const uniqueModules = Array.from(
+      new Map(allModules.map((m) => [m.id, m])).values(),
+    );
+
+    SystemService.sidebarCache.set(userId, {
+      modules: uniqueModules,
+      timestamp: now,
+    });
+    return uniqueModules;
   }
 
   async getSystemAdminDashboardStats() {

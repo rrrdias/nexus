@@ -158,10 +158,6 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     }
   }, [periodo])
 
-  useEffect(() => {
-    loadDisciplinas()
-  }, [loadDisciplinas])
-
   // Carregar KPIs do Dashboard
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true)
@@ -203,10 +199,13 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     }
   }, [periodo, selectedDisciplina, grupoRisco, faixaTempo, recenciaAcesso, statusKanbanFilter, debouncedSearch, page])
 
+  // 1. Efeito unificado para carregar resumo e disciplinas ao mudar o período
   useEffect(() => {
     loadSummary()
-  }, [loadSummary])
+    loadDisciplinas()
+  }, [loadSummary, loadDisciplinas])
 
+  // 2. Efeito para carregar lista de alunos ao mudar filtros ou página
   useEffect(() => {
     loadStudents()
   }, [loadStudents])
@@ -214,7 +213,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
   // Disparo manual de sincronização
   const handleSync = async () => {
     setSyncing(true)
-    showToast("Sincronização iniciada com o Moodle EaD (ID 63)...", "success")
+    showToast("Sincronização iniciada com o Moodle EaD...", "success")
     try {
       const res = await triggerTutoriaManualSync("ead")
       showToast(`Sincronização concluída! ${res.records || 0} logs processados.`, "success")
@@ -865,7 +864,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm transition-all cursor-pointer gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sincronizando..." : "Atualizar Logs do AVA (ID 63)"}
+            {syncing ? "Sincronizando..." : "Atualizar Logs do AVA"}
           </Button>
         </div>
       </div>
@@ -2027,7 +2026,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
             {/* Footer Fixo do Modal */}
             <div className="p-4 px-6 border-t border-gray-100 bg-gray-50/70 flex items-center justify-between shrink-0">
               <span className="text-xs text-gray-400">
-                Dados consolidados via SQL Adiado (ID 63) • Tutoria Nexus Core
+                Dados consolidados via SQL Adiado • Tutoria Nexus Core
               </span>
               <Button
                 type="button"

@@ -435,19 +435,20 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const countRes = await this.db
-      .select({ count: drizzleSql<number>`count(*)` })
-      .from(academicDiscente)
-      .where(whereClause);
+    const [countRes, data] = await Promise.all([
+      this.db
+        .select({ count: drizzleSql<number>`count(*)` })
+        .from(academicDiscente)
+        .where(whereClause),
+      this.db
+        .select()
+        .from(academicDiscente)
+        .where(whereClause)
+        .orderBy(asc(academicDiscente.nome))
+        .limit(size)
+        .offset(offset),
+    ]);
     const total = Number(countRes[0]?.count || 0);
-
-    const data = await this.db
-      .select()
-      .from(academicDiscente)
-      .where(whereClause)
-      .orderBy(asc(academicDiscente.nome))
-      .limit(size)
-      .offset(offset);
 
     return {
       data,
@@ -485,19 +486,20 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const countRes = await this.db
-      .select({ count: drizzleSql<number>`count(*)` })
-      .from(academicDocente)
-      .where(whereClause);
+    const [countRes, data] = await Promise.all([
+      this.db
+        .select({ count: drizzleSql<number>`count(*)` })
+        .from(academicDocente)
+        .where(whereClause),
+      this.db
+        .select()
+        .from(academicDocente)
+        .where(whereClause)
+        .orderBy(asc(academicDocente.nome))
+        .limit(size)
+        .offset(offset),
+    ]);
     const total = Number(countRes[0]?.count || 0);
-
-    const data = await this.db
-      .select()
-      .from(academicDocente)
-      .where(whereClause)
-      .orderBy(asc(academicDocente.nome))
-      .limit(size)
-      .offset(offset);
 
     return {
       data,
@@ -531,23 +533,24 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
       whereClause = and(...textConditions);
     }
 
-    const countRes = await this.db
-      .select({ count: drizzleSql<number>`count(*)` })
-      .from(academicTurma)
-      .where(whereClause);
+    const [countRes, data] = await Promise.all([
+      this.db
+        .select({ count: drizzleSql<number>`count(*)` })
+        .from(academicTurma)
+        .where(whereClause),
+      this.db
+        .select()
+        .from(academicTurma)
+        .where(whereClause)
+        .orderBy(
+          desc(academicTurma.periodo),
+          asc(academicTurma.nomeDisciplina),
+          asc(academicTurma.turma),
+        )
+        .limit(size)
+        .offset(offset),
+    ]);
     const total = Number(countRes[0]?.count || 0);
-
-    const data = await this.db
-      .select()
-      .from(academicTurma)
-      .where(whereClause)
-      .orderBy(
-        desc(academicTurma.periodo),
-        asc(academicTurma.nomeDisciplina),
-        asc(academicTurma.turma),
-      )
-      .limit(size)
-      .offset(offset);
 
     const formattedData = data.map((item) => ({
       ...item,
@@ -625,10 +628,11 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
 
     if (whereClause && search) countQuery.where(whereClause);
 
-    const countRes = await countQuery;
+    const [countRes, data] = await Promise.all([
+      countQuery,
+      baseQuery.limit(size).offset(offset),
+    ]);
     const total = Number(countRes[0]?.count || 0);
-
-    const data = await baseQuery.limit(size).offset(offset);
 
     // Format output to match old Lyceum response
     const formattedData = data.map((m) => ({

@@ -1099,71 +1099,97 @@ export class AvaReportsService {
 
     try {
       const whereClause = this.buildConsolidatedConditions(filters);
-
-      // 1. Contagem total ultrarrápida no snapshot
-      const [countRes] = await this.db
-        .select({ count: sql<number>`count(*)` })
-        .from(avaConsolidatedReport)
-        .where(whereClause);
-
-      const total_records = Number(countRes?.count || 0);
-      const total_pages = Math.ceil(total_records / size) || 1;
       const offset = (page - 1) * size;
+      const sourceInstitution = filters.sourceInstitution || 'ead';
 
-      // 2. Busca paginada direta no Snapshot (Zero Left Joins em runtime - ~14ms!)
-      const pageRows =
-        total_records > 0
-          ? await this.db
-              .select({
-                id: avaConsolidatedReport.id,
-                alunoId: avaConsolidatedReport.alunoId,
-                matricula: avaConsolidatedReport.matricula,
-                usuario: avaConsolidatedReport.usuario,
-                aluno: avaConsolidatedReport.aluno,
-                email: avaConsolidatedReport.email,
-                userPhone1: avaConsolidatedReport.userPhone1,
-                periodo: avaConsolidatedReport.periodo,
-                curso: avaConsolidatedReport.curso,
-                subcategoria: avaConsolidatedReport.subcategoria,
-                cursoPerfil: avaConsolidatedReport.cursoPerfil,
-                periodoPerfil: avaConsolidatedReport.periodoPerfil,
-                unidadeFisica: avaConsolidatedReport.unidadeFisica,
-                enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
-                lastaccess: avaConsolidatedReport.lastaccess,
-                diasSemAcesso: avaConsolidatedReport.diasSemAcesso,
-                // Progresso
-                progressoFase1: avaConsolidatedReport.progressoFase1,
-                progressoFase2: avaConsolidatedReport.progressoFase2,
-                progressoFase3: avaConsolidatedReport.progressoFase3,
-                progressoTotal: avaConsolidatedReport.progressoTotal,
-                progressoListaFase1: avaConsolidatedReport.progressoListaFase1,
-                progressoListaFase2: avaConsolidatedReport.progressoListaFase2,
-                progressoListaFase3: avaConsolidatedReport.progressoListaFase3,
-                listaFase1: avaConsolidatedReport.progressoListaFase1,
-                listaFase2: avaConsolidatedReport.progressoListaFase2,
-                listaFase3: avaConsolidatedReport.progressoListaFase3,
-                sourceInstitution: avaConsolidatedReport.sourceInstitution,
-                // Notas
-                gradeId: avaConsolidatedReport.gradeId,
-                notaFase1: avaConsolidatedReport.notaFase1,
-                notaFase2: avaConsolidatedReport.notaFase2,
-                notaFase3: avaConsolidatedReport.notaFase3,
-                mediaFinal: avaConsolidatedReport.mediaFinal,
-                notasListaFase1: avaConsolidatedReport.notasListaFase1,
-                notasListaFase2: avaConsolidatedReport.notasListaFase2,
-                notasListaFase3: avaConsolidatedReport.notasListaFase3,
-                listaNotas: avaConsolidatedReport.listaNotas,
-              })
-              .from(avaConsolidatedReport)
-              .where(whereClause)
-              .orderBy(
-                avaConsolidatedReport.aluno,
-                avaConsolidatedReport.curso,
-                avaConsolidatedReport.id,
-              )
-              .limit(size)
-              .offset(offset)
-          : [];
+      const statsCacheKey = `ava:consolidated:stats:${JSON.stringify(filters)}`;
+      const computeStats = async () => {
+        const [res] = await this.db
+          .select({
+            totalRecords: sql<number>`count(*)`,
+            avgProgress: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            avgProgF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            avgProgF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            avgProgF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
+
+            avgGrade: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            avgNotaF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            avgNotaF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
+            avgNotaF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
+
+            belowApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
+            aboveApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) >= 60 then 1 end)`,
+            onTrackProgress: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric) >= 70 then 1 end)`,
+            noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
+            uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaConsolidatedReport.alunoId}, ''), ${avaConsolidatedReport.matricula}))`,
+            uniqueDisciplines: sql<number>`count(distinct ${avaConsolidatedReport.curso})`,
+            lastSync: sql<string>`max(${avaConsolidatedReport.updatedAt})`,
+          })
+          .from(avaConsolidatedReport)
+          .where(whereClause);
+        return res;
+      };
+
+      // Executa busca da página, estatísticas (com cache de 120s) e dropdowns em PARALELO
+      const [pageRows, statsRes, dropdowns] = await Promise.all([
+        this.db
+          .select({
+            id: avaConsolidatedReport.id,
+            alunoId: avaConsolidatedReport.alunoId,
+            matricula: avaConsolidatedReport.matricula,
+            usuario: avaConsolidatedReport.usuario,
+            aluno: avaConsolidatedReport.aluno,
+            email: avaConsolidatedReport.email,
+            userPhone1: avaConsolidatedReport.userPhone1,
+            periodo: avaConsolidatedReport.periodo,
+            curso: avaConsolidatedReport.curso,
+            subcategoria: avaConsolidatedReport.subcategoria,
+            cursoPerfil: avaConsolidatedReport.cursoPerfil,
+            periodoPerfil: avaConsolidatedReport.periodoPerfil,
+            unidadeFisica: avaConsolidatedReport.unidadeFisica,
+            enrolmentStatus: avaConsolidatedReport.enrolmentStatus,
+            lastaccess: avaConsolidatedReport.lastaccess,
+            diasSemAcesso: avaConsolidatedReport.diasSemAcesso,
+            // Progresso
+            progressoFase1: avaConsolidatedReport.progressoFase1,
+            progressoFase2: avaConsolidatedReport.progressoFase2,
+            progressoFase3: avaConsolidatedReport.progressoFase3,
+            progressoTotal: avaConsolidatedReport.progressoTotal,
+            progressoListaFase1: avaConsolidatedReport.progressoListaFase1,
+            progressoListaFase2: avaConsolidatedReport.progressoListaFase2,
+            progressoListaFase3: avaConsolidatedReport.progressoListaFase3,
+            listaFase1: avaConsolidatedReport.progressoListaFase1,
+            listaFase2: avaConsolidatedReport.progressoListaFase2,
+            listaFase3: avaConsolidatedReport.progressoListaFase3,
+            sourceInstitution: avaConsolidatedReport.sourceInstitution,
+            // Notas
+            gradeId: avaConsolidatedReport.gradeId,
+            notaFase1: avaConsolidatedReport.notaFase1,
+            notaFase2: avaConsolidatedReport.notaFase2,
+            notaFase3: avaConsolidatedReport.notaFase3,
+            mediaFinal: avaConsolidatedReport.mediaFinal,
+            notasListaFase1: avaConsolidatedReport.notasListaFase1,
+            notasListaFase2: avaConsolidatedReport.notasListaFase2,
+            notasListaFase3: avaConsolidatedReport.notasListaFase3,
+            listaNotas: avaConsolidatedReport.listaNotas,
+          })
+          .from(avaConsolidatedReport)
+          .where(whereClause)
+          .orderBy(
+            avaConsolidatedReport.aluno,
+            avaConsolidatedReport.curso,
+            avaConsolidatedReport.id,
+          )
+          .limit(size)
+          .offset(offset),
+        this.cacheService
+          ? this.cacheService.wrap(statsCacheKey, computeStats, 120)
+          : computeStats(),
+        this.getCachedDropdownOptions(sourceInstitution),
+      ]);
+
+      const total_records = Number((statsRes as any)?.totalRecords || 0);
+      const total_pages = Math.ceil(total_records / size) || 1;
 
       const data = pageRows.map((row) => ({
         ...row,
@@ -1173,34 +1199,6 @@ export class AvaReportsService {
         notaFase3: row.notaFase3 ?? '-',
         mediaFinal: row.mediaFinal ?? '-',
       }));
-
-      // 3. Agregações estatísticas em SQL nativo no snapshot
-      const [statsRes] = await this.db
-        .select({
-          avgProgress: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          avgProgF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          avgProgF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          avgProgF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.progressoFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
-
-          avgGrade: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          avgNotaF1: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase1}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          avgNotaF2: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase2}, '[^0-9.]', '', 'g'), '')::numeric)`,
-          avgNotaF3: sql<number>`avg(nullif(regexp_replace(${avaConsolidatedReport.notaFase3}, '[^0-9.]', '', 'g'), '')::numeric)`,
-
-          belowApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
-          aboveApproval: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.mediaFinal}, '[^0-9.]', '', 'g'), '')::numeric) >= 60 then 1 end)`,
-          onTrackProgress: sql<number>`count(case when (nullif(regexp_replace(${avaConsolidatedReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric) >= 70 then 1 end)`,
-          noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaConsolidatedReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') then 1 end)`,
-          uniqueStudents: sql<number>`count(distinct coalesce(nullif(${avaConsolidatedReport.alunoId}, ''), ${avaConsolidatedReport.matricula}))`,
-          uniqueDisciplines: sql<number>`count(distinct ${avaConsolidatedReport.curso})`,
-          lastSync: sql<string>`max(${avaConsolidatedReport.updatedAt})`,
-        })
-        .from(avaConsolidatedReport)
-        .where(whereClause);
-
-      // 4. Dropdowns de filtros únicos diretamente do snapshot com cache
-      const sourceInstitution = filters.sourceInstitution || 'ead';
-      const dropdowns = await this.getCachedDropdownOptions(sourceInstitution);
 
       const now = new Date();
       const nextSyncDate = new Date(now);
@@ -1314,179 +1312,191 @@ export class AvaReportsService {
   async getAvaDashboardStats(user: SessionUser) {
     await this.assertAvaAccess(user);
 
-    try {
-      const [progressStatsRes, gradeStatsRes] = await Promise.all([
-        this.db
-          .select({
-            sourceInstitution: avaProgressReport.sourceInstitution,
-            totalStudents: sql<number>`count(*)`,
-            validProgressCount: sql<number>`count(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), ''))`,
-            avgProgress: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
-            noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaProgressReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') or (coalesce(${avaProgressReport.diasSemAcesso}, '') ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer > 14) then 1 end)`,
-            lastSync: sql<Date>`max(${avaProgressReport.updatedAt})`,
-          })
-          .from(avaProgressReport)
-          .groupBy(avaProgressReport.sourceInstitution),
+    const computeDashboardStats = async () => {
+      try {
+        const [progressStatsRes, gradeStatsRes] = await Promise.all([
+          this.db
+            .select({
+              sourceInstitution: avaProgressReport.sourceInstitution,
+              totalStudents: sql<number>`count(*)`,
+              validProgressCount: sql<number>`count(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), ''))`,
+              avgProgress: sql<number>`avg(nullif(regexp_replace(${avaProgressReport.progressoTotal}, '[^0-9.]', '', 'g'), '')::numeric)`,
+              noAccessCount: sql<number>`count(case when lower(trim(coalesce(${avaProgressReport.lastaccess}, ''))) in ('nunca acessou', 'sem acesso', '', 'none', 'nulo', '-') or (coalesce(${avaProgressReport.diasSemAcesso}, '') ~ '^[0-9]+$' and ${avaProgressReport.diasSemAcesso}::integer > 14) then 1 end)`,
+              lastSync: sql<Date>`max(${avaProgressReport.updatedAt})`,
+            })
+            .from(avaProgressReport)
+            .groupBy(avaProgressReport.sourceInstitution),
 
-        this.db
-          .select({
-            sourceInstitution: avaGradesReport.sourceInstitution,
-            validGradesCount: sql<number>`count(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), ''))`,
-            avgGrade: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric)`,
-            belowApprovalCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
-            lastSync: sql<Date>`max(${avaGradesReport.updatedAt})`,
-          })
-          .from(avaGradesReport)
-          .groupBy(avaGradesReport.sourceInstitution),
-      ]);
+          this.db
+            .select({
+              sourceInstitution: avaGradesReport.sourceInstitution,
+              validGradesCount: sql<number>`count(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), ''))`,
+              avgGrade: sql<number>`avg(nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric)`,
+              belowApprovalCount: sql<number>`count(case when (nullif(regexp_replace(${avaGradesReport.media}, '[^0-9.]', '', 'g'), '')::numeric) < 60 then 1 end)`,
+              lastSync: sql<Date>`max(${avaGradesReport.updatedAt})`,
+            })
+            .from(avaGradesReport)
+            .groupBy(avaGradesReport.sourceInstitution),
+        ]);
 
-      const progressMap = new Map(
-        progressStatsRes.map((r) => [r.sourceInstitution?.toLowerCase(), r]),
-      );
-      const gradeMap = new Map(
-        gradeStatsRes.map((r) => [r.sourceInstitution?.toLowerCase(), r]),
-      );
+        const progressMap = new Map(
+          progressStatsRes.map((r) => [r.sourceInstitution?.toLowerCase(), r]),
+        );
+        const gradeMap = new Map(
+          gradeStatsRes.map((r) => [r.sourceInstitution?.toLowerCase(), r]),
+        );
 
-      let totalStudents = 0;
-      let totalProgressWeighted = 0;
-      let totalValidProgress = 0;
-      let totalNoAccess = 0;
+        let totalStudents = 0;
+        let totalProgressWeighted = 0;
+        let totalValidProgress = 0;
+        let totalNoAccess = 0;
 
-      for (const p of progressStatsRes) {
-        const count = Number(p.totalStudents || 0);
-        const validCount = Number(p.validProgressCount || 0);
-        const avg = Number(p.avgProgress || 0);
-        totalStudents += count;
-        totalValidProgress += validCount;
-        totalProgressWeighted += avg * validCount;
-        totalNoAccess += Number(p.noAccessCount || 0);
-      }
-
-      let totalGradeWeighted = 0;
-      let totalValidGrades = 0;
-      let belowApprovalCount = 0;
-
-      for (const g of gradeStatsRes) {
-        const validCount = Number(g.validGradesCount || 0);
-        const avg = Number(g.avgGrade || 0);
-        totalValidGrades += validCount;
-        totalGradeWeighted += avg * validCount;
-        belowApprovalCount += Number(g.belowApprovalCount || 0);
-      }
-
-      const averageProgress =
-        totalValidProgress > 0
-          ? Math.round(totalProgressWeighted / totalValidProgress)
-          : 0;
-      const averageGrade =
-        totalValidGrades > 0
-          ? Math.round(totalGradeWeighted / totalValidGrades)
-          : 0;
-
-      const institutions = ['ead', 'eefn', 'raizes', 'uni', 'uniego'];
-      const institutionsStats = institutions.map((inst) => {
-        const p = progressMap.get(inst);
-        const g = gradeMap.get(inst);
-
-        const lastSyncP = p?.lastSync ? new Date(p.lastSync) : null;
-        const lastSyncG = g?.lastSync ? new Date(g.lastSync) : null;
-        let lastSync: Date | null = null;
-        if (lastSyncP && lastSyncG) {
-          lastSync = lastSyncP > lastSyncG ? lastSyncP : lastSyncG;
-        } else {
-          lastSync = lastSyncP || lastSyncG;
+        for (const p of progressStatsRes) {
+          const count = Number(p.totalStudents || 0);
+          const validCount = Number(p.validProgressCount || 0);
+          const avg = Number(p.avgProgress || 0);
+          totalStudents += count;
+          totalValidProgress += validCount;
+          totalProgressWeighted += avg * validCount;
+          totalNoAccess += Number(p.noAccessCount || 0);
         }
 
-        return {
-          id: inst,
-          name: inst.toUpperCase(),
-          totalStudents: Number(p?.totalStudents || 0),
-          averageProgress: p?.avgProgress
-            ? Math.round(Number(p.avgProgress))
-            : 0,
-          averageGrade: g?.avgGrade ? Math.round(Number(g.avgGrade)) : 0,
-          belowApprovalCount: Number(g?.belowApprovalCount || 0),
-          noAccessCount: Number(p?.noAccessCount || 0),
-          lastSync: lastSync ? lastSync.toISOString() : null,
-          status: lastSync ? 'success' : 'offline',
-        };
-      });
+        let totalGradeWeighted = 0;
+        let totalValidGrades = 0;
+        let belowApprovalCount = 0;
 
-      return {
-        totalStudents,
-        averageProgress,
-        averageGrade,
-        belowApprovalCount,
-        noAccessCount: totalNoAccess,
-        institutionsStats,
-      };
-    } catch (error) {
-      console.error('Error in getAvaDashboardStats:', error);
-      return {
-        totalStudents: 0,
-        averageProgress: 0,
-        averageGrade: 0,
-        belowApprovalCount: 0,
-        noAccessCount: 0,
-        institutionsStats: [
-          {
-            id: 'ead',
-            name: 'EAD',
-            totalStudents: 0,
-            averageProgress: 0,
-            averageGrade: 0,
-            belowApprovalCount: 0,
-            noAccessCount: 0,
-            lastSync: null,
-            status: 'offline',
-          },
-          {
-            id: 'eefn',
-            name: 'EEFN',
-            totalStudents: 0,
-            averageProgress: 0,
-            averageGrade: 0,
-            belowApprovalCount: 0,
-            noAccessCount: 0,
-            lastSync: null,
-            status: 'offline',
-          },
-          {
-            id: 'raizes',
-            name: 'RAÍZES',
-            totalStudents: 0,
-            averageProgress: 0,
-            averageGrade: 0,
-            belowApprovalCount: 0,
-            noAccessCount: 0,
-            lastSync: null,
-            status: 'offline',
-          },
-          {
-            id: 'uni',
-            name: 'UNI',
-            totalStudents: 0,
-            averageProgress: 0,
-            averageGrade: 0,
-            belowApprovalCount: 0,
-            noAccessCount: 0,
-            lastSync: null,
-            status: 'offline',
-          },
-          {
-            id: 'uniego',
-            name: 'UNIEGO',
-            totalStudents: 0,
-            averageProgress: 0,
-            averageGrade: 0,
-            belowApprovalCount: 0,
-            noAccessCount: 0,
-            lastSync: null,
-            status: 'offline',
-          },
-        ],
-      };
+        for (const g of gradeStatsRes) {
+          const validCount = Number(g.validGradesCount || 0);
+          const avg = Number(g.avgGrade || 0);
+          totalValidGrades += validCount;
+          totalGradeWeighted += avg * validCount;
+          belowApprovalCount += Number(g.belowApprovalCount || 0);
+        }
+
+        const averageProgress =
+          totalValidProgress > 0
+            ? Math.round(totalProgressWeighted / totalValidProgress)
+            : 0;
+        const averageGrade =
+          totalValidGrades > 0
+            ? Math.round(totalGradeWeighted / totalValidGrades)
+            : 0;
+
+        const institutions = ['ead', 'eefn', 'raizes', 'uni', 'uniego'];
+        const institutionsStats = institutions.map((inst) => {
+          const p = progressMap.get(inst);
+          const g = gradeMap.get(inst);
+
+          const lastSyncP = p?.lastSync ? new Date(p.lastSync) : null;
+          const lastSyncG = g?.lastSync ? new Date(g.lastSync) : null;
+          let lastSync: Date | null = null;
+          if (lastSyncP && lastSyncG) {
+            lastSync = lastSyncP > lastSyncG ? lastSyncP : lastSyncG;
+          } else {
+            lastSync = lastSyncP || lastSyncG;
+          }
+
+          return {
+            id: inst,
+            name: inst.toUpperCase(),
+            totalStudents: Number(p?.totalStudents || 0),
+            averageProgress: p?.avgProgress
+              ? Math.round(Number(p.avgProgress))
+              : 0,
+            averageGrade: g?.avgGrade ? Math.round(Number(g.avgGrade)) : 0,
+            belowApprovalCount: Number(g?.belowApprovalCount || 0),
+            noAccessCount: Number(p?.noAccessCount || 0),
+            lastSync: lastSync ? lastSync.toISOString() : null,
+            status: lastSync ? 'success' : 'offline',
+          };
+        });
+
+        return {
+          totalStudents,
+          averageProgress,
+          averageGrade,
+          belowApprovalCount,
+          noAccessCount: totalNoAccess,
+          institutionsStats,
+        };
+      } catch (error) {
+        console.error('Error in getAvaDashboardStats:', error);
+        return {
+          totalStudents: 0,
+          averageProgress: 0,
+          averageGrade: 0,
+          belowApprovalCount: 0,
+          noAccessCount: 0,
+          institutionsStats: [
+            {
+              id: 'ead',
+              name: 'EAD',
+              totalStudents: 0,
+              averageProgress: 0,
+              averageGrade: 0,
+              belowApprovalCount: 0,
+              noAccessCount: 0,
+              lastSync: null,
+              status: 'offline',
+            },
+            {
+              id: 'eefn',
+              name: 'EEFN',
+              totalStudents: 0,
+              averageProgress: 0,
+              averageGrade: 0,
+              belowApprovalCount: 0,
+              noAccessCount: 0,
+              lastSync: null,
+              status: 'offline',
+            },
+            {
+              id: 'raizes',
+              name: 'RAÍZES',
+              totalStudents: 0,
+              averageProgress: 0,
+              averageGrade: 0,
+              belowApprovalCount: 0,
+              noAccessCount: 0,
+              lastSync: null,
+              status: 'offline',
+            },
+            {
+              id: 'uni',
+              name: 'UNI',
+              totalStudents: 0,
+              averageProgress: 0,
+              averageGrade: 0,
+              belowApprovalCount: 0,
+              noAccessCount: 0,
+              lastSync: null,
+              status: 'offline',
+            },
+            {
+              id: 'uniego',
+              name: 'UNIEGO',
+              totalStudents: 0,
+              averageProgress: 0,
+              averageGrade: 0,
+              belowApprovalCount: 0,
+              noAccessCount: 0,
+              lastSync: null,
+              status: 'offline',
+            },
+          ],
+        };
+      }
+    };
+
+    if (this.cacheService) {
+      return this.cacheService.wrap(
+        'ava:dashboard:stats',
+        computeDashboardStats,
+        120,
+      );
     }
+
+    return computeDashboardStats();
   }
 
   async getCachedDropdownOptions(

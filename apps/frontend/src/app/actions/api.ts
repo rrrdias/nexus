@@ -2,32 +2,43 @@
 
 import { auth, signOut } from "../../auth"
 import { headers } from "next/headers"
+import { cache } from "react"
+
+const getCachedSession = cache(async () => {
+  return auth()
+})
+
+const getCachedClientOrigin = cache(async () => {
+  try {
+    const h = await headers()
+    const origin = h.get("origin")
+    if (origin && /^https?:\/\//i.test(origin)) {
+      return origin.replace(/\/+$/, "")
+    }
+    const host = h.get("x-forwarded-host") || h.get("host")
+    const proto = h.get("x-forwarded-proto") || "http"
+    if (host) {
+      return `${proto}://${host}`.replace(/\/+$/, "")
+    }
+  } catch {
+    // Ignora caso executado fora de contexto de request Next.js
+  }
+  return ""
+})
 
 export async function fetchFromApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   let token: string | undefined = process.env.TEST_AUTH_TOKEN
   let clientOrigin = ""
   if (!token) {
-    const session = await auth()
+    const [session, resolvedOrigin] = await Promise.all([
+      getCachedSession(),
+      getCachedClientOrigin(),
+    ])
     token = session?.user?.accessToken
+    clientOrigin = resolvedOrigin
 
     if (!token) {
       await signOut({ redirectTo: "/nexus/login" })
-    }
-
-    try {
-      const h = await headers()
-      const origin = h.get("origin")
-      if (origin && /^https?:\/\//i.test(origin)) {
-        clientOrigin = origin.replace(/\/+$/, "")
-      } else {
-        const host = h.get("x-forwarded-host") || h.get("host")
-        const proto = h.get("x-forwarded-proto") || "http"
-        if (host) {
-          clientOrigin = `${proto}://${host}`.replace(/\/+$/, "")
-        }
-      }
-    } catch {
-      // Ignora caso executado fora de contexto de request Next.js
     }
   }
 

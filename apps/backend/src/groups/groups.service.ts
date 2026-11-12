@@ -10,6 +10,7 @@ import { groups, groupSystemAccess, systemModules } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service';
 import { RbacGuard } from '../auth/rbac.guard';
+import { SystemService } from '../system/system.service';
 
 type SessionUser = {
   id?: string;
@@ -114,6 +115,7 @@ export class GroupsService {
       await this.cacheService.delByPattern('rbac:user:*');
     }
     RbacGuard.clearCache();
+    SystemService.clearSidebarCache();
 
     return { success: true };
   }
@@ -148,6 +150,7 @@ export class GroupsService {
       await this.cacheService.delByPattern('rbac:user:*');
     }
     RbacGuard.clearCache();
+    SystemService.clearSidebarCache();
 
     return { success: true };
   }
@@ -160,6 +163,7 @@ export class GroupsService {
       await this.cacheService.delByPattern('rbac:user:*');
     }
     RbacGuard.clearCache();
+    SystemService.clearSidebarCache();
 
     return { success: true };
   }

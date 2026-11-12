@@ -18,6 +18,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { hashPassword } from './password.util';
 import { CacheService } from '../cache/cache.service';
 import { RbacGuard } from '../auth/rbac.guard';
+import { SystemService } from '../system/system.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
 
@@ -230,6 +231,7 @@ export class UsersService {
       await this.cacheService.del(`rbac:user:${userId}:modules`);
     }
     RbacGuard.clearCache(userId);
+    SystemService.clearSidebarCache(userId);
 
     await this.auditService?.record({
       userId: userSession.id,
@@ -259,6 +261,7 @@ export class UsersService {
       await this.cacheService.del(`rbac:user:${userId}:modules`);
     }
     RbacGuard.clearCache(userId);
+    SystemService.clearSidebarCache(userId);
 
     await this.auditService?.record({
       userId: userSession.id,
@@ -282,6 +285,7 @@ export class UsersService {
       await this.cacheService.del(`rbac:user:${userId}:modules`);
     }
     RbacGuard.clearCache(userId);
+    SystemService.clearSidebarCache(userId);
 
     await this.auditService?.record({
       userId: userSession.id,

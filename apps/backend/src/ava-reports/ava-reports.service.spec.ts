@@ -20,9 +20,10 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
     };
 
     db = queryBuilder;
-    service = new AvaReportsService(db, {
+    service = new AvaReportsService(db, {} as any, {
       get: jest.fn(),
       set: jest.fn(),
+      wrap: jest.fn((_key: string, fn: () => any) => fn()),
     } as any);
   });
 
@@ -133,10 +134,10 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
     ];
 
     db.where
-      .mockResolvedValueOnce([{ count: 1200 }])
       .mockReturnValueOnce(db)
       .mockResolvedValueOnce([
         {
+          totalRecords: 1200,
           avgProgress: 76.5,
           avgGrade: 81.0,
           belowApproval: 10,

@@ -24,31 +24,31 @@ export default async function AdminSchedulingPage({
   }
 
   const filters = await searchParams
-  const [locals, periods] = await Promise.all([
-    getLocals(),
-    getPeriods(),
-  ])
-
   const preferredPeriod =
     process.env.NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD ||
     process.env.NEXUS_DEFAULT_PERIOD ||
     "2026-2"
+  const selectedPeriod = filters.periodo || preferredPeriod
+
+  const [locals, periods, initialBookings] = await Promise.all([
+    getLocals(),
+    getPeriods(),
+    getBookings({
+      matricula: filters.matricula,
+      localId: filters.localId === "all" ? undefined : filters.localId,
+      periodo: selectedPeriod,
+      data: filters.data,
+      status: filters.status === "all" ? undefined : filters.status,
+      page: filters.page ? parseInt(filters.page) : 1,
+      size: 15,
+    }),
+  ])
+
   const defaultPeriod = periods.includes(preferredPeriod)
     ? preferredPeriod
     : periods.includes("2026-2")
       ? "2026-2"
       : periods[0] || "2026-2"
-  const selectedPeriod = filters.periodo || defaultPeriod
-
-  const initialBookings = await getBookings({
-    matricula: filters.matricula,
-    localId: filters.localId === "all" ? undefined : filters.localId,
-    periodo: selectedPeriod,
-    data: filters.data,
-    status: filters.status === "all" ? undefined : filters.status,
-    page: filters.page ? parseInt(filters.page) : 1,
-    size: 15,
-  })
 
   return (
     <div className="space-y-6">

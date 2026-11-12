@@ -389,7 +389,11 @@ export class AvaSyncService implements OnModuleInit {
       );
 
       if (this.cacheService) {
-        await this.cacheService.delByPattern('ava:dropdowns:*');
+        await Promise.all([
+          this.cacheService.delByPattern('ava:dropdowns:*'),
+          this.cacheService.delByPattern('ava:consolidated:stats:*'),
+          this.cacheService.del('ava:dashboard:stats'),
+        ]);
       }
     } catch (err: any) {
       console.error(

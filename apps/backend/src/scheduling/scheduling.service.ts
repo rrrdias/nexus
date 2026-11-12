@@ -115,6 +115,10 @@ function getNowInSaoPaulo(referenceDate: Date = new Date()): {
 
 @Injectable()
 export class SchedulingService implements OnModuleInit {
+  private static periodsCache: { periods: string[]; timestamp: number } | null =
+    null;
+  private static readonly PERIODS_CACHE_TTL_MS = 300_000; // 5 minutos
+
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
     @Optional() private readonly auditService?: AuditService,
@@ -955,44 +959,56 @@ export class SchedulingService implements OnModuleInit {
     return updated;
   }
 
-  // 5. Distinct Periods Query
+  // 5. Distinct Periods Query (Parallelized & Cached)
   async getPeriods(): Promise<string[]> {
+    const now = Date.now();
+    if (
+      SchedulingService.periodsCache &&
+      now - SchedulingService.periodsCache.timestamp <
+        SchedulingService.PERIODS_CACHE_TTL_MS
+    ) {
+      return SchedulingService.periodsCache.periods;
+    }
+
     const periodsSet = new Set<string>();
 
-    try {
-      const turmaPeriods = await this.db
-        .selectDistinct({ periodo: academicTurma.periodo })
-        .from(academicTurma)
-        .where(isNotNull(academicTurma.periodo));
-      turmaPeriods.forEach((p) => {
-        if (p.periodo && p.periodo.trim()) periodsSet.add(p.periodo.trim());
-      });
-    } catch {
-      // Tabela academic_turma pode estar indisponível ou vazia
-    }
+    const [turmaPeriods, avaPeriods, bookingPeriods] = await Promise.all([
+      (async () => {
+        try {
+          return await this.db
+            .selectDistinct({ periodo: academicTurma.periodo })
+            .from(academicTurma)
+            .where(isNotNull(academicTurma.periodo));
+        } catch {
+          return [];
+        }
+      })(),
+      (async () => {
+        try {
+          return await this.db
+            .selectDistinct({ periodo: avaProgressReport.periodo })
+            .from(avaProgressReport)
+            .where(isNotNull(avaProgressReport.periodo));
+        } catch {
+          return [];
+        }
+      })(),
+      (async () => {
+        try {
+          return await this.db
+            .selectDistinct({ periodo: agendamentosMatricula.periodo })
+            .from(agendamentosMatricula)
+            .where(isNotNull(agendamentosMatricula.periodo));
+        } catch {
+          return [];
+        }
+      })(),
+    ]);
 
-    try {
-      const avaPeriods = await this.db
-        .selectDistinct({ periodo: avaProgressReport.periodo })
-        .from(avaProgressReport)
-        .where(isNotNull(avaProgressReport.periodo));
-      avaPeriods.forEach((p) => {
-        if (p.periodo && p.periodo.trim()) periodsSet.add(p.periodo.trim());
-      });
-    } catch {
-      // Tabela ava_progress_report pode estar indisponível ou vazia
-    }
-
-    try {
-      const bookingPeriods = await this.db
-        .selectDistinct({ periodo: agendamentosMatricula.periodo })
-        .from(agendamentosMatricula)
-        .where(isNotNull(agendamentosMatricula.periodo));
-      bookingPeriods.forEach((p) => {
-        if (p.periodo && p.periodo.trim()) periodsSet.add(p.periodo.trim());
-      });
-    } catch {
-      // Tabela agendamentos_matricula pode estar indisponível ou vazia
+    for (const p of [...turmaPeriods, ...avaPeriods, ...bookingPeriods]) {
+      if (p.periodo && p.periodo.trim()) {
+        periodsSet.add(p.periodo.trim());
+      }
     }
 
     periodsSet.add(getDefaultPeriod());
@@ -1002,7 +1018,142 @@ export class SchedulingService implements OnModuleInit {
       periodsSet.add('2026-1');
     }
 
-    return Array.from(periodsSet).sort((a, b) => b.localeCompare(a));
+    const sorted = Array.from(periodsSet).sort((a, b) => b.localeCompare(a));
+    SchedulingService.periodsCache = { periods: sorted, timestamp: now };
+    return sorted;
+  }
+
+  private async enrichBookingsWithStudentInfo<
+    T extends {
+      matricula: string;
+      periodo: string;
+      studentName?: string | null;
+      studentEmail?: string | null;
+      acNomeSocial?: string | null;
+      acNome?: string | null;
+      acSobrenome?: string | null;
+      acEmail?: string | null;
+      acUsuario?: string | null;
+    },
+  >(
+    rows: T[],
+  ): Promise<Array<T & { studentName: string; studentEmail: string }>> {
+    if (rows.length === 0) return [];
+
+    const uniqueMatriculas = Array.from(
+      new Set(rows.map((r) => r.matricula?.trim()).filter(Boolean)),
+    );
+
+    const [avaRows, acRows] =
+      uniqueMatriculas.length > 0
+        ? await Promise.all([
+            (async () => {
+              try {
+                return await this.db
+                  .select({
+                    matricula: avaProgressReport.matricula,
+                    periodo: avaProgressReport.periodo,
+                    aluno: sql<string>`max(${avaProgressReport.aluno})`,
+                    usuario: sql<string>`max(${avaProgressReport.usuario})`,
+                  })
+                  .from(avaProgressReport)
+                  .where(inArray(avaProgressReport.matricula, uniqueMatriculas))
+                  .groupBy(
+                    avaProgressReport.matricula,
+                    avaProgressReport.periodo,
+                  );
+              } catch {
+                return [];
+              }
+            })(),
+            (async () => {
+              try {
+                return await this.db
+                  .select({
+                    matricula: academicDiscente.matricula,
+                    nomeSocial: sql<string>`max(${academicDiscente.nomeSocial})`,
+                    nome: sql<string>`max(${academicDiscente.nome})`,
+                    sobrenome: sql<string>`max(${academicDiscente.sobrenome})`,
+                    email: sql<string>`max(${academicDiscente.email})`,
+                    usuario: sql<string>`max(${academicDiscente.usuario})`,
+                  })
+                  .from(academicDiscente)
+                  .where(inArray(academicDiscente.matricula, uniqueMatriculas))
+                  .groupBy(academicDiscente.matricula);
+              } catch {
+                return [];
+              }
+            })(),
+          ])
+        : [[], []];
+
+    const avaByMatPeriodo = new Map<
+      string,
+      { aluno: string | null; usuario: string | null }
+    >();
+    const avaByMat = new Map<
+      string,
+      { aluno: string | null; usuario: string | null }
+    >();
+    for (const r of avaRows) {
+      if (!r.matricula) continue;
+      const mat = r.matricula.trim();
+      const per = (r.periodo || '').trim();
+      avaByMatPeriodo.set(`${mat}_${per}`, {
+        aluno: r.aluno,
+        usuario: r.usuario,
+      });
+      if (!avaByMat.has(mat)) {
+        avaByMat.set(mat, { aluno: r.aluno, usuario: r.usuario });
+      }
+    }
+
+    const acByMat = new Map<
+      string,
+      {
+        nomeSocial: string | null;
+        nome: string | null;
+        sobrenome: string | null;
+        email: string | null;
+        usuario: string | null;
+      }
+    >();
+    for (const r of acRows) {
+      if (!r.matricula) continue;
+      acByMat.set(r.matricula.trim(), r);
+    }
+
+    return rows.map((row) => {
+      const mat = (row.matricula || '').trim();
+      const per = (row.periodo || '').trim();
+      const avaInfo = avaByMatPeriodo.get(`${mat}_${per}`) || avaByMat.get(mat);
+      const acInfo = acByMat.get(mat);
+
+      const studentName =
+        avaInfo?.aluno ||
+        acInfo?.nomeSocial ||
+        (acInfo?.nome
+          ? `${acInfo.nome} ${acInfo.sobrenome || ''}`.trim()
+          : null) ||
+        row.studentName ||
+        row.acNomeSocial ||
+        (row.acNome ? `${row.acNome} ${row.acSobrenome || ''}`.trim() : null) ||
+        'Estudante Não Identificado';
+      const studentEmail =
+        avaInfo?.usuario ||
+        acInfo?.email ||
+        acInfo?.usuario ||
+        row.studentEmail ||
+        row.acEmail ||
+        row.acUsuario ||
+        '';
+
+      return {
+        ...row,
+        studentName,
+        studentEmail,
+      };
+    });
   }
 
   // 6. Backoffice Lists & Filters
@@ -1041,113 +1192,40 @@ export class SchedulingService implements OnModuleInit {
 
     const whereClause = and(...conditions);
 
-    // Subquery from AVA Progress Report
-    const studentSubquery = this.db
-      .select({
-        matricula: avaProgressReport.matricula,
-        periodo: avaProgressReport.periodo,
-        aluno: sql<string>`max(${avaProgressReport.aluno})`.as('ava_aluno'),
-        usuario: sql<string>`max(${avaProgressReport.usuario})`.as(
-          'ava_usuario',
-        ),
-      })
-      .from(avaProgressReport)
-      .groupBy(avaProgressReport.matricula, avaProgressReport.periodo)
-      .as('student_subquery');
-
-    // Subquery from Academic Discente (Lyceum cache)
-    const academicDiscenteSubquery = this.db
-      .select({
-        matricula: academicDiscente.matricula,
-        nomeSocial: sql<string>`max(${academicDiscente.nomeSocial})`.as(
-          'ac_nome_social',
-        ),
-        nome: sql<string>`max(${academicDiscente.nome})`.as('ac_nome'),
-        sobrenome: sql<string>`max(${academicDiscente.sobrenome})`.as(
-          'ac_sobrenome',
-        ),
-        email: sql<string>`max(${academicDiscente.email})`.as('ac_email'),
-        usuario: sql<string>`max(${academicDiscente.usuario})`.as('ac_usuario'),
-      })
-      .from(academicDiscente)
-      .groupBy(academicDiscente.matricula)
-      .as('ac_discente_subquery');
-
-    // Get paginated bookings details
-    const rawData = await this.db
-      .select({
-        id: agendamentosMatricula.id,
-        matricula: agendamentosMatricula.matricula,
-        descricao: agendamentosMatricula.descricao,
-        status: agendamentosMatricula.status,
-        periodo: agendamentosMatricula.periodo,
-        data: agendamentosMatricula.data,
-        createdAt: agendamentosMatricula.createdAt,
-        hora: opcaos.hora,
-        localId: opcaos.localId,
-        localNome: locals.nome,
-        studentName: studentSubquery.aluno,
-        studentEmail: studentSubquery.usuario,
-        acNomeSocial: academicDiscenteSubquery.nomeSocial,
-        acNome: academicDiscenteSubquery.nome,
-        acSobrenome: academicDiscenteSubquery.sobrenome,
-        acEmail: academicDiscenteSubquery.email,
-        acUsuario: academicDiscenteSubquery.usuario,
-      })
-      .from(agendamentosMatricula)
-      .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
-      .innerJoin(locals, eq(opcaos.localId, locals.id))
-      .leftJoin(
-        studentSubquery,
-        and(
-          eq(studentSubquery.matricula, agendamentosMatricula.matricula),
-          eq(studentSubquery.periodo, agendamentosMatricula.periodo),
-        ),
-      )
-      .leftJoin(
-        academicDiscenteSubquery,
-        eq(academicDiscenteSubquery.matricula, agendamentosMatricula.matricula),
-      )
-      .where(whereClause)
-      .orderBy(desc(agendamentosMatricula.createdAt))
-      .limit(size)
-      .offset(offset);
-
-    // Get total count
-    const [countResult] = await this.db
-      .select({ count: sql`count(*)` })
-      .from(agendamentosMatricula)
-      .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
-      .innerJoin(locals, eq(opcaos.localId, locals.id))
-      .where(whereClause);
+    // Get paginated bookings details and total count in parallel (without scanning 50k+ AVA rows)
+    const [rawData, [countResult]] = await Promise.all([
+      this.db
+        .select({
+          id: agendamentosMatricula.id,
+          matricula: agendamentosMatricula.matricula,
+          descricao: agendamentosMatricula.descricao,
+          status: agendamentosMatricula.status,
+          periodo: agendamentosMatricula.periodo,
+          data: agendamentosMatricula.data,
+          createdAt: agendamentosMatricula.createdAt,
+          hora: opcaos.hora,
+          localId: opcaos.localId,
+          localNome: locals.nome,
+        })
+        .from(agendamentosMatricula)
+        .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
+        .innerJoin(locals, eq(opcaos.localId, locals.id))
+        .where(whereClause)
+        .orderBy(desc(agendamentosMatricula.createdAt))
+        .limit(size)
+        .offset(offset),
+      this.db
+        .select({ count: sql`count(*)` })
+        .from(agendamentosMatricula)
+        .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
+        .innerJoin(locals, eq(opcaos.localId, locals.id))
+        .where(whereClause),
+    ]);
 
     const totalRecords = Number(countResult?.count || 0);
     const totalPages = Math.ceil(totalRecords / size);
 
-    // Hydrate names & emails from synced progress reports or Lyceum discentes
-    const bookings = rawData.map((row: any) => {
-      const studentName =
-        row.studentName ||
-        row.acNomeSocial ||
-        (row.acNome ? `${row.acNome} ${row.acSobrenome || ''}`.trim() : null) ||
-        'Estudante Não Identificado';
-      const studentEmail =
-        row.studentEmail || row.acEmail || row.acUsuario || '';
-      return {
-        id: row.id,
-        matricula: row.matricula,
-        descricao: row.descricao,
-        status: row.status,
-        periodo: row.periodo,
-        data: row.data,
-        createdAt: row.createdAt,
-        hora: row.hora,
-        localId: row.localId,
-        localNome: row.localNome,
-        studentName,
-        studentEmail,
-      };
-    });
+    const bookings = await this.enrichBookingsWithStudentInfo(rawData);
 
     return {
       page,
@@ -1193,40 +1271,6 @@ export class SchedulingService implements OnModuleInit {
 
     const whereClause = and(...conditions);
 
-    // Subquery from AVA Progress Report
-    const studentSubquery = this.db
-      .select({
-        matricula: avaProgressReport.matricula,
-        periodo: avaProgressReport.periodo,
-        aluno: sql<string>`max(${avaProgressReport.aluno})`.as('att_ava_aluno'),
-        usuario: sql<string>`max(${avaProgressReport.usuario})`.as(
-          'att_ava_usuario',
-        ),
-      })
-      .from(avaProgressReport)
-      .groupBy(avaProgressReport.matricula, avaProgressReport.periodo)
-      .as('att_student_subquery');
-
-    // Subquery from Academic Discente (Lyceum cache)
-    const academicDiscenteSubquery = this.db
-      .select({
-        matricula: academicDiscente.matricula,
-        nomeSocial: sql<string>`max(${academicDiscente.nomeSocial})`.as(
-          'att_ac_nome_social',
-        ),
-        nome: sql<string>`max(${academicDiscente.nome})`.as('att_ac_nome'),
-        sobrenome: sql<string>`max(${academicDiscente.sobrenome})`.as(
-          'att_ac_sobrenome',
-        ),
-        email: sql<string>`max(${academicDiscente.email})`.as('att_ac_email'),
-        usuario: sql<string>`max(${academicDiscente.usuario})`.as(
-          'att_ac_usuario',
-        ),
-      })
-      .from(academicDiscente)
-      .groupBy(academicDiscente.matricula)
-      .as('att_ac_discente_subquery');
-
     const rawData = await this.db
       .select({
         id: agendamentosMatricula.id,
@@ -1239,38 +1283,16 @@ export class SchedulingService implements OnModuleInit {
         localId: opcaos.localId,
         localNome: locals.nome,
         localEndereco: locals.endereco,
-        studentName: studentSubquery.aluno,
-        studentEmail: studentSubquery.usuario,
-        acNomeSocial: academicDiscenteSubquery.nomeSocial,
-        acNome: academicDiscenteSubquery.nome,
-        acSobrenome: academicDiscenteSubquery.sobrenome,
-        acEmail: academicDiscenteSubquery.email,
-        acUsuario: academicDiscenteSubquery.usuario,
       })
       .from(agendamentosMatricula)
       .innerJoin(opcaos, eq(agendamentosMatricula.opcaoId, opcaos.id))
       .innerJoin(locals, eq(opcaos.localId, locals.id))
-      .leftJoin(
-        studentSubquery,
-        and(
-          eq(studentSubquery.matricula, agendamentosMatricula.matricula),
-          eq(studentSubquery.periodo, agendamentosMatricula.periodo),
-        ),
-      )
-      .leftJoin(
-        academicDiscenteSubquery,
-        eq(academicDiscenteSubquery.matricula, agendamentosMatricula.matricula),
-      )
       .where(whereClause)
       .orderBy(opcaos.hora, agendamentosMatricula.matricula);
 
-    return rawData.map((row: any) => {
-      const studentName =
-        row.studentName ||
-        row.acNomeSocial ||
-        (row.acNome ? `${row.acNome} ${row.acSobrenome || ''}`.trim() : null) ||
-        'Estudante Não Identificado';
+    const enrichedRows = await this.enrichBookingsWithStudentInfo(rawData);
 
+    return enrichedRows.map((row: any) => {
       const disciplinas = row.descricao
         ? row.descricao
             .split(';')
@@ -1283,8 +1305,8 @@ export class SchedulingService implements OnModuleInit {
       return {
         id: row.id,
         matricula: row.matricula,
-        studentName,
-        studentEmail: row.studentEmail || row.acEmail || row.acUsuario || '',
+        studentName: row.studentName,
+        studentEmail: row.studentEmail,
         localNome: row.localNome,
         localEndereco: row.localEndereco,
         data: row.data,

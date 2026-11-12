@@ -430,6 +430,25 @@ export class TutoriaService implements OnModuleInit {
 
   // 2.1. Lista de disciplinas distintas do período para o seletor
   async getDisciplinas(periodo = '2026-2', institution = 'ead') {
+    const cacheKey = `tutoria:disciplinas:${institution}:${periodo}`;
+    if (this.cacheService) {
+      return this.cacheService.wrap(
+        cacheKey,
+        async () => {
+          return this.db.execute(sql`
+            SELECT DISTINCT
+              disciplina_id,
+              disciplina_codigo,
+              disciplina_nome
+            FROM tutoria_engajamento_aluno
+            WHERE "sourceInstitution" = ${institution} AND periodo = ${periodo}
+            ORDER BY disciplina_nome ASC;
+          `);
+        },
+        300,
+      );
+    }
+
     return this.db.execute(sql`
       SELECT DISTINCT
         disciplina_id,
