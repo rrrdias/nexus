@@ -714,7 +714,10 @@ export class SchedulingService implements OnModuleInit {
 
       const matchedTimeMap = new Map<string, typeof opcao>();
       for (const slot of slots) {
-        matchedTimeMap.set(slot.hora.slice(0, 5), slot);
+        const key = slot.hora.slice(0, 5);
+        if (!matchedTimeMap.has(key) || slot.id === opcao.id) {
+          matchedTimeMap.set(key, slot);
+        }
       }
 
       for (const reqTime of requiredTimes) {
@@ -736,7 +739,7 @@ export class SchedulingService implements OnModuleInit {
         const slot = matchedTimeMap.get(reqTime)!;
         await tx
           .update(opcaos)
-          .set({ vagas: slot.vagas - 1, updatedAt: new Date() })
+          .set({ vagas: Math.max(0, slot.vagas - 1), updatedAt: new Date() })
           .where(eq(opcaos.id, slot.id));
       }
 
@@ -821,15 +824,22 @@ export class SchedulingService implements OnModuleInit {
 
       if (opcao) {
         // Calculate consecutive slots that were occupied
-        const disciplines = booking.descricao.split(';');
-        const totalDisciplines = disciplines.length;
+        const disciplines = (booking.descricao || '')
+          .split(';')
+          .map((d) => d.trim())
+          .filter(Boolean);
+        const totalDisciplines = Math.max(1, disciplines.length);
         const timeStr = opcao.hora.slice(0, 5);
-        const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) =>
-          getNextTimeStr(timeStr, i),
-        );
+        const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) => {
+          const startMin = parseTimeToMinutes(timeStr);
+          const totalMin = (((startMin! + i * 30) % 1440) + 1440) % 1440;
+          const h = Math.floor(totalMin / 60);
+          const m = totalMin % 60;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        });
         const allPossibleTimes = [
           ...requiredTimes,
-          ...requiredTimes.map((t) => t.slice(0, 5)),
+          ...requiredTimes.map((t) => `${t}:00`),
         ];
 
         // Fetch and Lock all matching slots (supporting both HH:MM:00 and HH:MM formats)
@@ -846,12 +856,23 @@ export class SchedulingService implements OnModuleInit {
           .orderBy(opcaos.hora)
           .for('update');
 
-        // Restore vacancy capacity (+1)
+        const matchedTimeMap = new Map<string, typeof opcao>();
         for (const slot of slots) {
-          await tx
-            .update(opcaos)
-            .set({ vagas: slot.vagas + 1, updatedAt: new Date() })
-            .where(eq(opcaos.id, slot.id));
+          const key = slot.hora.slice(0, 5);
+          if (!matchedTimeMap.has(key) || slot.id === opcao.id) {
+            matchedTimeMap.set(key, slot);
+          }
+        }
+
+        // Restore vacancy capacity (+1) for each occupied 30-min slot
+        for (const reqTime of requiredTimes) {
+          const slot = matchedTimeMap.get(reqTime);
+          if (slot) {
+            await tx
+              .update(opcaos)
+              .set({ vagas: slot.vagas + 1, updatedAt: new Date() })
+              .where(eq(opcaos.id, slot.id));
+          }
         }
       }
 
@@ -974,9 +995,11 @@ export class SchedulingService implements OnModuleInit {
       // Tabela agendamentos_matricula pode estar indisponível ou vazia
     }
 
-    if (periodsSet.size === 0) {
+    periodsSet.add(getDefaultPeriod());
+
+    if (periodsSet.size <= 1) {
+      periodsSet.add('2026-2');
       periodsSet.add('2026-1');
-      periodsSet.add('2025-2');
     }
 
     return Array.from(periodsSet).sort((a, b) => b.localeCompare(a));
@@ -1561,7 +1584,7 @@ export class SchedulingService implements OnModuleInit {
         and(
           eq(opcaos.localId, localId),
           eq(opcaos.status, true),
-          sql`${opcaos.vagas} > 0`,
+          sql`${opcaos.vagas} >= 0`,
         ),
       )
       .orderBy(opcaos.data, opcaos.hora);
@@ -1722,7 +1745,71 @@ export class SchedulingService implements OnModuleInit {
         }
       }
 
-      // 5. Cálculo dos horários consecutivos para o novo agendamento
+      // 5. PRIMEIRO: Liberar vagas dos slots do agendamento anterior no banco
+      // Isso garante que, se o novo horário tiver interseção de slots de 30 min com o agendamento anterior
+      // no mesmo dia/polo, as vagas antigas já estarão devolvidas (+1) antes da leitura e decremento (-1) dos novos slots.
+      const [oldOpcao] = await tx
+        .select()
+        .from(opcaos)
+        .where(eq(opcaos.id, booking.opcaoId))
+        .limit(1);
+
+      if (oldOpcao) {
+        const oldDisciplines = (booking.descricao || '')
+          .split(';')
+          .map((d) => d.trim())
+          .filter(Boolean);
+        const oldDisciplinesCount =
+          oldDisciplines.length > 0 ? oldDisciplines.length : totalDisciplines;
+        const oldTimeStr = oldOpcao.hora.slice(0, 5);
+        const oldRequiredTimes = Array.from(
+          { length: oldDisciplinesCount },
+          (_, i) => {
+            const startMin = parseTimeToMinutes(oldTimeStr);
+            const totalMin = (((startMin! + i * 30) % 1440) + 1440) % 1440;
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          },
+        );
+        const oldAllPossibleTimes = [
+          ...oldRequiredTimes,
+          ...oldRequiredTimes.map((t) => `${t}:00`),
+        ];
+
+        const oldSlots = await tx
+          .select()
+          .from(opcaos)
+          .where(
+            and(
+              eq(opcaos.localId, oldOpcao.localId),
+              eq(opcaos.data, oldOpcao.data),
+              inArray(opcaos.hora, oldAllPossibleTimes),
+            ),
+          )
+          .orderBy(opcaos.hora)
+          .for('update');
+
+        const oldTimeMap = new Map<string, typeof oldOpcao>();
+        for (const slot of oldSlots) {
+          const key = slot.hora.slice(0, 5);
+          if (!oldTimeMap.has(key) || slot.id === oldOpcao.id) {
+            oldTimeMap.set(key, slot);
+          }
+        }
+
+        for (const reqTime of oldRequiredTimes) {
+          const slot = oldTimeMap.get(reqTime);
+          if (slot) {
+            await tx
+              .update(opcaos)
+              .set({ vagas: slot.vagas + 1, updatedAt: new Date() })
+              .where(eq(opcaos.id, slot.id));
+          }
+        }
+      }
+
+      // 6. Cálculo dos horários consecutivos para o novo agendamento
       const newRequiredTimes = Array.from(
         { length: totalDisciplines },
         (_, i) => {
@@ -1738,7 +1825,7 @@ export class SchedulingService implements OnModuleInit {
         ...newRequiredTimes.map((t) => `${t}:00`),
       ];
 
-      // 6. Lock ordenado dos novos slots necessários com FOR UPDATE
+      // 7. Lock ordenado dos novos slots necessários com FOR UPDATE (já com as vagas antigas restauradas no banco)
       const newSlots = await tx
         .select()
         .from(opcaos)
@@ -1755,7 +1842,10 @@ export class SchedulingService implements OnModuleInit {
 
       const newTimeMap = new Map<string, typeof newOpcao>();
       for (const slot of newSlots) {
-        newTimeMap.set(slot.hora.slice(0, 5), slot);
+        const key = slot.hora.slice(0, 5);
+        if (!newTimeMap.has(key) || slot.id === newOpcao.id) {
+          newTimeMap.set(key, slot);
+        }
       }
 
       for (const reqTime of newRequiredTimes) {
@@ -1772,56 +1862,12 @@ export class SchedulingService implements OnModuleInit {
         }
       }
 
-      // 7. Liberar vagas dos slots do agendamento anterior
-      const [oldOpcao] = await tx
-        .select()
-        .from(opcaos)
-        .where(eq(opcaos.id, booking.opcaoId))
-        .limit(1);
-
-      if (oldOpcao) {
-        const oldDisciplines = (booking.descricao || '')
-          .split(';')
-          .filter(Boolean);
-        const oldDisciplinesCount =
-          oldDisciplines.length > 0 ? oldDisciplines.length : totalDisciplines;
-        const oldTimeStr = oldOpcao.hora.slice(0, 5);
-        const oldRequiredTimes = Array.from(
-          { length: oldDisciplinesCount },
-          (_, i) => getNextTimeStr(oldTimeStr, i),
-        );
-        const oldAllPossibleTimes = [
-          ...oldRequiredTimes,
-          ...oldRequiredTimes.map((t) => t.slice(0, 5)),
-        ];
-
-        const oldSlots = await tx
-          .select()
-          .from(opcaos)
-          .where(
-            and(
-              eq(opcaos.localId, oldOpcao.localId),
-              eq(opcaos.data, oldOpcao.data),
-              inArray(opcaos.hora, oldAllPossibleTimes),
-            ),
-          )
-          .orderBy(opcaos.hora)
-          .for('update');
-
-        for (const slot of oldSlots) {
-          await tx
-            .update(opcaos)
-            .set({ vagas: slot.vagas + 1, updatedAt: new Date() })
-            .where(eq(opcaos.id, slot.id));
-        }
-      }
-
-      // 8. Decrementar vagas dos novos slots
+      // 8. Decrementar vagas dos novos slots (utilizando o saldo já atualizado após a devolução)
       for (const reqTime of newRequiredTimes) {
         const slot = newTimeMap.get(reqTime)!;
         await tx
           .update(opcaos)
-          .set({ vagas: slot.vagas - 1, updatedAt: new Date() })
+          .set({ vagas: Math.max(0, slot.vagas - 1), updatedAt: new Date() })
           .where(eq(opcaos.id, slot.id));
       }
 

@@ -183,9 +183,9 @@ export async function importBookings(bookings: any[]) {
 export async function getPeriods(): Promise<string[]> {
   try {
     const res = await fetchFromApi('/api/scheduling/periods', { method: 'GET' });
-    return Array.isArray(res) && res.length > 0 ? res : ['2026-1', '2025-2'];
+    return Array.isArray(res) && res.length > 0 ? res : ['2026-2', '2026-1', '2025-2'];
   } catch {
-    return ['2026-1', '2025-2'];
+    return ['2026-2', '2026-1', '2025-2'];
   }
 }
 

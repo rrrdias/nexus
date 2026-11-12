@@ -21,6 +21,7 @@ import {
   filterValidStartSlots,
   normalizeDateStr,
   getExamEndTime,
+  getNextTimeStr,
 } from "@/lib/scheduling-utils"
 import {
   Calendar,
@@ -129,16 +130,43 @@ export function RescheduleDialog({
     const validDates: string[] = []
     const filteredSlotsMap: Record<string, AvailableSlot[]> = {}
 
+    const currentBookingDateStr = normalizeDateStr(booking.data)
+    const currentStartTime = booking.hora ? booking.hora.slice(0, 5) : ""
+    const currentOccupiedCount =
+      booking.disciplinasSnapshot && booking.disciplinasSnapshot.length > 0
+        ? booking.disciplinasSnapshot.length
+        : disciplinesCount
+    const currentOccupiedTimes = new Set<string>(
+      currentStartTime
+        ? Array.from({ length: currentOccupiedCount }, (_, i) =>
+            getNextTimeStr(currentStartTime, i)
+          )
+        : []
+    )
+
     for (const [dStr, daySlots] of Object.entries(map)) {
-      const validStart = filterValidStartSlots(
-        daySlots.map((s) => ({
+      const isSameBookingDayAndLocal =
+        selectedLocalId === booking.localId && dStr === currentBookingDateStr
+
+      // Mantém o saldo real de vagas do banco para exibição fiel ao painel administrativo;
+      // apenas desbloqueia (vagas = 1) caso um horário consecutivo ocupado pelo próprio aluno tenha chegado a 0
+      const adjustedDaySlots = daySlots.map((s) => {
+        const timeKey = s.hora.slice(0, 5)
+        const isOccupiedBySelf =
+          isSameBookingDayAndLocal && currentOccupiedTimes.has(timeKey)
+        return {
           ...s,
+          vagas: s.vagas <= 0 && isOccupiedBySelf ? 1 : s.vagas,
           data: s.data,
           status: s.status,
-        })),
+        }
+      })
+
+      const validStart = filterValidStartSlots(
+        adjustedDaySlots,
         disciplinesCount,
         dStr
-      )
+      ).filter((s) => s.id !== booking.opcaoId)
 
       if (validStart.length > 0) {
         validDates.push(dStr)

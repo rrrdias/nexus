@@ -313,7 +313,11 @@ export function AttendanceListDialog({
 }: AttendanceListDialogProps) {
   const [localId, setLocalId] = useState(initialLocalId === "all" ? "" : initialLocalId)
   const [dataProva, setDataProva] = useState(initialDate)
-  const [periodo, setPeriodo] = useState(initialPeriod || availablePeriods[0] || "2026-1")
+  const [periodo, setPeriodo] = useState(
+    initialPeriod ||
+      (availablePeriods.includes("2026-2") ? "2026-2" : availablePeriods[0]) ||
+      "2026-2"
+  )
   const [records, setRecords] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)

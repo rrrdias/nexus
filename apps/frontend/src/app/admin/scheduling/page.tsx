@@ -29,7 +29,15 @@ export default async function AdminSchedulingPage({
     getPeriods(),
   ])
 
-  const defaultPeriod = periods[0] || "2026-1"
+  const preferredPeriod =
+    process.env.NEXT_PUBLIC_NEXUS_DEFAULT_PERIOD ||
+    process.env.NEXUS_DEFAULT_PERIOD ||
+    "2026-2"
+  const defaultPeriod = periods.includes(preferredPeriod)
+    ? preferredPeriod
+    : periods.includes("2026-2")
+      ? "2026-2"
+      : periods[0] || "2026-2"
   const selectedPeriod = filters.periodo || defaultPeriod
 
   const initialBookings = await getBookings({

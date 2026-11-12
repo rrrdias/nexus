@@ -61,8 +61,8 @@ import {
 export function SchedulingDashboard({ 
   locals, 
   initialBookings,
-  availablePeriods = ["2026-1", "2025-2"],
-  defaultPeriod = "2026-1"
+  availablePeriods = ["2026-2", "2026-1", "2025-2"],
+  defaultPeriod = "2026-2"
 }: { 
   locals: any[], 
   initialBookings: any,

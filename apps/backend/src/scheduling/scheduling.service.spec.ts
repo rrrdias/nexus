@@ -420,4 +420,138 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
       });
     });
   });
+
+  describe('Fase 5: rescheduleStudentBooking() vacancy restoration', () => {
+    it('should restore old slot vacancies BEFORE reading and decrementing new overlapping slots', async () => {
+      // Simulate in-memory slots table where student currently occupies 08:00 and 08:30 (vagas = 9)
+      // and 09:00 is free (vagas = 10). Student reschedules from 08:00 to 08:30 (occupying 08:30 and 09:00).
+      const slotsDb: Record<string, any> = {
+        'slot-0800': {
+          id: 'slot-0800',
+          localId: 'local-1',
+          data: new Date('2099-11-20T00:00:00Z'),
+          hora: '08:00:00',
+          vagas: 9,
+          status: true,
+        },
+        'slot-0830': {
+          id: 'slot-0830',
+          localId: 'local-1',
+          data: new Date('2099-11-20T00:00:00Z'),
+          hora: '08:30:00',
+          vagas: 9,
+          status: true,
+        },
+        'slot-0900': {
+          id: 'slot-0900',
+          localId: 'local-1',
+          data: new Date('2099-11-20T00:00:00Z'),
+          hora: '09:00:00',
+          vagas: 10,
+          status: true,
+        },
+      };
+
+      jest.spyOn(service, 'getStudentProfile').mockResolvedValue({
+        matricula: '2026001',
+        nome: 'Maria Silva',
+        email: 'maria@nexus.edu.br',
+        telefone: '62999998888',
+        modalidade: 'Graduação EaD',
+        categoria: 'REGULARES',
+        disciplinas: ['Direito Civil I', 'Direito Penal I'],
+        totalDisciplinas: 2,
+      });
+
+      let forUpdateCall = 0;
+      let limitCall = 0;
+      let pendingVagasUpdate: number | null = null;
+
+      db.for = jest.fn().mockImplementation(() => {
+        forUpdateCall++;
+        if (forUpdateCall === 1) {
+          // 1. Lock booking
+          return Promise.resolve([
+            {
+              id: 'booking-1',
+              matricula: '2026001',
+              opcaoId: 'slot-0800',
+              descricao: 'Direito Civil I;Direito Penal I',
+              status: 'ativo',
+              periodo: '2026-2',
+              data: new Date('2099-11-20T00:00:00Z'),
+            },
+          ]);
+        }
+        if (forUpdateCall === 2) {
+          // 2. Lock oldSlots (08:00 and 08:30)
+          return Promise.resolve([
+            { ...slotsDb['slot-0800'] },
+            { ...slotsDb['slot-0830'] },
+          ]);
+        }
+        // 3. Lock newSlots (08:30 and 09:00) - reads updated slotsDb!
+        return Promise.resolve([
+          { ...slotsDb['slot-0830'] },
+          { ...slotsDb['slot-0900'] },
+        ]);
+      });
+
+      db.limit = jest.fn().mockImplementation(() => {
+        limitCall++;
+        if (limitCall === 1) {
+          // newOpcao
+          return Promise.resolve([{ ...slotsDb['slot-0830'] }]);
+        }
+        if (limitCall === 2) {
+          // oldOpcao
+          return Promise.resolve([{ ...slotsDb['slot-0800'] }]);
+        }
+        // localRecord
+        return Promise.resolve([{ id: 'local-1', nome: 'Polo Anápolis' }]);
+      });
+
+      let updateOrder = 0;
+      const updateTargets = [
+        'slot-0800',
+        'slot-0830',
+        'slot-0830',
+        'slot-0900',
+      ];
+      db.set = jest.fn().mockImplementation((payload: any) => {
+        if (typeof payload.vagas === 'number') {
+          pendingVagasUpdate = payload.vagas;
+          const targetId = updateTargets[updateOrder++];
+          if (targetId && slotsDb[targetId]) {
+            slotsDb[targetId].vagas = pendingVagasUpdate;
+          }
+        }
+        return db;
+      });
+
+      db.returning = jest.fn().mockResolvedValue([
+        {
+          id: 'booking-1',
+          matricula: '2026001',
+          opcaoId: 'slot-0830',
+          status: 'ativo',
+          periodo: '2026-2',
+        },
+      ]);
+
+      await service.rescheduleStudentBooking(
+        'booking-1',
+        '2026001',
+        'slot-0830',
+        '2026-2',
+      );
+
+      // 08:00 was released: 9 -> 10
+      expect(slotsDb['slot-0800'].vagas).toBe(10);
+      // 08:30 was released (9 -> 10) AND then consumed (10 -> 9), NOT 8!
+      expect(slotsDb['slot-0830'].vagas).toBe(9);
+      // 09:00 was consumed: 10 -> 9
+      expect(slotsDb['slot-0900'].vagas).toBe(9);
+    });
+  });
 });
