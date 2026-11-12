@@ -120,7 +120,7 @@ export class UsersService {
     };
   }
 
-  async createUser(userSession: SessionUser, data: any) {
+  async createUser(userSession: SessionUser, data: any, originUrl?: string) {
     this.assertSuperAdmin(userSession);
     const { name, email, password, userid, isActive, groupIds, moduleIds } =
       data;
@@ -179,6 +179,7 @@ export class UsersService {
           name.trim(),
           userid?.trim() || email.trim(),
           password.trim(),
+          originUrl,
         )
         .catch((err) => {
           this.logger.warn(

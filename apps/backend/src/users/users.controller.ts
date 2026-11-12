@@ -31,7 +31,11 @@ export class UsersController {
 
   @Post()
   createUser(@Req() req: any, @Body() data: CreateUserDto) {
-    return this.usersService.createUser(req.user, data);
+    const originUrl =
+      req?.headers?.['x-client-origin']?.toString() ||
+      req?.headers?.['origin']?.toString() ||
+      '';
+    return this.usersService.createUser(req.user, data, originUrl);
   }
 
   @Put(':id')

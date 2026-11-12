@@ -168,7 +168,7 @@ export class AuthService implements OnModuleInit {
    */
   async forgotPassword(
     identifier: string,
-    context?: { ipAddress?: string; userAgent?: string },
+    context?: { ipAddress?: string; userAgent?: string; originUrl?: string },
   ) {
     await this.ensurePasswordResetTable();
 
@@ -202,6 +202,7 @@ export class AuthService implements OnModuleInit {
             user.email,
             user.name || user.userid || 'Usuário',
             resetToken,
+            context?.originUrl,
           )
           .then((res) => {
             this.auditService?.record({

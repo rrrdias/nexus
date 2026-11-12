@@ -53,8 +53,17 @@ export class AuthController {
         : req?.socket?.remoteAddress || req?.ip || ''
     ).replace('::ffff:', '');
     const userAgent = headers['user-agent']?.toString() || '';
+    const originUrl =
+      dto.originUrl ||
+      headers['x-client-origin']?.toString() ||
+      headers['origin']?.toString() ||
+      '';
 
-    return this.authService.forgotPassword(dto.login, { ipAddress, userAgent });
+    return this.authService.forgotPassword(dto.login, {
+      ipAddress,
+      userAgent,
+      originUrl,
+    });
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -71,7 +80,9 @@ export class AuthController {
     ).replace('::ffff:', '');
     const userAgent = headers['user-agent']?.toString() || '';
 
-    return this.authService.resetPassword(dto.token, dto.newPassword, {
+    const newPassword = dto.newPassword || dto.newPass || '';
+
+    return this.authService.resetPassword(dto.token, newPassword, {
       ipAddress,
       userAgent,
     });

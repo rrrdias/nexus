@@ -43,7 +43,8 @@ function RecuperarSenhaContent() {
 
     setIsForgotLoading(true)
     try {
-      const res = await forgotPasswordAction(loginInput.trim())
+      const clientOrigin = typeof window !== "undefined" ? window.location.origin : undefined
+      const res = await forgotPasswordAction(loginInput.trim(), clientOrigin)
       if (res.success) {
         setForgotSuccess(true)
       } else {

@@ -150,15 +150,33 @@ export class MailService implements OnModuleInit {
   }
 
   /**
+   * Resolve a URL base pública do portal (prioriza domínio/IP real do cliente quando APP_URL for localhost)
+   */
+  private resolvePublicBaseUrl(originUrl?: string): string {
+    const configured = (this.config.appUrl || '').trim().replace(/\/+$/, '');
+    const isConfiguredLocalhost =
+      !configured ||
+      configured.includes('localhost') ||
+      configured.includes('127.0.0.1');
+
+    let chosen = configured || 'http://localhost:3002';
+    if (isConfiguredLocalhost && originUrl && /^https?:\/\//i.test(originUrl.trim())) {
+      chosen = originUrl.trim().replace(/\/+$/, '');
+    }
+
+    return chosen.endsWith('/nexus') ? chosen : `${chosen}/nexus`;
+  }
+
+  /**
    * 1. Enviar E-mail de Recuperação de Senha
    */
   async sendPasswordResetEmail(
     to: string,
     name: string,
     token: string,
+    originUrl?: string,
   ): Promise<MailSendResult> {
-    const rawUrl = (this.config.appUrl || 'http://localhost:3002').replace(/\/+$/, '');
-    const baseUrl = rawUrl.endsWith('/nexus') ? rawUrl : `${rawUrl}/nexus`;
+    const baseUrl = this.resolvePublicBaseUrl(originUrl);
     const resetUrl = `${baseUrl}/recuperar-senha?token=${encodeURIComponent(token)}`;
     const { subject, html, text } = getPasswordResetTemplate(name, resetUrl);
     const result = await this.sendMail({ to, subject, html, text });
@@ -178,9 +196,9 @@ export class MailService implements OnModuleInit {
     name: string,
     login: string,
     temporaryPassword?: string,
+    originUrl?: string,
   ): Promise<MailSendResult> {
-    const rawUrl = (this.config.appUrl || 'http://localhost:3002').replace(/\/+$/, '');
-    const baseUrl = rawUrl.endsWith('/nexus') ? rawUrl : `${rawUrl}/nexus`;
+    const baseUrl = this.resolvePublicBaseUrl(originUrl);
     const accessUrl = `${baseUrl}/login`;
     const { subject, html, text } = getWelcomeUserTemplate(
       name,
