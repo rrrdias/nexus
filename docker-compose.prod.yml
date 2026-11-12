@@ -106,6 +106,21 @@ services:
       LYCEUM_DB_PASSWORD: ${LYCEUM_DB_PASSWORD}
       LYCEUM_DB_PREFIX: ${LYCEUM_DB_PREFIX}
       LYCEUM_ACTIVE_PERIODS: ${LYCEUM_ACTIVE_PERIODS}
+      # SMTP / Microsoft 365 Email Service
+      SMTP_HOST: ${SMTP_HOST:-smtp.office365.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-sistemas.ted@aee.edu.br}
+      SMTP_PASS: ${SMTP_PASS:-b4<VB93wu2}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Sistemas TED}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-sistemas.ted@aee.edu.br}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Sistemas TED <sistemas.ted@aee.edu.br>}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+      EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-20}
+      EMAIL_RETRY_MAX_ATTEMPTS: ${EMAIL_RETRY_MAX_ATTEMPTS:-3}
+      EMAIL_RETRY_DELAY_SECONDS: ${EMAIL_RETRY_DELAY_SECONDS:-5}
+      OPERATION_OBSERVABILITY_ENABLED: ${OPERATION_OBSERVABILITY_ENABLED:-True}
+      APP_URL: ${APP_URL:-}
     command: sh -c "cd apps/backend && npx drizzle-kit push --force && node dist/main.js"
 
     networks:

@@ -46,6 +46,7 @@ export function getMailConfig(): MailConfig {
     'true';
   const appUrl = (
     process.env.APP_URL ||
+    process.env.FRONTEND_URL ||
     process.env.NEXTAUTH_URL ||
     'http://localhost:3002'
   ).replace(/\/$/, '');
