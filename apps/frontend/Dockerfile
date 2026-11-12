@@ -44,6 +44,7 @@ ARG NEXT_BASE_PATH=""
 ENV NEXT_BASE_PATH=$NEXT_BASE_PATH
 
 ENV NODE_ENV=production
+ENV BUILD_STANDALONE=true
 
 # Build the Next.js app
 RUN npm run build -w @nexus-core/frontend
@@ -53,6 +54,7 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV BUILD_STANDALONE=true
 ENV NEXT_BASE_PATH=/nexus
 
 RUN addgroup --system --gid 1001 nodejs

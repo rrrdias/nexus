@@ -9,7 +9,7 @@ import {
   index,
   integer,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, relations } from 'drizzle-orm';
 
 export const users = pgTable(
   'user',
@@ -27,6 +27,30 @@ export const users = pgTable(
     lastLoginAt: timestamp('lastLoginAt', { withTimezone: true, mode: 'date' }),
   },
   (t) => [index('idx_user_is_active').on(t.isActive)],
+);
+
+export const passwordResetTokens = pgTable(
+  'password_reset_tokens',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    token: text('token').unique().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index('idx_pwd_reset_token').on(t.token),
+    index('idx_pwd_reset_user').on(t.userId),
+    index('idx_pwd_reset_email').on(t.email),
+  ],
 );
 
 export const systemModules = pgTable(
@@ -787,10 +811,15 @@ export const tutoriaAtendimentosKanban = pgTable(
         onDelete: 'set null',
       },
     ),
+    tutorIniciadorId: text('tutor_iniciador_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
     observacoes: text('observacoes'),
     canalContatoUtilizado: text('canal_contato_utilizado'), // 'whatsapp', 'email', 'telefone', 'ava'
     ultimoContatoEm: timestamp('ultimo_contato_em', { mode: 'date' }),
     dataResolucao: timestamp('data_resolucao', { mode: 'date' }),
+    ultimaIntervencaoEm: timestamp('ultima_intervencao_em', { mode: 'date' }),
+    qtdIntervencoes: integer('qtd_intervencoes').default(0).notNull(),
 
     createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
     updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
@@ -800,6 +829,144 @@ export const tutoriaAtendimentosKanban = pgTable(
     index('idx_tutoria_kanban_mat').on(t.matricula),
     index('idx_tutoria_kanban_plano').on(t.planoAcaoId),
     index('idx_tutoria_kanban_tutor').on(t.tutorResponsavelId),
+    index('idx_tutoria_kanban_tutor_iniciador').on(t.tutorIniciadorId),
     index('idx_tutoria_kanban_periodo').on(t.periodo),
   ],
 );
+
+export const tutoriaAtendimentosHistorico = pgTable(
+  'tutoria_atendimentos_historico',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    atendimentoId: text('atendimento_id').references(
+      () => tutoriaAtendimentosKanban.id,
+      {
+        onDelete: 'cascade',
+      },
+    ),
+    matricula: text('matricula').notNull(),
+    periodo: text('periodo').notNull(),
+    sourceInstitution: text('sourceInstitution').default('ead').notNull(),
+    tipoEvento: text('tipo_evento').notNull(),
+    autorId: text('autor_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    autorNome: text('autor_nome'),
+    tutorResponsavelAnteriorId: text(
+      'tutor_responsavel_anterior_id',
+    ).references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    tutorResponsavelNovoId: text('tutor_responsavel_novo_id').references(
+      () => users.id,
+      {
+        onDelete: 'set null',
+      },
+    ),
+    estadoAnterior: text('estado_anterior'),
+    estadoNovo: text('estado_novo'),
+    canalContato: text('canal_contato'),
+    observacoes: text('observacoes'),
+    metadata: text('metadata'),
+    createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    index('idx_tutoria_hist_atendimento').on(t.atendimentoId),
+    index('idx_tutoria_hist_matricula').on(t.matricula),
+    index('idx_tutoria_hist_created_at').on(t.createdAt),
+    index('idx_tutoria_hist_tipo').on(t.tipoEvento),
+    index('idx_tutoria_hist_autor').on(t.autorId),
+  ],
+);
+
+export const tutoriaAtendimentosKanbanRelations = relations(
+  tutoriaAtendimentosKanban,
+  ({ one, many }) => ({
+    planoAcao: one(tutoriaPlanosAcao, {
+      fields: [tutoriaAtendimentosKanban.planoAcaoId],
+      references: [tutoriaPlanosAcao.id],
+    }),
+    tutorResponsavel: one(users, {
+      fields: [tutoriaAtendimentosKanban.tutorResponsavelId],
+      references: [users.id],
+      relationName: 'kanbanTutorResponsavel',
+    }),
+    tutorIniciador: one(users, {
+      fields: [tutoriaAtendimentosKanban.tutorIniciadorId],
+      references: [users.id],
+      relationName: 'kanbanTutorIniciador',
+    }),
+    historico: many(tutoriaAtendimentosHistorico),
+  }),
+);
+
+export const tutoriaAtendimentosHistoricoRelations = relations(
+  tutoriaAtendimentosHistorico,
+  ({ one }) => ({
+    atendimento: one(tutoriaAtendimentosKanban, {
+      fields: [tutoriaAtendimentosHistorico.atendimentoId],
+      references: [tutoriaAtendimentosKanban.id],
+    }),
+    autor: one(users, {
+      fields: [tutoriaAtendimentosHistorico.autorId],
+      references: [users.id],
+      relationName: 'historicoAutor',
+    }),
+    tutorResponsavelAnterior: one(users, {
+      fields: [tutoriaAtendimentosHistorico.tutorResponsavelAnteriorId],
+      references: [users.id],
+      relationName: 'historicoTutorAnterior',
+    }),
+    tutorResponsavelNovo: one(users, {
+      fields: [tutoriaAtendimentosHistorico.tutorResponsavelNovoId],
+      references: [users.id],
+      relationName: 'historicoTutorNovo',
+    }),
+  }),
+);
+
+export const usersRelations = relations(users, ({ many }) => ({
+  kanbanAtendimentosComoResponsavel: many(tutoriaAtendimentosKanban, {
+    relationName: 'kanbanTutorResponsavel',
+  }),
+  kanbanAtendimentosComoIniciador: many(tutoriaAtendimentosKanban, {
+    relationName: 'kanbanTutorIniciador',
+  }),
+  historicoComoAutor: many(tutoriaAtendimentosHistorico, {
+    relationName: 'historicoAutor',
+  }),
+  historicoComoTutorAnterior: many(tutoriaAtendimentosHistorico, {
+    relationName: 'historicoTutorAnterior',
+  }),
+  historicoComoTutorNovo: many(tutoriaAtendimentosHistorico, {
+    relationName: 'historicoTutorNovo',
+  }),
+}));
+
+export type TutoriaAtendimentoHistorico =
+  typeof tutoriaAtendimentosHistorico.$inferSelect;
+export type NewTutoriaAtendimentoHistorico =
+  typeof tutoriaAtendimentosHistorico.$inferInsert;
+
+export type TutoriaAtendimentoKanban =
+  typeof tutoriaAtendimentosKanban.$inferSelect;
+export type NewTutoriaAtendimentoKanban =
+  typeof tutoriaAtendimentosKanban.$inferInsert;
+
+export type TutoriaTipoEvento =
+  | 'abertura'
+  | 'mudanca_status'
+  | 'contato_enviado'
+  | 'intervencao_manual'
+  | 'passagem_bastao'
+  | 'finalizacao'
+  | 'reabertura';
+
+export type TutoriaCanalContato =
+  | 'whatsapp'
+  | 'email'
+  | 'telefone'
+  | 'ava'
+  | 'outro';

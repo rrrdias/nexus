@@ -15,7 +15,8 @@ export default auth(async (req) => {
     pathname.includes('/agendamento') ||
     pathname.includes('/api/public') ||
     pathname.includes('/loadingpage') ||
-    pathname.includes('/landingpage')
+    pathname.includes('/landingpage') ||
+    pathname.includes('/recuperar-senha')
 
   // Ignora completamente recursos estáticos e internos do Next.js (CSS, JS, Fontes, Imagens)
   if (

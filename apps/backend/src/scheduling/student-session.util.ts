@@ -29,7 +29,10 @@ export function verifyStudentSessionToken(
   secret = getStudentSessionSecret(),
 ): { valid: boolean; matricula?: string; reason?: string } {
   if (!token || typeof token !== 'string') {
-    return { valid: false, reason: 'Token de sessão do estudante não fornecido.' };
+    return {
+      valid: false,
+      reason: 'Token de sessão do estudante não fornecido.',
+    };
   }
 
   const parts = token.trim().split('.');
@@ -48,8 +51,7 @@ export function verifyStudentSessionToken(
   if (timestamp > now + 60000 || now - timestamp > SESSION_TTL_MS) {
     return {
       valid: false,
-      reason:
-        'Sessão de agendamento expirada (limite de 30 minutos excedido).',
+      reason: 'Sessão de agendamento expirada (limite de 30 minutos excedido).',
     };
   }
 

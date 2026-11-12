@@ -30,7 +30,16 @@ export class EngagementFilterDto {
   @IsOptional()
   @IsString()
   @IsIn(['todos', 'mais_7_dias', 'mais_14_dias', 'mais_30_dias', 'sem_acesso'])
-  recenciaAcesso?: 'todos' | 'mais_7_dias' | 'mais_14_dias' | 'mais_30_dias' | 'sem_acesso';
+  recenciaAcesso?:
+    | 'todos'
+    | 'mais_7_dias'
+    | 'mais_14_dias'
+    | 'mais_30_dias'
+    | 'sem_acesso';
+
+  @IsOptional()
+  @IsString()
+  statusKanban?: string;
 
   @IsOptional()
   @Type(() => Number)

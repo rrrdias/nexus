@@ -1,4 +1,5 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { StudentSessionGuard } from './student-session.guard';
 import {
   createStudentSessionToken,
@@ -32,7 +33,8 @@ describe('StudentSessionGuard & student-session.util', () => {
     it('should REJECT forged/tampered signature', () => {
       const token = createStudentSessionToken('G2610162', secret);
       const parts = token.split('.');
-      parts[2] = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+      parts[2] =
+        'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
       const tampered = parts.join('.');
       const res = verifyStudentSessionToken(tampered, 'G2610162', secret);
       expect(res.valid).toBe(false);
@@ -41,7 +43,6 @@ describe('StudentSessionGuard & student-session.util', () => {
 
     it('should REJECT expired token (> 30 mins)', () => {
       const pastTime = (Date.now() - 31 * 60 * 1000).toString();
-      const crypto = require('crypto');
       const hmac = crypto
         .createHmac('sha256', secret)
         .update(`G2610162:${pastTime}`)
@@ -55,7 +56,11 @@ describe('StudentSessionGuard & student-session.util', () => {
   });
 
   describe('StudentSessionGuard.canActivate', () => {
-    function mockContext(headers: any, query: any = {}, body: any = {}): ExecutionContext {
+    function mockContext(
+      headers: any,
+      query: any = {},
+      body: any = {},
+    ): ExecutionContext {
       return {
         switchToHttp: () => ({
           getRequest: () => ({

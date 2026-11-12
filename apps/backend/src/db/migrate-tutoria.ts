@@ -34,13 +34,27 @@ async function migrate() {
       CREATE UNIQUE INDEX IF NOT EXISTS unq_tutoria_logs_atividades 
       ON tutoria_logs_atividades ("sourceInstitution", periodo, disciplina_id, aluno_id, atividade_id);
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_inst_periodo ON tutoria_logs_atividades ("sourceInstitution", periodo);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_aluno_disc ON tutoria_logs_atividades (aluno_id, disciplina_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_mat_disc ON tutoria_logs_atividades (matricula, disciplina_codigo);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_fase ON tutoria_logs_atividades (unidade_tematica_nome);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_aluno_trgm ON tutoria_logs_atividades USING gin (aluno_nome gin_trgm_ops);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_mat_trgm ON tutoria_logs_atividades USING gin (matricula gin_trgm_ops);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_disc_trgm ON tutoria_logs_atividades USING gin (disciplina_nome gin_trgm_ops);`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_inst_periodo ON tutoria_logs_atividades ("sourceInstitution", periodo);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_aluno_disc ON tutoria_logs_atividades (aluno_id, disciplina_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_mat_disc ON tutoria_logs_atividades (matricula, disciplina_codigo);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_fase ON tutoria_logs_atividades (unidade_tematica_nome);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_aluno_trgm ON tutoria_logs_atividades USING gin (aluno_nome gin_trgm_ops);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_mat_trgm ON tutoria_logs_atividades USING gin (matricula gin_trgm_ops);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_logs_disc_trgm ON tutoria_logs_atividades USING gin (disciplina_nome gin_trgm_ops);`,
+    );
 
     // 2. Tabela de engajamento consolidado
     await db.execute(sql`
@@ -75,11 +89,21 @@ async function migrate() {
       CREATE UNIQUE INDEX IF NOT EXISTS unq_tutoria_engajamento_aluno 
       ON tutoria_engajamento_aluno ("sourceInstitution", periodo, disciplina_id, aluno_id);
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_inst_periodo ON tutoria_engajamento_aluno ("sourceInstitution", periodo);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_mat ON tutoria_engajamento_aluno (matricula);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_disc_cod ON tutoria_engajamento_aluno (disciplina_codigo);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_grupo_risco ON tutoria_engajamento_aluno (grupo_risco_calculado);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_aluno_trgm ON tutoria_engajamento_aluno USING gin (aluno_nome gin_trgm_ops);`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_inst_periodo ON tutoria_engajamento_aluno ("sourceInstitution", periodo);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_mat ON tutoria_engajamento_aluno (matricula);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_disc_cod ON tutoria_engajamento_aluno (disciplina_codigo);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_grupo_risco ON tutoria_engajamento_aluno (grupo_risco_calculado);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_aluno_trgm ON tutoria_engajamento_aluno USING gin (aluno_nome gin_trgm_ops);`,
+    );
 
     // 3. Tabela de planos de ação
     await db.execute(sql`
@@ -101,8 +125,12 @@ async function migrate() {
         "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
       );
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_planos_periodo_grupo ON tutoria_planos_acao (periodo, grupo_tipo);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_planos_status ON tutoria_planos_acao (status);`);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_planos_periodo_grupo ON tutoria_planos_acao (periodo, grupo_tipo);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_planos_status ON tutoria_planos_acao (status);`,
+    );
 
     // 4. Tabela de atendimentos Kanban
     await db.execute(sql`
@@ -126,11 +154,33 @@ async function migrate() {
         "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
       );
     `);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_status ON tutoria_atendimentos_kanban (status_kanban);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_mat ON tutoria_atendimentos_kanban (matricula);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_plano ON tutoria_atendimentos_kanban (plano_acao_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_tutor ON tutoria_atendimentos_kanban (tutor_responsavel_id);`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_periodo ON tutoria_atendimentos_kanban (periodo);`);
+    await db.execute(sql`
+      ALTER TABLE tutoria_atendimentos_kanban
+      ADD COLUMN IF NOT EXISTS aluno_nome text,
+      ADD COLUMN IF NOT EXISTS aluno_email text,
+      ADD COLUMN IF NOT EXISTS disciplina_codigo text,
+      ADD COLUMN IF NOT EXISTS disciplina_nome text,
+      ADD COLUMN IF NOT EXISTS canal_contato_utilizado text,
+      ADD COLUMN IF NOT EXISTS ultimo_contato_em timestamp with time zone,
+      ADD COLUMN IF NOT EXISTS data_resolucao timestamp with time zone,
+      ADD COLUMN IF NOT EXISTS plano_acao_id text,
+      ADD COLUMN IF NOT EXISTS tutor_responsavel_id text;
+    `);
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_status ON tutoria_atendimentos_kanban (status_kanban);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_mat ON tutoria_atendimentos_kanban (matricula);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_plano ON tutoria_atendimentos_kanban (plano_acao_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_tutor ON tutoria_atendimentos_kanban (tutor_responsavel_id);`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_tutoria_kanban_periodo ON tutoria_atendimentos_kanban (periodo);`,
+    );
 
     // 5. Cadastrar Módulo Tutoria no system_modules caso não exista
     await db.execute(sql`

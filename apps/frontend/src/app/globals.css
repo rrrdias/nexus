@@ -72,6 +72,8 @@
 }
 
 :root {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --background:            oklch(0.972 0.002 247);  /* #F4F5F7 gray-1 */
   --foreground:            oklch(0.115 0.012 264);  /* #1A1D23 gray-9 */
   --card:                  oklch(1 0 0);

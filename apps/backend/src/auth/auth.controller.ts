@@ -10,6 +10,8 @@ import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
 import { Throttle } from '@nestjs/throttler';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('api/auth')
 export class AuthController {
@@ -36,5 +38,42 @@ export class AuthController {
     return context
       ? this.authService.login(identifier, signInDto.password, context)
       : this.authService.login(identifier, signInDto.password);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: any = {}) {
+    const headers = req?.headers || {};
+    const forwarded = headers['x-forwarded-for'];
+    const ipAddress = (
+      typeof forwarded === 'string'
+        ? forwarded.split(',')[0].trim()
+        : req?.socket?.remoteAddress || req?.ip || ''
+    ).replace('::ffff:', '');
+    const userAgent = headers['user-agent']?.toString() || '';
+
+    return this.authService.forgotPassword(dto.login, { ipAddress, userAgent });
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() req: any = {}) {
+    const headers = req?.headers || {};
+    const forwarded = headers['x-forwarded-for'];
+    const ipAddress = (
+      typeof forwarded === 'string'
+        ? forwarded.split(',')[0].trim()
+        : req?.socket?.remoteAddress || req?.ip || ''
+    ).replace('::ffff:', '');
+    const userAgent = headers['user-agent']?.toString() || '';
+
+    return this.authService.resetPassword(dto.token, dto.newPassword, {
+      ipAddress,
+      userAgent,
+    });
   }
 }

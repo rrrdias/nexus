@@ -55,15 +55,23 @@ describe('TutoriaSyncService', () => {
       status: 200,
     } as any);
 
-    const result = await service.triggerMoodleUpdate('ead', 'http://moodle-test.com/att');
+    const result = await service.triggerMoodleUpdate(
+      'ead',
+      'http://moodle-test.com/att',
+    );
     expect(result).toBe(true);
-    expect(global.fetch).toHaveBeenCalledWith('http://moodle-test.com/att', { cache: 'no-store' });
+    expect(global.fetch).toHaveBeenCalledWith('http://moodle-test.com/att', {
+      cache: 'no-store',
+    });
   });
 
   it('should handle moodle update network failure gracefully', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('Connection timeout'));
 
-    const result = await service.triggerMoodleUpdate('ead', 'http://moodle-test.com/att');
+    const result = await service.triggerMoodleUpdate(
+      'ead',
+      'http://moodle-test.com/att',
+    );
     expect(result).toBe(false);
   });
 });

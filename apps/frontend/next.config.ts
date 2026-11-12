@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: process.env.BUILD_STANDALONE === "true" || process.env.DOCKER_BUILD === "true" ? "standalone" : undefined,
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   basePath: "/nexus", // <-- Defina fixo aqui
   assetPrefix: "/nexus",
   poweredByHeader: false,
@@ -69,10 +71,16 @@ const nextConfig: NextConfig = {
         basePath: false,
         permanent: false,
       },
+      {
+        source: "/recuperar-senha",
+        destination: "/nexus/recuperar-senha",
+        basePath: false,
+        permanent: false,
+      },
     ];
   },
   experimental: {
-    cpus: 2,
+    turbopackPluginRuntimeStrategy: "workerThreads",
   },
 };
 

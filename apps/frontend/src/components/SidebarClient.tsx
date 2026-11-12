@@ -430,6 +430,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                       <Link href="/tutoria" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/tutoria' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
                         Acompanhamento
                       </Link>
+                      <Link href="/tutoria/kanban" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/tutoria/kanban' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                        Atendimentos Kanban
+                      </Link>
                     </div>
                   </div>
                 ) : (
@@ -441,6 +444,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                   >
                     <Link href="/tutoria" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/tutoria' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
                       Acompanhamento
+                    </Link>
+                    <Link href="/tutoria/kanban" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/tutoria/kanban' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
+                      Atendimentos Kanban
                     </Link>
                   </div>
                 )}

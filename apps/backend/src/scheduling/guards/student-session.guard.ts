@@ -13,8 +13,7 @@ export class StudentSessionGuard implements CanActivate {
 
     // Extrair token do header X-Student-Session ou cookie nexus_student_session
     const tokenHeader =
-      req.headers['x-student-session'] ||
-      req.headers['x-student-token'];
+      req.headers['x-student-session'] || req.headers['x-student-token'];
     const cookieHeader = req.headers['cookie'];
     let cookieToken: string | undefined;
 

@@ -1,41 +1,51 @@
 # Original User Request
 
-## 2026-10-23T11:52:27Z
+## Initial Request — 2026-11-10T20:15:51Z
 
-Revisão abrangente, auditoria técnica e análise arquitetural profunda de toda a aplicação Nexus Core (NestJS backend e Next.js 16 frontend), avaliando a integridade dos módulos acadêmicos, relatórios consolidados, sincronizações AVA/Lyceum e o recém-implementado fluxo público de agendamento de provas presenciais, identificando falhas potenciais, gargalos de performance, riscos de segurança e um roadmap priorizado de melhorias.
+Planejamento arquitetural e implementação completa para suporte a múltiplos tutores simultâneos, modelo híbrido de posse de atendimento, linha do tempo e trilha de auditoria no módulo de tutoria do NexusHub (frontend em Next.js e backend em NestJS com Drizzle ORM).
 
-Working directory: c:/Users/ricardo.dias/develop/projetos/nexus-core
 Integrity mode: development
 
 ## Requirements
 
-### R1. Auditoria de Segurança, Autenticação e Controle de Acesso
-- Auditar todas as rotas da API backend e rotas do Next.js (App Router e middleware), garantindo que apenas os endpoints intencionalmente públicos (`@Public()` e rotas de agendamento do aluno) estejam abertos sem autenticação, e que o RBAC (`@RequireModule()`, roles de admin/coordenador/polo) esteja rigorosamente aplicado nas rotas administrativas.
-- Validar a segurança e isolamento da sessão temporária do estudante via cookie (`nexus_student_session` de 30 min) e mitigações contra acessos indevidos com matrículas de terceiros.
-- Verificar conformidade contra injeção de SQL, cross-site scripting (XSS), exposição indevida de variáveis de ambiente/credenciais e headers de segurança HTTP (Helmet, CSP, CORS).
+### R1. Regras de Negócio e Modelo Híbrido Multi-Tutor
+Implementar o modelo de atendimento híbrido multi-tutor, onde cada discente possui um tutor responsável principal atribuído, permitindo simultaneamente que outros tutores realizem intervenções, enviem contatos ou passem a titularidade do atendimento (passagem de bastão) com notas de transição.
 
-### R2. Análise de Concorrência, Transações e Performance de Agendamento
-- Avaliar a robustez do mecanismo de reserva de vagas consecutivas de 30 minutos em cenários de alta concorrência (concorrência simultânea de múltiplos alunos para os mesmos horários no mesmo polo).
-- Auditar o uso de travas pessimistas (`FOR UPDATE`), transações no PostgreSQL via Drizzle ORM e devolução atômica de vagas no cancelamento/remarcação.
-- Identificar gargalos de I/O em queries ao banco de dados e avaliar a necessidade de índices adicionais em `opcaos`, `agendamentos_matricula`, `locais` e tabelas de relatórios.
+### R2. Modelagem de Dados e Trilha de Auditoria (Backend)
+No backend (`apps/backend`), atualizar o schema Drizzle (`apps/backend/src/db/schema.ts`) e o `TutoriaModule` para persistir o ciclo completo de auditoria e linha do tempo de cada discente/atendimento:
+- Abertura de atendimento e tutor iniciador.
+- Mudanças de coluna/etapa no Kanban (etapas: `pendente`, `em_contato`, `em_recuperacao`, `revertido`, `evadido`).
+- Tentativas e envios de comunicação (WhatsApp ou outros canais).
+- Notas de transição entre tutores e passagem de bastão / alteração de tutor responsável.
+- Finalização e reabertura de atendimentos.
+Cada evento deve registrar data/hora, identificador e nome do tutor atuante, tipo de evento, estado anterior e novo, e observações pertinentes.
 
-### R3. Resiliência e Integridade nas Integrações (Moodle AVA e Lyceum)
-- Revisar os fluxos de sincronização assíncrona com BullMQ/Redis (`AvaSyncService` e `LyceumSyncService`), avaliando tolerância a falhas, timeouts, reconexões e comportamento sob indisponibilidade temporária dos bancos externos (MSSQL / MySQL).
-- Avaliar a consistência do snapshot consolidado por polo/instituição e evitar processamento duplicado ou bloqueio do event loop.
+### R3. APIs de Atendimento e Histórico (Backend)
+Disponibilizar endpoints no NestJS (`TutoriaModule`) para:
+- Registrar intervenções manuais e automáticas na trilha de auditoria de atendimento.
+- Transferir a titularidade principal do atendimento entre tutores com nota explicativa.
+- Consultar a linha do tempo cronológica consolidada de intervenções por discente.
 
-### R4. Qualidade de Código, Padrões Frontend e Experiência do Usuário (UX)
-- Avaliar a organização de componentes no Next.js 16 (Server Components vs Client Components, Server Actions e tratamento de erros sem masking de digest em produção).
-- Revisar a experiência do aluno em dispositivos móveis no fluxo de agendamento (Loading Page, Landing Page, Stepper Wizard, Confirmação e Impressão do Comprovante).
-- Identificar duplicações de código, estados desnecessários ou potenciais vazamentos de memória/listeners.
-
-### R5. Relatório Consolidado de Auditoria e Roadmap Priorizado
-- Gerar um relatório analítico estruturado categorizando os apontamentos em: **Crítico**, **Alto**, **Médio** e **Baixo/Melhoria**.
-- Fornecer matriz de recomendações ordenadas por **Impacto vs Esforço** com sugestões práticas de implementação para os próximos passos da aplicação.
+### R4. Linha do Tempo e Interface Multi-Tutor (Frontend)
+No frontend (`apps/frontend`), atualizar as telas do módulo de tutoria:
+- Modal de Detalhes (`/tutoria` - `TutoriaDashboard.tsx`): Exibir a linha do tempo cronológica com o histórico completo de intervenções (quem iniciou, quem deu continuidade, mensagens, transições de status e passagens de bastão) e permitir registro de novas intervenções ou transferência de tutor responsável.
+- Quadro Kanban (`/tutoria/kanban` - `TutoriaKanbanClient.tsx`): Exibir o tutor responsável principal em cada card, indicar visualmente atendimentos com intervenções recentes e registrar automaticamente no histórico as transições de coluna realizadas por qualquer tutor autenticado.
 
 ## Acceptance Criteria
 
-### Integridade Técnica e Verificabilidade
-- [ ] Execução e verificação dos comandos de integridade do monorepo (`npm run build` e `npm run test` em backend e frontend), registrando eventuais warnings ou falhas.
-- [ ] Mapeamento e conferência de 100% dos controllers e rotas expostas no backend NestJS quanto à proteção de autorização e guards.
-- [ ] Análise estática de vulnerabilidades e verificação de concorrência nas reservas de agendamento.
-- [ ] Emissão de relatório técnico completo contendo diagnósticos pontuais, trechos de código referenciados e plano de ação executável.
+### Trilha de Auditoria e Banco de Dados
+- [ ] Schema Drizzle no backend inclui tabela para eventos de auditoria e histórico de atendimento com chaves estrangeiras, índices cronológicos e campos para autor (id/nome), tipo de ação, payload de transição, notas e timestamp.
+- [ ] Migrations do banco de dados são geradas e executadas sem erros de integridade referencial.
+
+### Backend e Regras de Negócio
+- [ ] Endpoints do `TutoriaModule` permitem registrar intervenções, transferir tutor responsável com justificativa e recuperar a timeline consolidada ordenada cronologicamente por discente.
+- [ ] Ações realizadas em atendimentos (mudança de status kanban, envio de mensagem, registro de nota pedagógica) geram registros correspondentes na tabela de histórico vinculando o tutor autenticado.
+
+### Frontend e Visualização da Timeline
+- [ ] Modal de detalhes do discente em `/tutoria` renderiza a timeline cronológica exibindo autor da ação, avatar/nome do tutor, data/hora formatada, tipo de evento e conteúdo/observações.
+- [ ] Quadro Kanban (`/tutoria/kanban`) reflete o tutor responsável ativo nos cards e registra o autor correto no histórico ao arrastar/mover cards entre colunas.
+- [ ] Interface permite explicitamente passar o bastão (transferir tutor responsável) com inserção de nota/justificativa, refletindo a alteração na timeline e no card.
+
+### Verificação e Build
+- [ ] Build do monorepo (`npm run build` ou equivalente no Turborepo) executa com sucesso no backend e frontend sem erros de tipagem TypeScript ou lint.
+- [ ] Testes existentes ou novos testes unitários/integração do `TutoriaModule` executam com sucesso.

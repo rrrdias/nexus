@@ -54,7 +54,12 @@ async function processInChunks<T>(
     }
     await processor(chunk);
     if (onChunkProgress) {
-      await onChunkProgress(chunkNum, totalChunks, processedItems, items.length);
+      await onChunkProgress(
+        chunkNum,
+        totalChunks,
+        processedItems,
+        items.length,
+      );
     }
   }
 }
@@ -80,11 +85,16 @@ export class TutoriaSyncService {
   // Sincronização automática 2x ao dia: 04:00 AM e 13:00 PM
   @Cron('0 4,13 * * *')
   async handleScheduledSync() {
-    this.logger.log('⏰ [CRON] Executando sincronização agendada de logs da Tutoria (EaD - ID 63)...');
+    this.logger.log(
+      '⏰ [CRON] Executando sincronização agendada de logs da Tutoria (EaD - ID 63)...',
+    );
     try {
       await this.syncTutoriaLogs('ead');
     } catch (err: any) {
-      this.logger.error('❌ [CRON] Falha na sincronização agendada de logs da Tutoria:', err.message);
+      this.logger.error(
+        '❌ [CRON] Falha na sincronização agendada de logs da Tutoria:',
+        err.message,
+      );
     }
   }
 
@@ -125,19 +135,25 @@ export class TutoriaSyncService {
     onProgress?: (progress: number, step: string) => Promise<void>,
   ) {
     if (this.isSyncing) {
-      this.logger.warn('⚠️ Sincronização de logs de tutoria já em andamento. Ignorando nova chamada.');
+      this.logger.warn(
+        '⚠️ Sincronização de logs de tutoria já em andamento. Ignorando nova chamada.',
+      );
       return { status: 'already_running', message: 'Sync already in progress' };
     }
 
     const getUrl =
       customGetUrl ||
-      process.env.MOODLE_EAD_TUTORIA_GET_URL;
+      process.env.MOODLE_EAD_TUTORIA_GET_URL ||
+      'https://avaead.unievangelica.edu.br/webservice/pluginfile.php/1/block_reports/def_report_json/63/dfr.json?token=b9dc7b9cbd71a62048cdd1b27e0bb72d';
     const attUrl =
       customAttUrl ||
-      process.env.MOODLE_EAD_TUTORIA_ATT_URL;
+      process.env.MOODLE_EAD_TUTORIA_ATT_URL ||
+      'https://avaead.unievangelica.edu.br/webservice/rest/server.php?wstoken=b9dc7b9cbd71a62048cdd1b27e0bb72d&moodlewsrestformat=json&wsfunction=block_reports_queue_deferred_report&id=63';
 
     if (!getUrl) {
-      this.logger.error('❌ MOODLE_EAD_TUTORIA_GET_URL não configurada no .env');
+      this.logger.error(
+        '❌ MOODLE_EAD_TUTORIA_GET_URL não configurada no .env',
+      );
       return { status: 'error', reason: 'URL missing' };
     }
 
@@ -147,9 +163,14 @@ export class TutoriaSyncService {
 
     try {
       if (onProgress) {
-        await onProgress(5, `Buscando relatório de logs (${institution.toUpperCase()}) no Moodle...`);
+        await onProgress(
+          5,
+          `Buscando relatório de logs (${institution.toUpperCase()}) no Moodle...`,
+        );
       }
-      this.logger.log(`📥 [SYNC] Baixando logs de Tutoria do Moodle: ${getUrl}`);
+      this.logger.log(
+        `📥 [SYNC] Baixando logs de Tutoria do Moodle: ${getUrl}`,
+      );
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout
@@ -190,7 +211,9 @@ export class TutoriaSyncService {
       }
 
       if (!Array.isArray(rawItems) || rawItems.length === 0) {
-        this.logger.warn(`⚠️ Nenhum registro retornado pelo relatório de Tutoria para ${institution}.`);
+        this.logger.warn(
+          `⚠️ Nenhum registro retornado pelo relatório de Tutoria para ${institution}.`,
+        );
         await this.triggerMoodleUpdate(institution, attUrl);
         this.isSyncing = false;
         this.lastSyncTime = new Date();
@@ -203,9 +226,14 @@ export class TutoriaSyncService {
         return { status: 'success', records: 0 };
       }
 
-      this.logger.log(`📊 [SYNC] ${rawItems.length} registros recebidos. Iniciando gravação em lotes...`);
+      this.logger.log(
+        `📊 [SYNC] ${rawItems.length} registros recebidos. Iniciando gravação em lotes...`,
+      );
       if (onProgress) {
-        await onProgress(20, `Gravando ${rawItems.length} registros de logs no banco de dados...`);
+        await onProgress(
+          20,
+          `Gravando ${rawItems.length} registros de logs no banco de dados...`,
+        );
       }
 
       // 1. Inserir os logs brutos em lotes de 1000
@@ -214,28 +242,56 @@ export class TutoriaSyncService {
         rawItems,
         1000,
         async (chunk) => {
-          const rowsToInsert = chunk.map((item) => ({
-            sourceInstitution: institution,
-            periodo: String(item.periodo || '2026-2').trim(),
-            disciplinaId: String(item.disciplina_id || '').trim(),
-            disciplinaCodigo: item.disciplina_codigo ? String(item.disciplina_codigo).trim() : null,
-            disciplinaNome: item.disciplina_nome ? String(item.disciplina_nome).trim() : null,
-            alunoId: String(item.aluno_id || '').trim(),
-            matricula: item.matricula ? String(item.matricula).trim() : null,
-            alunoNome: item.aluno_nome ? String(item.aluno_nome).trim() : null,
-            alunoEmail: item.aluno_email ? String(item.aluno_email).trim() : null,
-            unidadeTematicaNome: item.unidade_tematica_nome ? String(item.unidade_tematica_nome).trim() : null,
-            atividadeId: String(item.atividade_id || '').trim(),
-            tipoModulo: item.tipo_modulo ? String(item.tipo_modulo).trim() : null,
-            conteudoNome: item.conteudo_nome ? String(item.conteudo_nome).trim() : null,
-            qtdCliquesAcessos: item.qtd_cliques_acessos ? parseInt(String(item.qtd_cliques_acessos), 10) || 0 : 0,
-            tempoConteudoMinutos: String(item.tempo_conteudo_minutos || '0').trim(),
-            dataPrimeiroAcessoConteudo: item.data_primeiro_acesso_conteudo ? String(item.data_primeiro_acesso_conteudo).trim() : null,
-            dataUltimoAcessoConteudo: item.data_ultimo_acesso_conteudo ? String(item.data_ultimo_acesso_conteudo).trim() : null,
-            dataUltimoAcessoDisciplina: item.data_ultimo_acesso_disciplina ? String(item.data_ultimo_acesso_disciplina).trim() : null,
-            dataUltimoLogin: item.data_ultimo_login ? String(item.data_ultimo_login).trim() : null,
-            updatedAt: new Date(),
-          })).filter(r => r.disciplinaId && r.alunoId && r.atividadeId);
+          const rowsToInsert = chunk
+            .map((item) => ({
+              sourceInstitution: institution,
+              periodo: String(item.periodo || '2026-2').trim(),
+              disciplinaId: String(item.disciplina_id || '').trim(),
+              disciplinaCodigo: item.disciplina_codigo
+                ? String(item.disciplina_codigo).trim()
+                : null,
+              disciplinaNome: item.disciplina_nome
+                ? String(item.disciplina_nome).trim()
+                : null,
+              alunoId: String(item.aluno_id || '').trim(),
+              matricula: item.matricula ? String(item.matricula).trim() : null,
+              alunoNome: item.aluno_nome
+                ? String(item.aluno_nome).trim()
+                : null,
+              alunoEmail: item.aluno_email
+                ? String(item.aluno_email).trim()
+                : null,
+              unidadeTematicaNome: item.unidade_tematica_nome
+                ? String(item.unidade_tematica_nome).trim()
+                : null,
+              atividadeId: String(item.atividade_id || '').trim(),
+              tipoModulo: item.tipo_modulo
+                ? String(item.tipo_modulo).trim()
+                : null,
+              conteudoNome: item.conteudo_nome
+                ? String(item.conteudo_nome).trim()
+                : null,
+              qtdCliquesAcessos: item.qtd_cliques_acessos
+                ? parseInt(String(item.qtd_cliques_acessos), 10) || 0
+                : 0,
+              tempoConteudoMinutos: String(
+                item.tempo_conteudo_minutos || '0',
+              ).trim(),
+              dataPrimeiroAcessoConteudo: item.data_primeiro_acesso_conteudo
+                ? String(item.data_primeiro_acesso_conteudo).trim()
+                : null,
+              dataUltimoAcessoConteudo: item.data_ultimo_acesso_conteudo
+                ? String(item.data_ultimo_acesso_conteudo).trim()
+                : null,
+              dataUltimoAcessoDisciplina: item.data_ultimo_acesso_disciplina
+                ? String(item.data_ultimo_acesso_disciplina).trim()
+                : null,
+              dataUltimoLogin: item.data_ultimo_login
+                ? String(item.data_ultimo_login).trim()
+                : null,
+              updatedAt: new Date(),
+            }))
+            .filter((r) => r.disciplinaId && r.alunoId && r.atividadeId);
 
           if (rowsToInsert.length === 0) return;
 
@@ -272,14 +328,20 @@ export class TutoriaSyncService {
         async (chunkNum, totalChunks, processedItems, totalItems) => {
           if (onProgress) {
             const pct = Math.floor(20 + (processedItems / totalItems) * 60);
-            await onProgress(pct, `Gravando lote ${chunkNum}/${totalChunks} (${processedItems}/${totalItems})...`);
+            await onProgress(
+              pct,
+              `Gravando lote ${chunkNum}/${totalChunks} (${processedItems}/${totalItems})...`,
+            );
           }
         },
       );
 
       // 2. Recalcular a tabela de engajamento consolidado
       if (onProgress) {
-        await onProgress(85, 'Recalculando indicadores de engajamento por aluno e fase...');
+        await onProgress(
+          85,
+          'Recalculando indicadores de engajamento por aluno e fase...',
+        );
       }
       await this.refreshEngagementSnapshot(institution);
 
@@ -291,7 +353,10 @@ export class TutoriaSyncService {
       }
 
       if (onProgress) {
-        await onProgress(100, `Sincronização concluída com sucesso! ${rawItems.length} registros processados.`);
+        await onProgress(
+          100,
+          `Sincronização concluída com sucesso! ${rawItems.length} registros processados.`,
+        );
       }
 
       const finishedAt = new Date();
@@ -320,7 +385,9 @@ export class TutoriaSyncService {
         startedAt,
         finishedAt: new Date(),
       };
-      this.logger.error(`❌ [SYNC] Erro durante sincronização de Tutoria: ${err.message}`);
+      this.logger.error(
+        `❌ [SYNC] Erro durante sincronização de Tutoria: ${err.message}`,
+      );
       throw err;
     } finally {
       this.isSyncing = false;
@@ -329,7 +396,9 @@ export class TutoriaSyncService {
 
   // Consolidação automática da tabela tutoria_engajamento_aluno
   async refreshEngagementSnapshot(institution = 'ead', periodo?: string) {
-    this.logger.log(`🔄 [AGREGAÇÃO] Atualizando tabela de engajamento consolidado (${institution})...`);
+    this.logger.log(
+      `🔄 [AGREGAÇÃO] Atualizando tabela de engajamento consolidado (${institution})...`,
+    );
 
     const periodoFilter = periodo ? sql`AND l.periodo = ${periodo}` : sql``;
 
@@ -430,6 +499,8 @@ export class TutoriaSyncService {
         "updatedAt" = now();
     `);
 
-    this.logger.log(`✅ [AGREGAÇÃO] Tabela de engajamento consolidado atualizada.`);
+    this.logger.log(
+      `✅ [AGREGAÇÃO] Tabela de engajamento consolidado atualizada.`,
+    );
   }
 }

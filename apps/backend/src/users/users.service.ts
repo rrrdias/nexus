@@ -3,6 +3,7 @@ import {
   Inject,
   Optional,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -18,6 +19,7 @@ import { hashPassword } from './password.util';
 import { CacheService } from '../cache/cache.service';
 import { RbacGuard } from '../auth/rbac.guard';
 import { AuditService } from '../audit/audit.service';
+import { MailService } from '../mail/mail.service';
 
 type SessionUser = {
   id?: string;
@@ -27,10 +29,13 @@ type SessionUser = {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
     @Optional() private readonly cacheService?: CacheService,
     @Optional() private readonly auditService?: AuditService,
+    @Optional() private readonly mailService?: MailService,
   ) {}
 
   private assertSuperAdmin(user?: SessionUser) {
@@ -165,6 +170,22 @@ export class UsersService {
         groupIds,
       },
     });
+
+    // Dispara e-mail de boas-vindas com dados de acesso (não bloqueante)
+    if (this.mailService) {
+      this.mailService
+        .sendWelcomeEmail(
+          email.trim(),
+          name.trim(),
+          userid?.trim() || email.trim(),
+          password.trim(),
+        )
+        .catch((err) => {
+          this.logger.warn(
+            `Falha ao disparar e-mail de boas-vindas para ${email}: ${err.message}`,
+          );
+        });
+    }
 
     return { success: true };
   }

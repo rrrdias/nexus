@@ -2,7 +2,9 @@ import { db } from './index';
 import { sql } from 'drizzle-orm';
 
 async function migrateDates() {
-  console.log('🚀 Iniciando migração de novas colunas de datas para Tutoria...');
+  console.log(
+    '🚀 Iniciando migração de novas colunas de datas para Tutoria...',
+  );
 
   try {
     // 1. Colunas em tutoria_logs_atividades

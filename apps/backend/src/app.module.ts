@@ -20,6 +20,7 @@ import { HealthModule } from './health/health.module';
 import { CacheModule } from './cache/cache.module';
 import { AuditModule } from './audit/audit.module';
 import { TutoriaModule } from './tutoria/tutoria.module';
+import { MailModule } from './mail/mail.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -48,6 +49,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     HealthModule,
     AuditModule,
     TutoriaModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [

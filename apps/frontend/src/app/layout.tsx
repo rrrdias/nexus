@@ -1,22 +1,10 @@
 import type { Metadata } from "next"
-import { Plus_Jakarta_Sans, DM_Mono } from "next/font/google"
 import "./globals.css"
 import { Sidebar } from "@/components/Sidebar"
 import { Topbar } from "@/components/Topbar"
 import { auth } from "@/auth"
 import { IdleTimeoutProvider } from "@/components/IdleTimeoutProvider"
 import { SessionProvider } from "next-auth/react"
-
-const fontSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans"
-})
-
-const fontMono = DM_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-mono"
-})
 
 export async function generateMetadata(): Promise<Metadata> {
   const basePath = process.env.NEXT_BASE_PATH || ""
@@ -39,11 +27,16 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const session = await auth()
+  let session = null
+  try {
+    session = await auth()
+  } catch (err) {
+    console.error("[RootLayout] Erro ao recuperar sessão:", err)
+  }
 
   return (
     <html lang="pt-BR" className="h-screen overflow-hidden">
-      <body className={`${fontSans.variable} ${fontMono.variable} font-sans flex h-screen bg-[#F4F5F7] antialiased overflow-hidden`}>
+      <body className="font-sans flex h-screen bg-[#F4F5F7] antialiased overflow-hidden">
         <SessionProvider basePath="/nexus/api/auth">
           {session ? <Sidebar /> : null}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full w-full">

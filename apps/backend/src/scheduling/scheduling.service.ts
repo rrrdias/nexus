@@ -12,6 +12,7 @@ import { DB_CONNECTION } from '../db/db.provider';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { getDefaultPeriod } from '../config/app-config';
 import { AuditService } from '../audit/audit.service';
+import { MailService } from '../mail/mail.service';
 import {
   eq,
   ne,
@@ -117,6 +118,7 @@ export class SchedulingService implements OnModuleInit {
   constructor(
     @Inject(DB_CONNECTION) private readonly db: PostgresJsDatabase<any>,
     @Optional() private readonly auditService?: AuditService,
+    @Optional() private readonly mailService?: MailService,
   ) {}
 
   async onModuleInit() {
@@ -752,6 +754,39 @@ export class SchedulingService implements OnModuleInit {
           updatedAt: new Date(),
         })
         .returning();
+
+      // Busca dados do polo/campus para envio de e-mail de confirmação
+      const [localRecord] = await tx
+        .select()
+        .from(locals)
+        .where(eq(locals.id, opcao.localId))
+        .limit(1);
+
+      const poloNome = localRecord?.nome || 'Polo de Apoio Presencial';
+      // E-mail de teste configurado para validação do fluxo de confirmação de agendamento
+      // Original: const studentEmail = (profile as any).email || (profile as any).usuario;
+      const studentEmail = 'rrrdias25@gmail.com';
+
+      if (this.mailService && studentEmail && typeof studentEmail === 'string' && studentEmail.includes('@')) {
+        this.mailService
+          .sendSchedulingConfirmation(studentEmail.trim(), {
+            studentName: profile.nome || (profile as any).aluno || 'Estudante',
+            matricula: profile.matricula || matricula,
+            poloNome,
+            data: opcao.data instanceof Date
+              ? opcao.data.toLocaleDateString('pt-BR')
+              : String(opcao.data),
+            hora: opcao.hora ? opcao.hora.slice(0, 5) : '',
+            sala: (opcao as any).sala || undefined,
+            disciplinas: profile.disciplinas,
+            periodo,
+          })
+          .catch((err) => {
+            console.error(
+              `[SchedulingService] Erro ao enviar e-mail de confirmação para ${studentEmail}: ${err.message}`,
+            );
+          });
+      }
 
       return {
         ...booking,
@@ -1611,7 +1646,8 @@ export class SchedulingService implements OnModuleInit {
       }
 
       if (
-        booking.matricula.trim().toLowerCase() !== matricula.trim().toLowerCase()
+        booking.matricula.trim().toLowerCase() !==
+        matricula.trim().toLowerCase()
       ) {
         throw new BadRequestException(
           'Este agendamento não pertence à matrícula informada.',

@@ -139,7 +139,6 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-
   private async createAndConnectPool(): Promise<sql.ConnectionPool | null> {
     if (!this.mssqlConfig) return null;
     if (this.isConnecting) {
@@ -764,7 +763,9 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
   getSqlPool(): sql.ConnectionPool {
     if (!this.pool || !this.pool.connected) {
       this.createAndConnectPool().catch(() => {});
-      throw new Error('Banco de dados Lyceum desconectado. Tentativa de reconexao iniciada.');
+      throw new Error(
+        'Banco de dados Lyceum desconectado. Tentativa de reconexao iniciada.',
+      );
     }
     return this.pool;
   }
@@ -773,10 +774,14 @@ export class AcademicService implements OnModuleInit, OnModuleDestroy {
     if (this.pool && this.pool.connected) {
       return this.pool;
     }
-    console.warn('[Lyceum DB] Pool desconectado. Tentando reconexao automatica com o Lyceum...');
+    console.warn(
+      '[Lyceum DB] Pool desconectado. Tentando reconexao automatica com o Lyceum...',
+    );
     const pool = await this.createAndConnectPool();
     if (!pool || !pool.connected) {
-      throw new Error('Banco de dados Lyceum temporariamente indisponivel. Tente novamente em instantes.');
+      throw new Error(
+        'Banco de dados Lyceum temporariamente indisponivel. Tente novamente em instantes.',
+      );
     }
     return pool;
   }

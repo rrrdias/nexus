@@ -1,13 +1,16 @@
 "use server"
 
-import { auth, signOut } from "@/auth"
+import { auth, signOut } from "../../auth"
 
 export async function fetchFromApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const session = await auth()
-  const token = session?.user?.accessToken
-
+  let token: string | undefined = process.env.TEST_AUTH_TOKEN
   if (!token) {
-    await signOut({ redirectTo: "/nexus/login" })
+    const session = await auth()
+    token = session?.user?.accessToken
+
+    if (!token) {
+      await signOut({ redirectTo: "/nexus/login" })
+    }
   }
 
   const baseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004"

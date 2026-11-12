@@ -9,7 +9,13 @@ export const metadata = {
 }
 
 export default async function TutoriaPage() {
-  const session = await auth()
+  let session = null
+  try {
+    session = await auth()
+  } catch (err) {
+    console.error("[TutoriaPage] Erro ao obter sessão:", err)
+  }
+
   if (!session?.user) {
     redirect("/login")
   }
@@ -25,9 +31,16 @@ export default async function TutoriaPage() {
     }
   }
 
+  const safeSessionUser = {
+    id: String(session.user.id || ""),
+    name: String(session.user.name || ""),
+    email: String(session.user.email || ""),
+    isSuperAdmin: !!(session.user as any)?.isSuperAdmin,
+  }
+
   return (
     <div className="space-y-6">
-      <TutoriaDashboard sessionUser={session.user} />
+      <TutoriaDashboard sessionUser={safeSessionUser} />
     </div>
   )
 }
