@@ -30,6 +30,7 @@ import {
   opcaos,
   agendamentosMatricula,
   avaProgressReport,
+  avaGradesReport,
   systemModules,
   usersSystemAccess,
   userGroups,
@@ -521,8 +522,41 @@ export class SchedulingService implements OnModuleInit {
       const canonicalMatricula =
         eadRecords[0].matricula || trimmedMatricula.toUpperCase();
       const studentName = eadRecords[0].aluno;
-      const email = eadRecords[0].usuario;
+      let email =
+        eadRecords.find((r) => r.usuario && r.usuario.includes('@'))?.usuario ||
+        eadRecords[0].usuario;
       const phone = eadRecords[0].userPhone1;
+
+      if (!email || !email.includes('@')) {
+        try {
+          const [gradeWithEmail] = await this.db
+            .select({ userEmail: avaGradesReport.userEmail })
+            .from(avaGradesReport)
+            .where(
+              and(
+                ilike(avaGradesReport.userIdentification, canonicalMatricula),
+                isNotNull(avaGradesReport.userEmail),
+              ),
+            )
+            .limit(1);
+
+          if (gradeWithEmail?.userEmail?.includes('@')) {
+            email = gradeWithEmail.userEmail.trim();
+          } else {
+            const [discWithEmail] = await this.db
+              .select({ email: academicDiscente.email })
+              .from(academicDiscente)
+              .where(ilike(academicDiscente.matricula, canonicalMatricula))
+              .limit(1);
+
+            if (discWithEmail?.email?.includes('@')) {
+              email = discWithEmail.email.trim();
+            }
+          }
+        } catch {
+          // Mantém o valor original caso a consulta complementar falhe
+        }
+      }
 
       return {
         matricula: canonicalMatricula,
@@ -770,9 +804,7 @@ export class SchedulingService implements OnModuleInit {
         .limit(1);
 
       const poloNome = localRecord?.nome || 'Polo de Apoio Presencial';
-      // E-mail de teste configurado para validação do fluxo de confirmação de agendamento
-      // Original: const studentEmail = (profile as any).email || (profile as any).usuario;
-      const studentEmail = 'rrrdias25@gmail.com';
+      const studentEmail = (profile as any).email || (profile as any).usuario;
 
       if (this.mailService && studentEmail && typeof studentEmail === 'string' && studentEmail.includes('@')) {
         this.mailService
@@ -1914,9 +1946,7 @@ export class SchedulingService implements OnModuleInit {
         .limit(1);
 
       const poloNome = localRecord?.nome || 'Polo de Apoio Presencial';
-      // E-mail de teste configurado para validação do fluxo de confirmação de agendamento
-      // Original: const studentEmail = (profile as any).email || (profile as any).usuario;
-      const studentEmail = 'rrrdias25@gmail.com';
+      const studentEmail = (profile as any).email || (profile as any).usuario;
 
       if (
         this.mailService &&

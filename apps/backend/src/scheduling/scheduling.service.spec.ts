@@ -8,6 +8,7 @@ import { SchedulingService } from './scheduling.service';
 describe('SchedulingService (createOption stability test, RBAC, Periods & Profile)', () => {
   let service: SchedulingService;
   let db: any;
+  let mailService: any;
   let queryResult: any;
 
   beforeEach(() => {
@@ -34,7 +35,10 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
     };
 
     db = queryBuilder;
-    service = new SchedulingService(db);
+    mailService = {
+      sendSchedulingConfirmation: jest.fn().mockResolvedValue({ success: true }),
+    };
+    service = new SchedulingService(db, undefined, mailService);
   });
 
   it('should be defined', () => {
@@ -552,6 +556,13 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
       expect(slotsDb['slot-0830'].vagas).toBe(9);
       // 09:00 was consumed: 10 -> 9
       expect(slotsDb['slot-0900'].vagas).toBe(9);
+      expect(mailService.sendSchedulingConfirmation).toHaveBeenCalledWith(
+        'maria@nexus.edu.br',
+        expect.objectContaining({
+          matricula: '2026001',
+          isReschedule: true,
+        }),
+      );
     });
   });
 });
