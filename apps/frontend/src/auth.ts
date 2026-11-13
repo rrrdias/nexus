@@ -1,6 +1,9 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 
+const BACKEND_JWT_LIFETIME_MS = 2 * 60 * 60 * 1000
+const REFRESH_THRESHOLD_MS = 30 * 60 * 1000
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: "/api/auth",
   trustHost: true,
@@ -63,7 +66,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.isSuperAdmin = user.isSuperAdmin
         token.groups = user.groups
         token.accessToken = user.accessToken
+        token.accessTokenExpiresAt = Date.now() + BACKEND_JWT_LIFETIME_MS - REFRESH_THRESHOLD_MS
+        token.isDisabled = false
+        return token
       }
+
+      if (token.accessToken && Date.now() >= (token.accessTokenExpiresAt || 0)) {
+        try {
+          const apiBaseUrl = process.env.NEXT_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3004"
+          const res = await fetch(`${apiBaseUrl}/api/auth/refresh`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token.accessToken}`,
+            },
+            cache: "no-store",
+          })
+
+          if (res.ok) {
+            const data = await res.json()
+            if (data?.access_token) {
+              token.accessToken = data.access_token
+              token.isSuperAdmin = data.user?.isSuperAdmin ?? token.isSuperAdmin
+              token.groups = data.user?.groups ?? token.groups
+              token.accessTokenExpiresAt = Date.now() + BACKEND_JWT_LIFETIME_MS - REFRESH_THRESHOLD_MS
+              token.isDisabled = false
+            }
+          } else if (res.status === 401) {
+            token.isDisabled = true
+            token.accessToken = ""
+          }
+        } catch (error) {
+          console.error("[Auth] Erro ao renovar token JWT silenciosamente:", error)
+        }
+      }
+
       return token
     },
     async session({ session, token }) {
@@ -72,6 +109,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.groups = (token.groups as string[]) || []
         session.user.id = token.sub as string
         session.user.accessToken = token.accessToken as string
+        session.user.isDisabled = !!token.isDisabled
       }
       return session
     }

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port 3002",
     "lint": "eslint",
-    "test": "npx tsx src/lib/activity-utils.test.ts && npx tsx src/lib/scheduling-utils.test.ts && npx tsx src/lib/tutoria-adversarial.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-kanban-m4.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-kanban-m4-adversarial.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-challenger-m4.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-empirical-challenge.test.ts && npx tsx src/lib/tutoria-e2e.test.ts"
+    "test": "npx tsx src/lib/activity-utils.test.ts && npx tsx src/lib/scheduling-utils.test.ts && npx tsx src/lib/core-utils.test.ts && npx tsx src/lib/tutoria-adversarial.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-kanban-m4.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-kanban-m4-adversarial.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-challenger-m4.test.ts && npx tsx --tsconfig tsconfig.json src/lib/tutoria-empirical-challenge.test.ts && npx tsx src/lib/tutoria-e2e.test.ts && npx tsx src/lib/tutoria-tier5-adversarial.test.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

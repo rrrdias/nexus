@@ -92,6 +92,17 @@ function getGradeBadgeStyle(grade: number) {
   return "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
 }
 
+function getEnrolmentStatusBadgeStyle(status?: string | null) {
+  const norm = String(status || 'Ativo').toLowerCase()
+  if (norm.includes("ativ") || norm.includes("matriculad")) {
+    return "bg-emerald-50 text-emerald-700 border-emerald-200"
+  }
+  if (norm.includes("suspens") || norm.includes("trancad") || norm.includes("inativ")) {
+    return "bg-amber-50 text-amber-700 border-amber-200"
+  }
+  return "bg-rose-50 text-rose-700 border-rose-200"
+}
+
 import {
   splitCourseAndCode,
   formatPhone,
@@ -310,7 +321,6 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                 const notaF3 = parseVal(row.notaFase3)
                 const mediaTot = parseVal(row.mediaFinal)
 
-                const isAtivo = String(row.enrolmentStatus).toLowerCase().includes("ativo")
                 const parsedCourse = splitCourseAndCode(row.curso)
                 const phoneFormatted = formatPhone(row.userPhone1)
                 const waLink = getWhatsAppLink(row.userPhone1, row.aluno)
@@ -540,11 +550,7 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                     {/* Status & Acesso */}
                     <td className="py-3.5 px-4 text-center align-middle">
                       <div className="flex flex-col items-center gap-1">
-                        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
-                          isAtivo 
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                            : "bg-rose-50 text-rose-700 border-rose-200"
-                        }`}>
+                        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${getEnrolmentStatusBadgeStyle(row.enrolmentStatus)}`}>
                           {row.enrolmentStatus || 'Ativo'}
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">

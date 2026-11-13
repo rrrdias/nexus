@@ -87,4 +87,12 @@ export class AuthController {
       userAgent,
     });
   }
+
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh')
+  refresh(@Req() req: any = {}) {
+    const userId = req?.user?.id || req?.user?.sub || '';
+    return this.authService.refreshToken(userId);
+  }
 }

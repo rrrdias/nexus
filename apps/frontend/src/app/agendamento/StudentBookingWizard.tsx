@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo, useRef } from "react"
 import {
   StudentProfile,
   LocalOption,
@@ -74,6 +74,19 @@ export function StudentBookingWizard({
   onBookingCompleted,
 }: StudentBookingWizardProps) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1)
+  const [selectedLocalId, setSelectedLocalId] = useState<string>("")
+  const [slots, setSlots] = useState<AvailableSlot[]>([])
+  const [loadingSlots, setLoadingSlots] = useState<boolean>(false)
+  const [selectedDate, setSelectedDate] = useState<string>("")
+  const [selectedSlotId, setSelectedSlotId] = useState<string>("")
+  const [agreedTerms, setAgreedTerms] = useState<boolean>(false)
+  const [submitting, setSubmitting] = useState<boolean>(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const selectedLocalIdRef = useRef(selectedLocalId)
+  const selectedSlotIdRef = useRef(selectedSlotId)
+  selectedLocalIdRef.current = selectedLocalId
+  selectedSlotIdRef.current = selectedSlotId
 
   // Navegação sincronizada com a History API do navegador (para suporte ao botão voltar em smartphones)
   const goToStep = (step: 1 | 2 | 3 | 4) => {
@@ -96,32 +109,30 @@ export function StudentBookingWizard({
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const params = new URLSearchParams(window.location.search)
-    const initialStep = Number(params.get("step"))
-    if (!initialStep || initialStep === 1) {
-      const url = new URL(window.location.href)
-      url.searchParams.set("step", "1")
-      window.history.replaceState({ step: 1 }, "", url.toString())
-    }
+    // Normaliza sempre a entrada inicial para o Passo 1, evitando estado inconsistente em refresh
+    const url = new URL(window.location.href)
+    url.searchParams.set("step", "1")
+    window.history.replaceState({ step: 1 }, "", url.toString())
 
     const handlePopState = (event: PopStateEvent) => {
-      const targetStep = event.state?.step || Number(new URLSearchParams(window.location.search).get("step")) || 1
-      if (targetStep >= 1 && targetStep <= 4) {
-        setCurrentStep(targetStep as 1 | 2 | 3 | 4)
-      }
+      const rawStep = Number(
+        event.state?.step || new URLSearchParams(window.location.search).get("step") || 1
+      )
+      const maxAllowedStep: 1 | 2 | 3 | 4 = !selectedLocalIdRef.current
+        ? 2
+        : !selectedSlotIdRef.current
+        ? 3
+        : 4
+      const safeStep = Math.min(
+        Math.max(Number.isFinite(rawStep) ? rawStep : 1, 1),
+        maxAllowedStep
+      ) as 1 | 2 | 3 | 4
+      setCurrentStep(safeStep)
     }
 
     window.addEventListener("popstate", handlePopState)
     return () => window.removeEventListener("popstate", handlePopState)
   }, [])
-  const [selectedLocalId, setSelectedLocalId] = useState<string>("")
-  const [slots, setSlots] = useState<AvailableSlot[]>([])
-  const [loadingSlots, setLoadingSlots] = useState<boolean>(false)
-  const [selectedDate, setSelectedDate] = useState<string>("")
-  const [selectedSlotId, setSelectedSlotId] = useState<string>("")
-  const [agreedTerms, setAgreedTerms] = useState<boolean>(false)
-  const [submitting, setSubmitting] = useState<boolean>(false)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const disciplinasCount = student.disciplinas?.length || 1
   const disciplinesCount = disciplinasCount

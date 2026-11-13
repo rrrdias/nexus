@@ -8,11 +8,22 @@ export type ActionResult<T = any> =
   | { success: false; error: string }
 
 export async function getGroups() {
-  return fetchFromApi('/api/groups', { method: 'GET' });
+  try {
+    const res = await fetchFromApi('/api/groups', { method: 'GET' });
+    return Array.isArray(res) ? res : [];
+  } catch (err: any) {
+    console.error("[getGroups Action Error]:", err?.message);
+    return [];
+  }
 }
 
 export async function getGroupWithModules(groupId: string) {
-  return fetchFromApi(`/api/groups/${groupId}`, { method: 'GET' });
+  try {
+    return await fetchFromApi(`/api/groups/${groupId}`, { method: 'GET' });
+  } catch (err: any) {
+    console.error("[getGroupWithModules Action Error]:", err?.message);
+    return null;
+  }
 }
 
 export async function createGroup(formData: FormData): Promise<ActionResult> {

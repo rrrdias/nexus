@@ -8,11 +8,22 @@ export type ActionResult<T = any> =
   | { success: false; error: string }
 
 export async function getUsers() {
-  return fetchFromApi('/api/users', { method: 'GET' });
+  try {
+    const res = await fetchFromApi('/api/users', { method: 'GET' });
+    return Array.isArray(res) ? res : [];
+  } catch (err: any) {
+    console.error("[getUsers Action Error]:", err?.message);
+    return [];
+  }
 }
 
 export async function getUserForEdit(userId: string) {
-  return fetchFromApi(`/api/users/${userId}`, { method: 'GET' });
+  try {
+    return await fetchFromApi(`/api/users/${userId}`, { method: 'GET' });
+  } catch (err: any) {
+    console.error("[getUserForEdit Action Error]:", err?.message);
+    return null;
+  }
 }
 
 export async function createUser(formData: FormData): Promise<ActionResult> {

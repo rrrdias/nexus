@@ -124,12 +124,31 @@ export function AcademicDashboard() {
       if (res.data?.queued && res.data?.jobId) {
         const jobId = res.data.jobId
         const queue = res.data.queue || 'academic-sync'
-        
+        const MAX_POLL_ATTEMPTS = 120
+        let attempts = 0
+        let consecutiveErrors = 0
+
         let isDone = false
         while (!isDone) {
           await new Promise(r => setTimeout(r, 1500))
+          attempts++
+          if (attempts > MAX_POLL_ATTEMPTS) {
+            isDone = true
+            showToast("A sincronização continua processando em segundo plano. Atualize a consulta em instantes.", "success")
+            break
+          }
+
           const statusRes = await getJobStatus(queue, jobId)
-          if (statusRes.success && statusRes.data) {
+          if (!statusRes.success) {
+            consecutiveErrors++
+            if (consecutiveErrors >= 5) {
+              throw new Error(statusRes.error || "Perda de comunicação ao consultar o progresso da sincronização.")
+            }
+            continue
+          }
+
+          consecutiveErrors = 0
+          if (statusRes.data) {
             const job = statusRes.data
             setSyncProgress(job.progress || 0)
             if (job.step) setSyncStep(job.step)

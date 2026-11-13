@@ -28,6 +28,7 @@ declare module "next-auth/jwt" {
     isSuperAdmin?: boolean
     groups?: string[]
     accessToken?: string
+    accessTokenExpiresAt?: number
     isDisabled?: boolean
   }
 }

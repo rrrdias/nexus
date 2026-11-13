@@ -219,8 +219,9 @@ export function ConsolidatedFilters({
                   className="w-full text-xs rounded-lg border border-gray-2 bg-gray-50 p-2 text-gray-8 focus:outline-none focus:border-green-brand"
                 >
                   <option value="">Todos os Status</option>
-                  <option value="Ativo">Ativo</option>
+                  <option value="Ativo">Ativo / Matriculado</option>
                   <option value="Suspenso">Suspenso / Trancado</option>
+                  <option value="Cancelado">Cancelado / Desvinculado</option>
                 </select>
               </div>
 

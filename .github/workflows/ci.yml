@@ -50,6 +50,9 @@ jobs:
       - name: 🧪 Run Backend Unit Tests
         run: npm run test --workspace=@nexus-core/backend
 
+      - name: 🧪 Run Frontend Unit & Integration Tests
+        run: npm run test --workspace=@nexus-core/frontend
+
       - name: 🚀 Run Backend E2E Tests
         run: npm run test:e2e --workspace=@nexus-core/backend
 

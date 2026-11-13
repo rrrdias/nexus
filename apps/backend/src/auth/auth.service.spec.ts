@@ -97,4 +97,47 @@ describe('AuthService (RBAC and Login Test)', () => {
       service.login('admin@unievangelica.edu.br', 'wrongpass'),
     ).rejects.toThrow(UnauthorizedException);
   });
+
+  it('should refresh token for an active user and return updated groups', async () => {
+    db.limit.mockResolvedValueOnce([
+      {
+        id: 'u1',
+        name: 'Admin User',
+        email: 'admin@unievangelica.edu.br',
+        image: null,
+        isActive: true,
+      },
+    ]);
+
+    db.where.mockReturnValueOnce(db).mockResolvedValueOnce([
+      {
+        user_group: { userId: 'u1', groupId: 'g1' },
+        group: { id: 'g1', name: 'Super Admin' },
+      },
+    ]);
+
+    const res = await service.refreshToken('u1');
+    expect(res.access_token).toBe('signed.jwt.token');
+    expect(res.user.isSuperAdmin).toBe(true);
+    expect(res.user.groups).toEqual(['Super Admin']);
+  });
+
+  it('should REJECT refresh token when user is inactive or not found', async () => {
+    db.limit.mockResolvedValueOnce([
+      {
+        id: 'u3',
+        email: 'inactive@unievangelica.edu.br',
+        isActive: false,
+      },
+    ]);
+
+    await expect(service.refreshToken('u3')).rejects.toThrow(
+      UnauthorizedException,
+    );
+
+    db.limit.mockResolvedValueOnce([]);
+    await expect(service.refreshToken('missing')).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
 });

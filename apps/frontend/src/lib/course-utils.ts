@@ -25,7 +25,7 @@ export function splitCourseAndCode(fullCourse: string | null | undefined): Parse
   const codeMatch = str.match(/(?:[-–—\s]+(?:on-line|online))?[-–—\s]+([A-Za-z0-9]+(?:-[A-Za-z0-9]+)+)$/i)
                  || str.match(/[-–—\s]+([A-Za-z0-9_]{5,}(?:-[A-Za-z0-9_]+)*)$/)
 
-  if (codeMatch) {
+  if (codeMatch && /\d/.test(codeMatch[1])) {
     const code = codeMatch[1].trim()
     let name = str.slice(0, codeMatch.index).trim()
     name = name.replace(/[-–—\s]*(?:on-line|online)[-–—\s]*$/i, "").trim()

@@ -188,6 +188,10 @@ export class AvaSyncService implements OnModuleInit {
         CREATE INDEX IF NOT EXISTS idx_ava_grades_join_ident_short ON ava_grades_report ("sourceInstitution", user_identification, course_shortname);
         CREATE INDEX IF NOT EXISTS idx_ava_progress_join_aluno ON ava_progress_report ("sourceInstitution", aluno_id, curso);
         CREATE INDEX IF NOT EXISTS idx_ava_progress_join_mat ON ava_progress_report ("sourceInstitution", matricula, curso);
+        CREATE INDEX IF NOT EXISTS idx_ava_grades_norm_fullname ON ava_grades_report ("sourceInstitution", user_id, (regexp_replace(course_fullname, '[^a-zA-Z0-9]', '', 'g')));
+        CREATE INDEX IF NOT EXISTS idx_ava_grades_norm_ident_fullname ON ava_grades_report ("sourceInstitution", user_identification, (regexp_replace(course_fullname, '[^a-zA-Z0-9]', '', 'g')));
+        CREATE INDEX IF NOT EXISTS idx_ava_grades_norm_shortname ON ava_grades_report ("sourceInstitution", user_id, (regexp_replace(course_shortname, '[^a-zA-Z0-9]', '', 'g')));
+        CREATE INDEX IF NOT EXISTS idx_ava_progress_norm_curso ON ava_progress_report ("sourceInstitution", aluno_id, (regexp_replace(curso, '[^a-zA-Z0-9]', '', 'g')));
 
         CREATE TABLE IF NOT EXISTS ava_consolidated_report (
           "id" text PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -305,7 +309,7 @@ export class AvaSyncService implements OnModuleInit {
           "lista_notas",
           "updatedAt"
         )
-        SELECT 
+        SELECT DISTINCT ON (p."sourceInstitution", p.aluno_id, p.curso)
           gen_random_uuid(),
           p."sourceInstitution",
           p.aluno_id,
@@ -320,7 +324,7 @@ export class AvaSyncService implements OnModuleInit {
           p.curso_perfil,
           p.periodo_perfil,
           p.unidade_fisica,
-          p.enrolment_status,
+          COALESCE(NULLIF(p.enrolment_status, ''), NULLIF(g.enrolment_status, ''), 'Ativo'),
           p.lastaccess,
           p.dias_sem_acesso,
           p.fase1,
@@ -351,6 +355,12 @@ export class AvaSyncService implements OnModuleInit {
            OR regexp_replace(p.curso, '[^a-zA-Z0-9]', '', 'g') = regexp_replace(g.course_shortname, '[^a-zA-Z0-9]', '', 'g')
          )
         WHERE 1=1 ${instFilter}
+        ORDER BY
+          p."sourceInstitution",
+          p.aluno_id,
+          p.curso,
+          CASE WHEN p.curso = g.course_fullname OR p.curso = g.course_shortname THEN 0 ELSE 1 END,
+          g."updatedAt" DESC NULLS LAST
         ON CONFLICT ("sourceInstitution", aluno_id, curso) DO UPDATE SET
           "matricula" = EXCLUDED."matricula",
           "usuario" = EXCLUDED."usuario",
@@ -590,6 +600,7 @@ export class AvaSyncService implements OnModuleInit {
 
       let inserted = 0;
       const updated = 0;
+      const syncStartTime = new Date();
 
       await processInChunks(
         `Notas ${institution}`,
@@ -619,7 +630,7 @@ export class AvaSyncService implements OnModuleInit {
             userEmail: item.user_email || item.email,
             userPhone1: item.user_phone1 || item.telefone,
             userPhone2: item.user_phone2,
-            enrolmentStatus: item.enrolment_status || item.status_matricula,
+            enrolmentStatus: item.enrolment_status || item.status_matricula || 'Ativo',
             cursoPerfil:
               item.curso_perfil || item.Curso_Perfil || item.custom_curso,
             periodoPerfil:
@@ -715,6 +726,21 @@ export class AvaSyncService implements OnModuleInit {
       console.log(
         `[SYNC] Notas ${institution} concluído: ${inserted} registros salvos no banco.`,
       );
+
+      if (inserted > 0 && typeof this.db.execute === 'function') {
+        await this.db.execute(sql`
+          UPDATE ava_grades_report
+          SET enrolment_status = 'Cancelado'
+          WHERE "sourceInstitution" = ${institution}
+            AND "updatedAt" < ${syncStartTime}
+            AND (
+              enrolment_status IS NULL
+              OR enrolment_status = ''
+              OR lower(enrolment_status) LIKE '%ativ%'
+              OR lower(enrolment_status) LIKE '%matriculad%'
+            );
+        `);
+      }
 
       // Atualizar Snapshot Consolidado automaticamente
       if (onProgress)
@@ -902,6 +928,7 @@ export class AvaSyncService implements OnModuleInit {
 
       let inserted = 0;
       const updated = 0;
+      const syncStartTime = new Date();
 
       await processInChunks(
         `Progresso ${institution}`,
@@ -933,7 +960,8 @@ export class AvaSyncService implements OnModuleInit {
                 item.Subcategoria ||
                 item.categoria ||
                 null,
-              enrolmentStatus: item.enrolment_status,
+              enrolmentStatus:
+                item.enrolment_status || item.status_matricula || 'Ativo',
               lastaccess: item.lastaccess,
               curso: String(item.curso || item.Curso || ''),
               fase1: String(item.fase1 || ''),
@@ -1010,6 +1038,21 @@ export class AvaSyncService implements OnModuleInit {
       console.log(
         `[SYNC] Progresso ${institution} concluído: ${inserted} registros salvos no banco.`,
       );
+
+      if (inserted > 0 && typeof this.db.execute === 'function') {
+        await this.db.execute(sql`
+          UPDATE ava_progress_report
+          SET enrolment_status = 'Cancelado'
+          WHERE "sourceInstitution" = ${institution}
+            AND "updatedAt" < ${syncStartTime}
+            AND (
+              enrolment_status IS NULL
+              OR enrolment_status = ''
+              OR lower(enrolment_status) LIKE '%ativ%'
+              OR lower(enrolment_status) LIKE '%matriculad%'
+            );
+        `);
+      }
 
       // Atualizar Snapshot Consolidado automaticamente
       if (onProgress)

@@ -191,6 +191,30 @@ export class AvaReportsService {
     return String(diff >= 0 ? diff : 0);
   }
 
+  private buildEnrolmentStatusCondition(column: any, statusFilter: string) {
+    const norm = statusFilter.trim().toLowerCase();
+    if (norm === 'ativo') {
+      return or(ilike(column, '%ativ%'), ilike(column, '%matriculad%'));
+    }
+    if (norm === 'suspenso') {
+      return or(
+        ilike(column, '%suspens%'),
+        ilike(column, '%trancad%'),
+        ilike(column, '%inativ%'),
+      );
+    }
+    if (norm === 'cancelado') {
+      return or(
+        ilike(column, '%cancelad%'),
+        ilike(column, '%desvinculad%'),
+        ilike(column, '%desistent%'),
+        ilike(column, '%evadid%'),
+        ilike(column, '%transferid%'),
+      );
+    }
+    return ilike(column, `%${statusFilter}%`);
+  }
+
   private buildProgressConditions(filters: any) {
     const conditions: any[] = [];
 
@@ -228,9 +252,9 @@ export class AvaReportsService {
       );
     if (filters.enrolment_status)
       conditions.push(
-        ilike(
+        this.buildEnrolmentStatusCondition(
           avaProgressReport.enrolmentStatus,
-          `%${filters.enrolment_status}%`,
+          filters.enrolment_status,
         ),
       );
 
@@ -326,7 +350,10 @@ export class AvaReportsService {
       );
     if (filters.enrolment_status)
       conditions.push(
-        ilike(avaGradesReport.enrolmentStatus, `%${filters.enrolment_status}%`),
+        this.buildEnrolmentStatusCondition(
+          avaGradesReport.enrolmentStatus,
+          filters.enrolment_status,
+        ),
       );
 
     const acesso_value = filters.lastaccess;
@@ -1031,9 +1058,9 @@ export class AvaReportsService {
       );
     if (filters.enrolment_status)
       conditions.push(
-        ilike(
+        this.buildEnrolmentStatusCondition(
           avaConsolidatedReport.enrolmentStatus,
-          `%${filters.enrolment_status}%`,
+          filters.enrolment_status,
         ),
       );
 

@@ -13,9 +13,11 @@ export default async function AdminUsersPage() {
   const session = await auth()
   if (!session?.user?.isSuperAdmin) redirect("/")
 
-  const usersWithDetails = await getUsers()
-  const allGroups = await getGroups()
-  const allModules = await getAllModules()
+  const [usersWithDetails, allGroups, allModules] = await Promise.all([
+    getUsers(),
+    getGroups(),
+    getAllModules(),
+  ])
 
   return (
     <div className="space-y-6">

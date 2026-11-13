@@ -36,3 +36,8 @@ rails_port/log/
 /rails_port/tmp
 /rails_port/log
 node_modules
+
+# TypeScript & Test caches
+*.tsbuildinfo
+coverage/
+apps/backend/coverage/

@@ -54,4 +54,32 @@ describe('AvaSyncService (Moodle Sync & Deduplication)', () => {
     expect(insertedItems[0].alunoId).toBe('101');
     expect(insertedItems[1].alunoId).toBe('M102');
   });
+
+  it('should mark unreturned progress records as Cancelado and update consolidated snapshot without deleting history', async () => {
+    db.execute = jest.fn().mockResolvedValue([]);
+
+    const mockItems = [
+      {
+        aluno_id: '201',
+        matricula: 'M201',
+        curso: 'Engenharia',
+        progresso_total: '80',
+      },
+    ];
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: jest.fn().mockResolvedValue(JSON.stringify(mockItems)),
+    }) as any;
+
+    const result = await service.syncProgress(
+      'ead',
+      'http://fake-url/progress',
+      undefined,
+    );
+
+    expect(result.status).toBe('success');
+    // 1) UPDATE ava_progress_report SET enrolment_status = 'Cancelado', 2) INSERT INTO ava_consolidated_report ... ON CONFLICT DO UPDATE
+    expect(db.execute).toHaveBeenCalledTimes(2);
+  });
 });

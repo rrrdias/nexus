@@ -163,6 +163,54 @@ export class AuthService implements OnModuleInit {
     };
   }
 
+  async refreshToken(userId: string) {
+    if (!userId) {
+      throw new UnauthorizedException('Usuário não identificado');
+    }
+
+    const userResult = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (userResult.length === 0 || !userResult[0].isActive) {
+      throw new UnauthorizedException('Usuário inativo ou não encontrado');
+    }
+
+    const user = userResult[0];
+
+    const adminGroups = await this.db
+      .select()
+      .from(userGroups)
+      .innerJoin(groups, eq(userGroups.groupId, groups.id))
+      .where(eq(userGroups.userId, user.id));
+
+    const isSuperAdmin = adminGroups.some(
+      (g) => g.group.name === 'Super Admin',
+    );
+    const groupNames = adminGroups.map((g) => g.group.name);
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      isSuperAdmin,
+      isDisabled: !user.isActive,
+    };
+
+    return {
+      access_token: await this.jwtService.signAsync(payload),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        isSuperAdmin,
+        groups: groupNames,
+      },
+    };
+  }
+
   /**
    * Solicita redefinição de senha com envio de e-mail e token temporário seguro
    */
