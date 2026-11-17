@@ -5,6 +5,8 @@ import {
   QUEUE_ACADEMIC_SYNC,
   QUEUE_AVA_SYNC,
   JOB_ACADEMIC_SYNC,
+  JOB_ACADEMIC_GRADES_MIRROR,
+  JOB_ACADEMIC_GRADES_CORRELATE,
   JOB_AVA_SYNC,
 } from './jobs.constants';
 
@@ -74,6 +76,77 @@ export class JobsService {
     this.logger.log(
       `Novo job de sincronização acadêmica enfileirado: ${job.id}`,
     );
+    return { jobId: job.id as string, queue: QUEUE_ACADEMIC_SYNC };
+  }
+
+  async addAcademicGradesMirrorJob(data: {
+    periodo?: string;
+    correlateAfter?: boolean;
+  }): Promise<{ jobId: string; queue: string }> {
+    const activeJobs =
+      typeof this.academicQueue.getActive === 'function'
+        ? await this.academicQueue.getActive()
+        : [];
+    const waitingJobs =
+      typeof this.academicQueue.getWaiting === 'function'
+        ? await this.academicQueue.getWaiting()
+        : [];
+
+    const existingJob = [...activeJobs, ...waitingJobs].find(
+      (j) =>
+        j.name === JOB_ACADEMIC_GRADES_MIRROR &&
+        (j.data?.periodo || '') === (data.periodo || ''),
+    );
+    if (existingJob) {
+      this.logger.log(
+        `Reutilizando job de espelhamento de notas já em andamento (${existingJob.id})`,
+      );
+      return { jobId: existingJob.id as string, queue: QUEUE_ACADEMIC_SYNC };
+    }
+
+    const job = await this.academicQueue.add(JOB_ACADEMIC_GRADES_MIRROR, data, {
+      attempts: 2,
+      backoff: {
+        type: 'exponential',
+        delay: 3000,
+      },
+      removeOnComplete: {
+        count: 50,
+        age: 86400,
+      },
+      removeOnFail: {
+        count: 100,
+      },
+    });
+
+    this.logger.log(`Novo job de espelhamento de notas enfileirado: ${job.id}`);
+    return { jobId: job.id as string, queue: QUEUE_ACADEMIC_SYNC };
+  }
+
+  async addAcademicGradesCorrelateJob(data: {
+    periodo?: string;
+    turmaId?: string;
+  }): Promise<{ jobId: string; queue: string }> {
+    const job = await this.academicQueue.add(
+      JOB_ACADEMIC_GRADES_CORRELATE,
+      data,
+      {
+        attempts: 2,
+        backoff: {
+          type: 'exponential',
+          delay: 3000,
+        },
+        removeOnComplete: {
+          count: 50,
+          age: 86400,
+        },
+        removeOnFail: {
+          count: 100,
+        },
+      },
+    );
+
+    this.logger.log(`Novo job de correlação de notas enfileirado: ${job.id}`);
     return { jobId: job.id as string, queue: QUEUE_ACADEMIC_SYNC };
   }
 

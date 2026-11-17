@@ -268,7 +268,10 @@ export class AuthService implements OnModuleInit {
             });
           })
           .catch((err) => {
-            console.error('[AuthService] Erro ao enviar e-mail de recuperação:', err?.message);
+            console.error(
+              '[AuthService] Erro ao enviar e-mail de recuperação:',
+              err?.message,
+            );
           });
       } else {
         await this.auditService?.record({
@@ -291,7 +294,8 @@ export class AuthService implements OnModuleInit {
         status: 'WARNING',
         ipAddress: context?.ipAddress,
         userAgent: context?.userAgent,
-        details: 'Tentativa de redefinição para identificador não localizado ou inativo',
+        details:
+          'Tentativa de redefinição para identificador não localizado ou inativo',
       });
     }
 
@@ -319,7 +323,9 @@ export class AuthService implements OnModuleInit {
     }
 
     if (!newPass || newPass.trim().length < 6) {
-      throw new BadRequestException('A nova senha deve ter no mínimo 6 caracteres.');
+      throw new BadRequestException(
+        'A nova senha deve ter no mínimo 6 caracteres.',
+      );
     }
 
     const [resetRecord] = await this.db

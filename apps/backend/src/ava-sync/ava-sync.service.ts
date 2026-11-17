@@ -630,7 +630,8 @@ export class AvaSyncService implements OnModuleInit {
             userEmail: item.user_email || item.email,
             userPhone1: item.user_phone1 || item.telefone,
             userPhone2: item.user_phone2,
-            enrolmentStatus: item.enrolment_status || item.status_matricula || 'Ativo',
+            enrolmentStatus:
+              item.enrolment_status || item.status_matricula || 'Ativo',
             cursoPerfil:
               item.curso_perfil || item.Curso_Perfil || item.custom_curso,
             periodoPerfil:

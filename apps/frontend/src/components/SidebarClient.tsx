@@ -370,6 +370,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                       <Link href="/academic" className={`flex items-center gap-2 text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname === '/academic' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
                         Consultar Registros
                       </Link>
+                      <Link href="/academic/notas" className={`flex items-center gap-2 text-[11px] hover:text-white px-3 py-2 rounded-md transition-colors ${pathname.startsWith('/academic/notas') ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/60 hover:bg-navy-light/40'}`}>
+                        Integração de Notas
+                      </Link>
                     </div>
                   </div>
                 ) : (
@@ -381,6 +384,9 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                   >
                     <Link href="/academic" className={`flex items-center gap-2 text-[11px] hover:text-white py-2 px-2.5 rounded-md transition-colors ${pathname === '/academic' ? 'text-green-brand font-medium bg-white/5' : 'text-white/50 hover:bg-white/5'}`}>
                       Consultar Registros
+                    </Link>
+                    <Link href="/academic/notas" className={`flex items-center gap-2 text-[11px] hover:text-white py-2 px-2.5 rounded-md transition-colors ${pathname.startsWith('/academic/notas') ? 'text-green-brand font-medium bg-white/5' : 'text-white/50 hover:bg-white/5'}`}>
+                      Integração de Notas
                     </Link>
                   </div>
                 )}

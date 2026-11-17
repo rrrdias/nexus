@@ -85,8 +85,10 @@ export function StudentBookingWizard({
 
   const selectedLocalIdRef = useRef(selectedLocalId)
   const selectedSlotIdRef = useRef(selectedSlotId)
-  selectedLocalIdRef.current = selectedLocalId
-  selectedSlotIdRef.current = selectedSlotId
+  useEffect(() => {
+    selectedLocalIdRef.current = selectedLocalId
+    selectedSlotIdRef.current = selectedSlotId
+  }, [selectedLocalId, selectedSlotId])
 
   // Navegação sincronizada com a History API do navegador (para suporte ao botão voltar em smartphones)
   const goToStep = (step: 1 | 2 | 3 | 4) => {

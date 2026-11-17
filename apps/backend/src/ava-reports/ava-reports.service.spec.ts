@@ -20,11 +20,15 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
     };
 
     db = queryBuilder;
-    service = new AvaReportsService(db, {} as any, {
-      get: jest.fn(),
-      set: jest.fn(),
-      wrap: jest.fn((_key: string, fn: () => any) => fn()),
-    } as any);
+    service = new AvaReportsService(
+      db,
+      {} as any,
+      {
+        get: jest.fn(),
+        set: jest.fn(),
+        wrap: jest.fn((_key: string, fn: () => any) => fn()),
+      } as any,
+    );
   });
 
   const superAdminUser = {
@@ -133,19 +137,17 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
       },
     ];
 
-    db.where
-      .mockReturnValueOnce(db)
-      .mockResolvedValueOnce([
-        {
-          totalRecords: 1200,
-          avgProgress: 76.5,
-          avgGrade: 81.0,
-          belowApproval: 10,
-          noAccessCount: 5,
-          uniqueStudents: 1100,
-          uniqueDisciplines: 25,
-        },
-      ]);
+    db.where.mockReturnValueOnce(db).mockResolvedValueOnce([
+      {
+        totalRecords: 1200,
+        avgProgress: 76.5,
+        avgGrade: 81.0,
+        belowApproval: 10,
+        noAccessCount: 5,
+        uniqueStudents: 1100,
+        uniqueDisciplines: 25,
+      },
+    ]);
 
     db.offset.mockResolvedValueOnce(mockConsolidatedRows);
     db.orderBy

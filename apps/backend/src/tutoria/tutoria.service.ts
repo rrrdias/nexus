@@ -1605,13 +1605,16 @@ export class TutoriaService implements OnModuleInit {
     // Disparar e-mail via MailService se configurado
     let mailResult: any = { success: true, messageId: 'simulated-mail-id' };
     if (this.mailService) {
-      mailResult = await this.mailService.sendTutoriaOrientation(dto.alunoEmail.trim(), {
-        alunoNome: dto.alunoNome || 'Estudante',
-        tutorNome,
-        disciplinaNome: dto.disciplinaNome || 'Sua Disciplina EAD',
-        mensagem: dto.mensagem.trim(),
-        periodo: dto.periodo || '2026-2',
-      });
+      mailResult = await this.mailService.sendTutoriaOrientation(
+        dto.alunoEmail.trim(),
+        {
+          alunoNome: dto.alunoNome || 'Estudante',
+          tutorNome,
+          disciplinaNome: dto.disciplinaNome || 'Sua Disciplina EAD',
+          mensagem: dto.mensagem.trim(),
+          periodo: dto.periodo || '2026-2',
+        },
+      );
 
       if (!mailResult.success) {
         throw new BadRequestException(
@@ -1686,7 +1689,8 @@ export class TutoriaService implements OnModuleInit {
       messageId: mailResult.messageId,
       eventoId: eventId,
       cardId: card?.id || null,
-      message: 'E-mail pedagógico enviado com sucesso e registrado na linha do tempo.',
+      message:
+        'E-mail pedagógico enviado com sucesso e registrado na linha do tempo.',
     };
   }
 }
