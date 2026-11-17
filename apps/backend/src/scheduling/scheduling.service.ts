@@ -448,7 +448,7 @@ export class SchedulingService implements OnModuleInit {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toUpperCase();
-      if (!normInst.includes('EAD')) {
+      if (!normInst.includes('EAD') && !normInst.includes('SEMI')) {
         return true;
       }
     }
@@ -461,6 +461,7 @@ export class SchedulingService implements OnModuleInit {
         .toUpperCase();
       if (
         !normTurno.includes('EAD') &&
+        !normTurno.includes('SEMI') &&
         !normTurno.includes('DISTANCIA') &&
         !normTurno.includes('VIRTUAL')
       ) {
@@ -487,15 +488,12 @@ export class SchedulingService implements OnModuleInit {
       );
 
     if (studentRecords.length > 0) {
-      // Restrição 1: Apenas alunos da Graduação EaD (sourceInstitution = 'ead' e não Semipresencial -SEMI)
+      // Restrição 1: Apenas alunos da Graduação EaD e Semipresencial (sourceInstitution = 'ead')
       const eadRecords = studentRecords.filter((r) => {
         const isEadInst =
           !r.sourceInstitution ||
           r.sourceInstitution.trim().toLowerCase() === 'ead';
-        const isSemipresencial =
-          Boolean(r.curso && /-SEMI\d{4}/i.test(r.curso)) ||
-          Boolean(r.cursoPerfil && /\bSEMI\b/i.test(r.cursoPerfil));
-        return isEadInst && !isSemipresencial;
+        return isEadInst;
       });
 
       if (eadRecords.length === 0) {

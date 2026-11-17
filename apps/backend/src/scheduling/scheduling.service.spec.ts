@@ -339,7 +339,7 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should REJECT Lyceum students with non-EaD short turno codes (NOT, MAT, VES, SEMI, POS) or non-EaD cursoInstituicao', async () => {
+    it('should REJECT Lyceum students with non-EaD/SEMI short turno codes (NOT, MAT, VES, POS) or non-EaD/SEMI cursoInstituicao', async () => {
       queryResult = [];
       db.limit.mockResolvedValue([
         {
@@ -357,7 +357,7 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should REJECT Semipresencial (-SEMI) courses in AVA ead institution', async () => {
+    it('should ALLOW Semipresencial (-SEMI) courses in AVA ead institution', async () => {
       queryResult = [
         {
           sourceInstitution: 'ead',
@@ -370,9 +370,11 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
         },
       ];
 
-      await expect(
-        service.getStudentProfile('D2520144', '2026-2'),
-      ).rejects.toThrow(BadRequestException);
+      const profile = await service.getStudentProfile('D2520144', '2026-2');
+      expect(profile.disciplinas).toEqual([
+        'BROMATOLOGIA E TECNOLOGIA DE ALIMENTOS – M128T01-SEMI20262',
+      ]);
+      expect(profile.totalDisciplinas).toBe(1);
     });
   });
 
