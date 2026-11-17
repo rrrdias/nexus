@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { SchedulingService } from './scheduling.service';
+import { SchedulingService, formatExamDatePtBr } from './scheduling.service';
 
 describe('SchedulingService (createOption stability test, RBAC, Periods & Profile)', () => {
   let service: SchedulingService;
@@ -36,7 +36,9 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
 
     db = queryBuilder;
     mailService = {
-      sendSchedulingConfirmation: jest.fn().mockResolvedValue({ success: true }),
+      sendSchedulingConfirmation: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
     };
     service = new SchedulingService(db, undefined, mailService);
   });
@@ -562,9 +564,24 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
         'maria@nexus.edu.br',
         expect.objectContaining({
           matricula: '2026001',
+          data: '20/11/2099',
           isReschedule: true,
         }),
       );
+    });
+  });
+
+  describe('formatExamDatePtBr', () => {
+    it('should format UTC midnight dates strictly in pt-BR without timezone backward shift', () => {
+      // 19/12/2026 UTC midnight would shift to 18/12 without UTC timezone
+      const utcMidnight = new Date('2026-12-19T00:00:00.000Z');
+      expect(formatExamDatePtBr(utcMidnight)).toBe('19/12/2026');
+
+      expect(formatExamDatePtBr('2026-12-19')).toBe('19/12/2026');
+      expect(formatExamDatePtBr('2026-12-19T00:00:00.000Z')).toBe('19/12/2026');
+      expect(formatExamDatePtBr('2026-12-19 00:00:00')).toBe('19/12/2026');
+      expect(formatExamDatePtBr(null)).toBe('');
+      expect(formatExamDatePtBr(undefined)).toBe('');
     });
   });
 });

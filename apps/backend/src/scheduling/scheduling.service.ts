@@ -83,6 +83,27 @@ function getExamEndTime(startTime: string, disciplinesCount: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+export function formatExamDatePtBr(
+  dateVal: Date | string | null | undefined,
+): string {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'string') {
+    const raw = dateVal.trim();
+    if (raw.includes('T')) {
+      const [y, m, d] = raw.split('T')[0].split('-');
+      if (y && m && d)
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const [y, m, d] = raw.slice(0, 10).split('-');
+      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+  }
+  const dt = dateVal instanceof Date ? dateVal : new Date(dateVal);
+  if (isNaN(dt.getTime())) return String(dateVal);
+  return dt.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
+
 function getNowInSaoPaulo(referenceDate: Date = new Date()): {
   dateStr: string;
   currentMinutes: number;
@@ -804,7 +825,12 @@ export class SchedulingService implements OnModuleInit {
       const poloNome = localRecord?.nome || 'Polo de Apoio Presencial';
       const studentEmail = (profile as any).email || (profile as any).usuario;
 
-      if (this.mailService && studentEmail && typeof studentEmail === 'string' && studentEmail.includes('@')) {
+      if (
+        this.mailService &&
+        studentEmail &&
+        typeof studentEmail === 'string' &&
+        studentEmail.includes('@')
+      ) {
         this.mailService
           .sendSchedulingConfirmation(studentEmail.trim(), {
             studentName: profile.nome || (profile as any).aluno || 'Estudante',
@@ -813,9 +839,7 @@ export class SchedulingService implements OnModuleInit {
             poloEndereco: localRecord?.endereco || undefined,
             poloTelefone: localRecord?.telefone || undefined,
             linkLocal: localRecord?.linkLocal || undefined,
-            data: opcao.data instanceof Date
-              ? opcao.data.toLocaleDateString('pt-BR')
-              : String(opcao.data),
+            data: formatExamDatePtBr(opcao.data),
             hora: opcao.hora ? opcao.hora.slice(0, 5) : '',
             sala: (opcao as any).sala || undefined,
             disciplinas: profile.disciplinas,
@@ -864,13 +888,16 @@ export class SchedulingService implements OnModuleInit {
           .filter(Boolean);
         const totalDisciplines = Math.max(1, disciplines.length);
         const timeStr = opcao.hora.slice(0, 5);
-        const requiredTimes = Array.from({ length: totalDisciplines }, (_, i) => {
-          const startMin = parseTimeToMinutes(timeStr);
-          const totalMin = (((startMin! + i * 30) % 1440) + 1440) % 1440;
-          const h = Math.floor(totalMin / 60);
-          const m = totalMin % 60;
-          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        });
+        const requiredTimes = Array.from(
+          { length: totalDisciplines },
+          (_, i) => {
+            const startMin = parseTimeToMinutes(timeStr);
+            const totalMin = (((startMin! + i * 30) % 1440) + 1440) % 1440;
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          },
+        );
         const allPossibleTimes = [
           ...requiredTimes,
           ...requiredTimes.map((t) => `${t}:00`),
@@ -1960,10 +1987,7 @@ export class SchedulingService implements OnModuleInit {
             poloEndereco: localRecord?.endereco || undefined,
             poloTelefone: localRecord?.telefone || undefined,
             linkLocal: localRecord?.linkLocal || undefined,
-            data:
-              newOpcao.data instanceof Date
-                ? newOpcao.data.toLocaleDateString('pt-BR')
-                : String(newOpcao.data),
+            data: formatExamDatePtBr(newOpcao.data),
             hora: newOpcao.hora ? newOpcao.hora.slice(0, 5) : '',
             sala: (newOpcao as any).sala || undefined,
             disciplinas: profile.disciplinas,
