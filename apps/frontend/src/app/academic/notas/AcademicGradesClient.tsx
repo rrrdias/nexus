@@ -142,7 +142,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
   const [turmasPage, setTurmasPage] = useState<number>(1)
 
   const [turmas, setTurmas] = useState<OnlineTurmaItem[]>([])
-  const [turmasMeta, setTurmasMeta] = useState({ total: 0, page: 1, pageSize: 50, totalPages: 1 })
+  const [turmasMeta, setTurmasMeta] = useState({ total: 0, page: 1, pageSize: 10, totalPages: 1 })
   const [loadingTurmas, setLoadingTurmas] = useState<boolean>(true)
 
   // Selected turma detail state
@@ -184,12 +184,12 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
         instituicao: instituicao || undefined,
         search: turmaSearchQuery || undefined,
         page: turmasPage,
-        pageSize: 50,
+        pageSize: 10,
       })
       if (res.success && res.data) {
         setTurmas(res.data.data || [])
         setTurmasMeta(
-          res.data.meta || { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+          res.data.meta || { total: 0, page: 1, pageSize: 10, totalPages: 1 },
         )
       } else {
         showToast(res.error || "Erro ao carregar turmas 100% online.", "error")
@@ -297,6 +297,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
     try {
       const res = await exportAcademicGradesAction({
         periodo: periodo || undefined,
+        instituicao: instituicao || undefined,
         turmaId: selectedTurma?.id,
         statusMatricula: selectedTurma ? statusMatriculaFilter : undefined,
         search: selectedTurma ? studentSearchQuery : turmaSearchQuery,
@@ -624,7 +625,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
 
                 <div className="md:col-span-2">
                   <label className="text-[11px] font-bold text-[#5F6775] uppercase tracking-wider block mb-1">
-                    Instituição AVA
+                    Instituição
                   </label>
                   <select
                     value={instituicao}
@@ -634,12 +635,11 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                     }}
                     className="w-full h-10 text-xs rounded-lg border border-gray-300 bg-white px-3 text-navy focus:outline-none focus:border-[#5E35B1]"
                   >
-                    <option value="">Todas</option>
-                    <option value="uni">UniEVANGÉLICA</option>
-                    <option value="ead">EaD</option>
-                    <option value="uniego">UNIEGO</option>
-                    <option value="raizes">Raízes</option>
-                    <option value="eefn">EEFN</option>
+                    <option value="">Todas as Instituições</option>
+                    <option value="UniEVANGÉLICA">UniEVANGÉLICA</option>
+                    <option value="FAEGO">FAEGO</option>
+                    <option value="FLORENCE">FLORENCE</option>
+                    <option value="RAÍZES">RAÍZES</option>
                   </select>
                 </div>
 

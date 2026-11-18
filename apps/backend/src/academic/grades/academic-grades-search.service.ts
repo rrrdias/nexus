@@ -450,7 +450,7 @@ export class AcademicGradesSearchService {
    */
   async listOnlineTurmas(query: GradesTurmasQuery) {
     const page = Math.max(1, Number(query.page) || 1);
-    const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 50));
+    const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 10));
     const offset = (page - 1) * pageSize;
 
     const conditions: any[] = [];
@@ -460,10 +460,12 @@ export class AcademicGradesSearchService {
       );
     }
     if (query.instituicao && query.instituicao.trim()) {
+      const inst = query.instituicao.trim();
+      const instLower = inst.toLowerCase();
       conditions.push(
-        eq(
-          academicOnlineTurmas.sourceInstitution,
-          query.instituicao.trim().toLowerCase(),
+        or(
+          eq(academicOnlineTurmas.sourceInstitution, instLower),
+          ilike(academicOnlineTurmas.cursoInstituicao, `%${inst}%`),
         ),
       );
     }
@@ -812,6 +814,16 @@ export class AcademicGradesSearchService {
         inArray(
           academicOnlineTurmas.periodo,
           getPeriodVariants(filters.periodo),
+        ),
+      );
+    }
+    if (filters.instituicao && filters.instituicao.trim()) {
+      const inst = filters.instituicao.trim();
+      const instLower = inst.toLowerCase();
+      conditions.push(
+        or(
+          eq(academicOnlineTurmas.sourceInstitution, instLower),
+          ilike(academicOnlineTurmas.cursoInstituicao, `%${inst}%`),
         ),
       );
     }

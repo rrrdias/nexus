@@ -26,7 +26,7 @@ describe('AcademicGradesController', () => {
     searchService = {
       listOnlineTurmas: jest.fn().mockResolvedValue({
         data: [{ id: 't1', turma: 'DIR-ON-20262' }],
-        meta: { total: 1, page: 1, pageSize: 50, totalPages: 1 },
+        meta: { total: 1, page: 1, pageSize: 10, totalPages: 1 },
       }),
       getTurmaDetails: jest
         .fn()
@@ -74,7 +74,7 @@ describe('AcademicGradesController', () => {
   });
 
   it('should list online turmas via SearchService', async () => {
-    const query: any = { periodo: '2026-2', page: 1, pageSize: 50 };
+    const query: any = { periodo: '2026-2', page: 1, pageSize: 10 };
     const res = await controller.listOnlineTurmas(query);
     expect(searchService.listOnlineTurmas).toHaveBeenCalledWith(query);
     expect(res.meta.total).toBe(1);

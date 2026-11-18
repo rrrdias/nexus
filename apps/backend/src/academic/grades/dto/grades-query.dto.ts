@@ -25,7 +25,7 @@ export class GradesQueryDto {
   @IsInt()
   @Min(1)
   @Max(200)
-  pageSize: number = 50;
+  pageSize: number = 10;
 }
 
 export class TurmaStudentsQueryDto {

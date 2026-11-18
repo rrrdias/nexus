@@ -199,6 +199,7 @@ export async function triggerSyncAvaCorrelateAction(payload: {
 
 export async function exportAcademicGradesAction(filters: {
   periodo?: string
+  instituicao?: string
   turmaId?: string
   statusMatricula?: string
   search?: string
@@ -206,6 +207,7 @@ export async function exportAcademicGradesAction(filters: {
   try {
     const params = new URLSearchParams()
     if (filters.periodo) params.append("periodo", filters.periodo)
+    if (filters.instituicao) params.append("instituicao", filters.instituicao)
     if (filters.turmaId) params.append("turmaId", filters.turmaId)
     if (filters.statusMatricula && filters.statusMatricula !== "todos") {
       params.append("statusMatricula", filters.statusMatricula)
