@@ -523,8 +523,27 @@ export class SchedulingService implements OnModuleInit {
         );
       }
 
-      // Restrição 2: Apenas disciplinas da categoria REGULARES
-      const regularRecords = eadRecords.filter((r) =>
+      // Restrição 2: Desconsiderar inscrições com status Suspenso, Cancelado ou Inativo no AVA
+      const activeEadRecords = eadRecords.filter((r) => {
+        if (!r.enrolmentStatus) return true;
+        const normStatus = r.enrolmentStatus.trim().toLowerCase();
+        return (
+          normStatus !== 'suspenso' &&
+          normStatus !== 'suspended' &&
+          normStatus !== 'cancelado' &&
+          normStatus !== 'cancelled' &&
+          normStatus !== 'inativo'
+        );
+      });
+
+      if (activeEadRecords.length === 0) {
+        throw new BadRequestException(
+          'O estudante não possui disciplinas com inscrição ativa no AVA para agendamento neste período.',
+        );
+      }
+
+      // Restrição 3: Apenas disciplinas da categoria REGULARES
+      const regularRecords = activeEadRecords.filter((r) =>
         this.isRegularAvaDiscipline(r.curso, (r as any).subcategoria),
       );
 

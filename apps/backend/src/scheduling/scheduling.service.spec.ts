@@ -324,6 +324,33 @@ describe('SchedulingService (createOption stability test, RBAC, Periods & Profil
       expect(profile.categoria).toBe('REGULARES');
     });
 
+    it('should exclude suspended/inactive enrollments (enrolmentStatus = "Suspenso") from AVA report', async () => {
+      queryResult = [
+        {
+          sourceInstitution: 'ead',
+          aluno: 'Cláudio Pereira',
+          usuario: 'claudio@nexus.edu.br',
+          userPhone1: '62999998888',
+          curso: 'Matemática Financeira',
+          subcategoria: 'REGULARES',
+          enrolmentStatus: 'Ativo',
+        },
+        {
+          sourceInstitution: 'ead',
+          aluno: 'Cláudio Pereira',
+          usuario: 'claudio@nexus.edu.br',
+          userPhone1: '62999998888',
+          curso: 'Comportamento Humano e Organizacional',
+          subcategoria: 'REGULARES',
+          enrolmentStatus: 'Suspenso',
+        },
+      ];
+
+      const profile = await service.getStudentProfile('D2620114', '2026-2');
+      expect(profile.disciplinas).toEqual(['Matemática Financeira']);
+      expect(profile.totalDisciplinas).toBe(1);
+    });
+
     it('should REJECT when EaD student only has non-REGULARES disciplines', async () => {
       queryResult = [
         {
