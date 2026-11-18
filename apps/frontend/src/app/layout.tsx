@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import "./globals.css"
 import { Sidebar } from "@/components/Sidebar"
 import { Topbar } from "@/components/Topbar"
@@ -8,15 +9,30 @@ import { SessionProvider } from "next-auth/react"
 
 export async function generateMetadata(): Promise<Metadata> {
   const basePath = process.env.NEXT_BASE_PATH || ""
+  let isLocalOrDev = process.env.NODE_ENV === "development"
+  try {
+    const reqHeaders = await headers()
+    const host = (
+      reqHeaders.get("x-forwarded-host") ||
+      reqHeaders.get("host") ||
+      ""
+    ).toLowerCase()
+    if (host.includes("localhost") || host.includes("127.0.0.1")) {
+      isLocalOrDev = true
+    }
+  } catch {
+    // Fallback para NODE_ENV fora de request
+  }
+
   return {
-    title: "Nexus Hub",
+    title: isLocalOrDev ? "Nexus Hub Dev" : "Nexus Hub",
     description: "Portal Hub de Sistemas",
     icons: {
       icon: [
         {
           url: `${basePath}/favicon.svg`,
           type: "image/svg+xml",
-        }
+        },
       ],
     },
   }

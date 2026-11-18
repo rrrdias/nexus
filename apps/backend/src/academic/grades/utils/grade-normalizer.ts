@@ -1,6 +1,7 @@
 import {
   GradeScale,
   NormalizedGradeResult,
+  ParsedGradeActivity,
 } from '../interfaces/academic-grades.types';
 
 /**
@@ -34,8 +35,9 @@ export function detectCohortPhaseScale(
 }
 
 /**
- * Normaliza nota individual com base na escala resolvida no nível da turma/fase.
- * Preserva estritamente a diferença entre ausente/pendente (null) e zero explícito (0.00 Lançada).
+ * Normaliza nota individual na escala 0 a 100 com arredondamento para cima (teto)
+ * para qualquer fração acima de ,0 (ex.: 93,8 -> 94, 80,1 -> 81, 9,3 em 0-10 -> 93).
+ * Preserva estritamente a diferença entre ausente/pendente (null) e zero explícito (0 Lançada).
  */
 export function normalizeGrade(
   rawGrade: string | null | undefined,
@@ -70,26 +72,72 @@ export function normalizeGrade(
 
   if (courseScale === '0-100') {
     effectiveScale = '0-100';
-    converted = val / 10.0;
+    converted = val;
   } else if (courseScale === '0-10') {
     effectiveScale = '0-10';
-    converted = val;
+    converted = val * 10.0;
   } else {
     if (val > 10.0) {
       effectiveScale = '0-100';
-      converted = val / 10.0;
+      converted = val;
     } else {
       effectiveScale = '0-10';
-      converted = val;
+      converted = val * 10.0;
     }
   }
 
-  const bounded = Math.max(0, Math.min(10, converted));
-  const rounded = Number(bounded.toFixed(2));
+  const clean100 = Number(converted.toFixed(2));
+  const bounded = Math.max(0, Math.min(100, clean100));
+  const rounded = Math.ceil(bounded);
 
   return {
     numericGrade: rounded,
     status: 'Lançada',
     scaleApplied: effectiveScale,
   };
+}
+
+/**
+ * Calcula a somatória de notas das atividades de uma fase em modelos aditivos
+ * (soma dos notaMax <= 100.5) aplicando arredondamento para cima (Math.ceil).
+ */
+export function computeAdditivePhaseSumGrade(
+  activities: ParsedGradeActivity[],
+): { rawSum: number; roundedGrade: number } | null {
+  if (!activities || activities.length === 0) return null;
+
+  let sumNotas = 0;
+  let sumMax = 0;
+  let hasAnyNumericGrade = false;
+
+  for (const act of activities) {
+    if (act.notaMax !== null && act.notaMax !== undefined) {
+      const cleanMax = String(act.notaMax).trim().replace(',', '.');
+      if (/^[0-9]+(\.[0-9]+)?$/.test(cleanMax)) {
+        const parsedMax = parseFloat(cleanMax);
+        if (!isNaN(parsedMax) && parsedMax > 0) {
+          sumMax += parsedMax;
+        }
+      }
+    }
+
+    if (act.nota !== null && act.nota !== undefined) {
+      const cleanNota = String(act.nota).trim().replace(',', '.');
+      if (/^[0-9]+(\.[0-9]+)?$/.test(cleanNota)) {
+        const parsedNota = parseFloat(cleanNota);
+        if (!isNaN(parsedNota)) {
+          sumNotas += parsedNota;
+          hasAnyNumericGrade = true;
+        }
+      }
+    }
+  }
+
+  if (!hasAnyNumericGrade || sumMax <= 0 || sumMax > 100.5) {
+    return null;
+  }
+
+  const rawSum = Number(sumNotas.toFixed(2));
+  const roundedGrade = Math.min(100, Math.ceil(Math.max(0, rawSum)));
+  return { rawSum, roundedGrade };
 }

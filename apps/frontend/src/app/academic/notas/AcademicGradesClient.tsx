@@ -43,7 +43,15 @@ function formatGradeValue(val: number | null | undefined, status: string) {
   if (val === null || val === undefined || status === "Pendente") {
     return null
   }
-  return val.toFixed(2).replace(".", ",")
+  const clean = Number(Number(val).toFixed(2))
+  return String(Math.ceil(clean))
+}
+
+function formatCsvGrade(raw: number | string | null | undefined) {
+  if (raw === null || raw === undefined || raw === "") return ""
+  const num = Number(raw)
+  if (isNaN(num)) return ""
+  return String(Math.ceil(Number(num.toFixed(2))))
 }
 
 function getStatusMatriculaBadge(status: string, bloqueio: boolean) {
@@ -106,8 +114,8 @@ function GradeCellPill({
     )
   }
 
-  const numeric = value ?? 0
-  const isPassing = numeric >= 6
+  const numeric = Math.ceil(Number((value ?? 0).toFixed(2)))
+  const isPassing = numeric >= 60
   const colorClass = highlight
     ? isPassing
       ? "bg-emerald-50 text-emerald-800 border-emerald-200"
@@ -303,7 +311,9 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
       }
 
       const headers = [
-        "Turma",
+        "Código Turma (AVA)",
+        "Turma (Lyceum)",
+        "Fullname no AVA (Moodle)",
         "Disciplina",
         "Período",
         "Matrícula",
@@ -332,7 +342,9 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
         headers.map(escapeCsv).join(";"),
         ...rows.map((r: any) =>
           [
+            r.codTurma || r.turmaId || r.turma,
             r.turma,
+            r.moodleCourseFullname || `${r.disciplina}-${r.codTurma || r.turmaId || r.turma}`,
             r.disciplina,
             r.periodo,
             r.matricula,
@@ -341,13 +353,13 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
             r.situacaoLyceum || "",
             r.statusMatricula,
             r.bloqueioLancamento ? "SIM" : "NÃO",
-            r.va1Nota ?? "",
+            formatCsvGrade(r.va1Nota),
             r.va1Status,
-            r.va2Nota ?? "",
+            formatCsvGrade(r.va2Nota),
             r.va2Status,
-            r.va3Nota ?? "",
+            formatCsvGrade(r.va3Nota),
             r.va3Status,
-            r.mediaFinalNota ?? "",
+            formatCsvGrade(r.mediaFinalNota),
             r.statusConsolidacao,
             r.divergenciaMotivo || "",
           ]
@@ -398,8 +410,31 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
         : detailStudent.notas.itensVa3
     : []
 
+  const phaseItemsSum = (() => {
+    let sum = 0
+    let hasNumeric = false
+    for (const item of phaseItems) {
+      if (item.nota !== null && item.nota !== undefined) {
+        const n = parseFloat(String(item.nota).trim().replace(",", "."))
+        if (!isNaN(n)) {
+          sum += n
+          hasNumeric = true
+        }
+      }
+    }
+    if (!hasNumeric) return null
+    const cleanSum = Number(sum.toFixed(2))
+    return {
+      rawSumFormatted: cleanSum.toLocaleString("pt-BR", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }),
+      rounded: Math.min(100, Math.ceil(Math.max(0, cleanSum))),
+    }
+  })()
+
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative min-w-0 max-w-full">
       {toast.type && (
         <div
           className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-lg border text-white transition-all flex items-center gap-3 ${
@@ -559,7 +594,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                   </label>
                   <div className="relative">
                     <Input
-                      placeholder="Código da turma, disciplina ou curso..."
+                      placeholder="Código AVA, turma, disciplina, curso ou fullname Moodle..."
                       value={turmaSearchInput}
                       onChange={(e) => setTurmaSearchInput(e.target.value)}
                       className="pl-9 h-10 text-xs border-gray-300"
@@ -626,19 +661,19 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
               <Table className="w-full text-sm">
                 <TableHeader>
                   <TableRow className="bg-[#F4F5F7] border-b border-gray-200 select-none">
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider">
+                    <TableHead className="px-3.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider">
                       Turma / Disciplina 100% Online
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider hidden md:table-cell">
+                    <TableHead className="px-3 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider hidden md:table-cell">
                       Instituição / Período
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
+                    <TableHead className="px-2.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
                       Situação Matrículas
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
+                    <TableHead className="px-2.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
                       Notas VA1 / VA2 / VA3
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">
+                    <TableHead className="px-3 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">
                       Ações
                     </TableHead>
                   </TableRow>
@@ -670,25 +705,40 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                   ) : (
                     turmas.map((t) => (
                       <TableRow key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                        <TableCell className="px-4 py-3.5">
+                        <TableCell className="px-3.5 py-3 whitespace-normal min-w-[220px] max-w-[360px] xl:max-w-[440px]">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono font-bold text-xs text-[#5E35B1] bg-[#5E35B1]/10 px-2 py-0.5 rounded">
-                                {t.turma}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className="font-mono font-bold text-xs text-[#5E35B1] bg-[#5E35B1]/10 px-2 py-0.5 rounded"
+                                title="Código único da turma para localizar no AVA (Moodle)"
+                              >
+                                Cód. AVA: {t.id}
+                              </span>
+                              <span className="font-mono font-semibold text-[11px] text-navy bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                Turma: {t.turma}
                               </span>
                               <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
                                 {t.modelagem}
                               </span>
                             </div>
-                            <p className="font-bold text-navy text-xs">{t.nomeDisciplina}</p>
-                            <p className="text-[11px] text-[#5F6775]">
+                            <p className="font-bold text-navy text-xs break-words">{t.nomeDisciplina}</p>
+                            <p className="text-[11px] font-mono text-slate-600 break-words leading-relaxed">
+                              Fullname AVA:{" "}
+                              <strong className="text-navy">
+                                {t.moodleCourseFullname || `${t.nomeDisciplina}-${t.id}`}
+                              </strong>
+                              {t.moodleCourseId && (
+                                <span className="text-slate-400"> • ID Moodle: {t.moodleCourseId}</span>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-[#5F6775] break-words">
                               {t.cursoNome || `Cód. Disciplina: ${t.disciplina}`}
                             </p>
                           </div>
                         </TableCell>
 
-                        <TableCell className="px-4 py-3.5 hidden md:table-cell">
-                          <p className="font-semibold text-navy text-xs">
+                        <TableCell className="px-3 py-3 hidden md:table-cell whitespace-normal max-w-[180px]">
+                          <p className="font-semibold text-navy text-xs break-words">
                             {t.cursoInstituicao || t.sourceInstitution.toUpperCase()}
                           </p>
                           <span className="text-[11px] font-mono text-[#5F6775]">
@@ -696,7 +746,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                           </span>
                         </TableCell>
 
-                        <TableCell className="px-4 py-3.5 text-center">
+                        <TableCell className="px-2.5 py-3 text-center whitespace-normal">
                           <div className="flex flex-wrap items-center justify-center gap-1.5">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                               Total: {t.totalAlunos}
@@ -712,8 +762,8 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                           </div>
                         </TableCell>
 
-                        <TableCell className="px-4 py-3.5 text-center">
-                          <div className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+                        <TableCell className="px-2.5 py-3 text-center">
+                          <div className="inline-flex flex-wrap items-center justify-center gap-1 font-mono text-[11px]">
                             <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold">
                               VA1: {t.totalNotasLancadasVa1}
                             </span>
@@ -726,7 +776,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                           </div>
                         </TableCell>
 
-                        <TableCell className="px-4 py-3.5 text-right">
+                        <TableCell className="px-3 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
                             <Button
                               variant="outline"
@@ -792,7 +842,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
         <div className="space-y-4">
           <Card className="bg-white border-gray-200 shadow-sm">
             <CardContent className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant="ghost"
@@ -803,7 +853,10 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                     <ArrowLeft className="w-4 h-4 mr-1" /> Voltar às Turmas
                   </Button>
                   <span className="font-mono font-bold text-xs bg-[#5E35B1]/10 text-[#5E35B1] px-2 py-0.5 rounded">
-                    {selectedTurma.turma}
+                    Cód. AVA: {selectedTurma.id}
+                  </span>
+                  <span className="font-mono font-semibold text-xs bg-slate-100 text-navy px-2 py-0.5 rounded border border-slate-200">
+                    Turma Lyceum: {selectedTurma.turma}
                   </span>
                   <span className="text-xs font-mono text-[#5F6775]">
                     {selectedTurma.periodo} • AVA: {selectedTurma.sourceInstitution.toUpperCase()}
@@ -812,6 +865,20 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                 <h2 className="text-base font-extrabold text-navy">
                   {selectedTurma.nomeDisciplina}
                 </h2>
+                <div className="inline-flex flex-wrap items-center gap-2 text-xs font-mono bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700">
+                  <span>
+                    Fullname no AVA (Moodle):{" "}
+                    <strong className="text-navy">
+                      {selectedTurma.moodleCourseFullname ||
+                        `${selectedTurma.nomeDisciplina}-${selectedTurma.id}`}
+                    </strong>
+                  </span>
+                  {selectedTurma.moodleCourseId && (
+                    <span className="text-slate-500">
+                      • ID Curso Moodle: <strong>{selectedTurma.moodleCourseId}</strong>
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-[#5F6775]">
                   Total: <strong>{selectedTurma.totalAlunos}</strong> • Matriculados:{" "}
                   <strong className="text-emerald-700">{selectedTurma.totalMatriculados}</strong> •
@@ -920,25 +987,25 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
               <Table className="w-full text-sm">
                 <TableHeader>
                   <TableRow className="bg-[#F4F5F7] border-b border-gray-200 select-none">
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider">
+                    <TableHead className="px-3.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider">
                       Aluno / Matrícula
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
+                    <TableHead className="px-2.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
                       Situação
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
-                      VA1 (0–10)
+                    <TableHead className="px-2.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
+                      VA1 (0–100)
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
-                      VA2 (0–10)
+                    <TableHead className="px-2.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
+                      VA2 (0–100)
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
-                      VA3 (0–10)
+                    <TableHead className="px-2.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
+                      VA3 (0–100)
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
+                    <TableHead className="px-2.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-center">
                       Média Final
                     </TableHead>
-                    <TableHead className="px-4 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">
+                    <TableHead className="px-3.5 py-3 text-[10px] font-bold text-[#9AA0AC] uppercase tracking-wider text-right">
                       Detalhamento
                     </TableHead>
                   </TableRow>
@@ -962,23 +1029,23 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                   ) : (
                     students.map((st) => (
                       <TableRow key={st.matriculaId} className="hover:bg-slate-50/80 transition-colors">
-                        <TableCell className="px-4 py-3">
+                        <TableCell className="px-3.5 py-3 whitespace-normal min-w-[180px] max-w-[280px]">
                           <div className="space-y-0.5">
-                            <p className="font-bold text-navy text-xs">{st.nomeAluno}</p>
-                            <div className="flex items-center gap-2 text-[11px] text-[#5F6775] font-mono">
+                            <p className="font-bold text-navy text-xs break-words">{st.nomeAluno}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#5F6775] font-mono">
                               <span className="bg-slate-100 px-1.5 py-0.5 rounded text-navy font-bold">
                                 {st.matricula}
                               </span>
-                              {st.emailAluno && <span className="truncate max-w-[220px]">{st.emailAluno}</span>}
+                              {st.emailAluno && <span className="truncate max-w-[200px]">{st.emailAluno}</span>}
                             </div>
                           </div>
                         </TableCell>
 
-                        <TableCell className="px-4 py-3 text-center">
+                        <TableCell className="px-2.5 py-3 text-center">
                           {getStatusMatriculaBadge(st.statusMatricula, st.bloqueioLancamento)}
                         </TableCell>
 
-                        <TableCell className="px-4 py-3 text-center">
+                        <TableCell className="px-2.5 py-3 text-center">
                           <GradeCellPill
                             value={st.notas.va1}
                             raw={st.notas.va1Raw}
@@ -986,7 +1053,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                           />
                         </TableCell>
 
-                        <TableCell className="px-4 py-3 text-center">
+                        <TableCell className="px-2.5 py-3 text-center">
                           <GradeCellPill
                             value={st.notas.va2}
                             raw={st.notas.va2Raw}
@@ -994,7 +1061,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                           />
                         </TableCell>
 
-                        <TableCell className="px-4 py-3 text-center">
+                        <TableCell className="px-2.5 py-3 text-center">
                           <GradeCellPill
                             value={st.notas.va3}
                             raw={st.notas.va3Raw}
@@ -1002,7 +1069,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                           />
                         </TableCell>
 
-                        <TableCell className="px-4 py-3 text-center">
+                        <TableCell className="px-2.5 py-3 text-center">
                           <GradeCellPill
                             value={st.notas.mediaFinal}
                             raw={st.notas.mediaRaw}
@@ -1013,7 +1080,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                           />
                         </TableCell>
 
-                        <TableCell className="px-4 py-3 text-right">
+                        <TableCell className="px-3.5 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
                             {st.notas.divergenciaMotivo === "lista_notas_truncada" && (
                               <span
@@ -1077,15 +1144,24 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
       {/* Modal Analítico de Itens de Nota (VA1, VA2, VA3) */}
       <Dialog open={Boolean(detailStudent)} onOpenChange={(open) => !open && setDetailStudent(null)}>
         <DialogContent className="sm:max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-0 overflow-hidden">
-          <DialogHeader className="bg-navy text-white px-6 py-4">
-            <DialogTitle className="text-base font-extrabold flex items-center gap-2">
-              <Award className="w-5 h-5 text-green-brand" />
+          <DialogHeader className="bg-navy text-white px-6 py-4 space-y-1">
+            <DialogTitle className="text-base font-extrabold !text-white flex items-center gap-2 pr-6">
+              <Award className="w-5 h-5 text-green-brand shrink-0" />
               Extrato de Itens Avaliativos — {detailStudent?.nomeAluno}
             </DialogTitle>
-            <p className="text-xs text-white/70 font-mono">
+            <p className="text-xs text-white/80 font-mono">
               Matrícula: {detailStudent?.matricula} • Situação:{" "}
               {detailStudent?.situacaoLyceum || detailStudent?.statusMatricula}
             </p>
+            {selectedTurma && (
+              <p className="text-[11px] text-white/70 font-mono break-all">
+                Cód. Turma AVA: <strong className="text-white">{selectedTurma.id}</strong> • Fullname AVA:{" "}
+                <strong className="text-white">
+                  {selectedTurma.moodleCourseFullname ||
+                    `${selectedTurma.nomeDisciplina}-${selectedTurma.id}`}
+                </strong>
+              </p>
+            )}
           </DialogHeader>
 
           {detailStudent && (
@@ -1094,7 +1170,7 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                 <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    A lista detalhada de atividades excedeu o limite de buffer do Moodle (1.024 caracteres) e foi sinalizada como truncada. As notas consolidada de VA1, VA2 e VA3 continuam preservadas.
+                    A lista detalhada de atividades excedeu o limite de buffer do Moodle (1.024 caracteres) sem listas por fase complementares e foi sinalizada como truncada. As notas consolidadas de VA1, VA2 e VA3 continuam preservadas.
                   </span>
                 </div>
               )}
@@ -1135,25 +1211,66 @@ export function AcademicGradesClient({ embedded = false }: AcademicGradesClientP
                   Nenhum item avaliativo detalhado localizado para a VA{detailPhaseTab} no snapshot atual do AVA.
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
-                  {phaseItems.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="px-4 py-3 flex items-center justify-between gap-4 bg-white hover:bg-slate-50"
-                    >
-                      <div className="space-y-0.5 min-w-0">
-                        <p className="font-semibold text-navy text-xs break-words">{item.nome}</p>
-                        <p className="text-[11px] text-[#5F6775] font-mono">
-                          Status: {item.status} {item.data && item.data !== "-" ? `• Data: ${item.data}` : ""}
-                        </p>
-                      </div>
-                      <div className="shrink-0 font-mono text-xs font-bold text-[#5E35B1] bg-[#5E35B1]/10 px-2.5 py-1 rounded-md">
-                        {item.nota !== null && item.nota !== undefined
-                          ? `${item.nota}${item.notaMax ? ` / ${item.notaMax}` : ""}`
-                          : "—"}
-                      </div>
+                <div className="space-y-3">
+                  {phaseItemsSum && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                      <span className="text-[#5F6775]">
+                        Somatória dos itens lançados:{" "}
+                        <strong className="font-mono text-navy">{phaseItemsSum.rawSumFormatted} pts</strong>
+                      </span>
+                      <span className="text-navy font-semibold">
+                        Nota final da etapa (arredondada):{" "}
+                        <strong className="font-mono text-sm text-[#5E35B1]">
+                          {phaseItemsSum.rounded}
+                        </strong>
+                      </span>
                     </div>
-                  ))}
+                  )}
+                  <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                  {phaseItems.map((item, idx) => {
+                    const statusLower = (item.status || "").toLowerCase()
+                    const isConcluido =
+                      statusLower.includes("conclu") ||
+                      statusLower.includes("avaliad") ||
+                      statusLower.includes("feito") ||
+                      statusLower.includes("realiz")
+                    const hasNota = item.nota !== null && item.nota !== undefined
+
+                    return (
+                      <div
+                        key={idx}
+                        className="px-4 py-3 flex items-center justify-between gap-4 bg-white hover:bg-slate-50"
+                      >
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="font-semibold text-navy text-xs break-words">{item.nome}</p>
+                          <p className="text-[11px] text-[#5F6775] font-mono">
+                            Status: {item.status} {item.data && item.data !== "-" ? `• Data: ${item.data}` : ""}
+                          </p>
+                        </div>
+                        {hasNota ? (
+                          <div className="shrink-0 font-mono text-xs font-bold text-[#5E35B1] bg-[#5E35B1]/10 px-2.5 py-1 rounded-md">
+                            {item.nota}{item.notaMax ? ` / ${item.notaMax}` : ""}
+                          </div>
+                        ) : (
+                          <div className="shrink-0 flex items-center gap-2">
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                isConcluido
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-slate-100 text-slate-600 border-slate-200"
+                              }`}
+                            >
+                              {isConcluido ? "Concluído" : item.status || "Pendente"}
+                            </span>
+                            <span className="font-mono text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                              {item.notaMax ? `Máx: ${item.notaMax}` : "—"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  </div>
                 </div>
               )}
             </div>

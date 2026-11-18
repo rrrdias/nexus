@@ -1,4 +1,5 @@
 import {
+  computeAdditivePhaseSumGrade,
   detectCohortPhaseScale,
   normalizeGrade,
 } from './utils/grade-normalizer';
@@ -6,6 +7,7 @@ import {
   classifyActivityPhase,
   detectListaNotasTruncated,
   parseActivities,
+  reconcileStudentPhaseActivities,
 } from './utils/activity-parser';
 import {
   getPeriodVariants,
@@ -26,35 +28,71 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
       expect(detectCohortPhaseScale(['8.0', '7.0'], 20)).toBe('0-100');
     });
 
-    it('should convert 0-100 cohort grades monotonically without inverting <= 10.0 scores', () => {
-      const cohortGrades = ['85.0', '10.0', '9.0', '10.5', '0', ''];
+    it('should convert grades monotonically to 0-100 scale and apply Math.ceil for any fraction above ,0', () => {
+      const cohortGrades = [
+        '85.0',
+        '93.8',
+        '80.1',
+        '10.0',
+        '9.0',
+        '10.5',
+        '0',
+        '',
+      ];
       const scale = detectCohortPhaseScale(cohortGrades);
       expect(scale).toBe('0-100');
 
       expect(normalizeGrade('85.0', scale)).toEqual({
-        numericGrade: 8.5,
+        numericGrade: 85,
         status: 'Lançada',
         scaleApplied: '0-100',
       });
-      // Sem inversão: 10.0/100 vira 1.00 (não 10.00!) e 10.5/100 vira 1.05
+      // Arredondamento para cima (teto) para qualquer decimal > ,0
+      expect(normalizeGrade('93.8', scale)).toEqual({
+        numericGrade: 94,
+        status: 'Lançada',
+        scaleApplied: '0-100',
+      });
+      expect(normalizeGrade('80.1', scale)).toEqual({
+        numericGrade: 81,
+        status: 'Lançada',
+        scaleApplied: '0-100',
+      });
+      expect(normalizeGrade('93.0', scale)).toEqual({
+        numericGrade: 93,
+        status: 'Lançada',
+        scaleApplied: '0-100',
+      });
+      // Escala 0-10 é convertida para 0-100 (9,3 -> 93; 8,01 -> 81)
+      expect(normalizeGrade('9.3', '0-10')).toEqual({
+        numericGrade: 93,
+        status: 'Lançada',
+        scaleApplied: '0-10',
+      });
+      expect(normalizeGrade('8.01', '0-10')).toEqual({
+        numericGrade: 81,
+        status: 'Lançada',
+        scaleApplied: '0-10',
+      });
+      // Sem inversão em cohort 0-100: 10.0 -> 10, 9.0 -> 9, 10.5 -> 11
       expect(normalizeGrade('10.0', scale)).toEqual({
-        numericGrade: 1.0,
+        numericGrade: 10,
         status: 'Lançada',
         scaleApplied: '0-100',
       });
       expect(normalizeGrade('9.0', scale)).toEqual({
-        numericGrade: 0.9,
+        numericGrade: 9,
         status: 'Lançada',
         scaleApplied: '0-100',
       });
       expect(normalizeGrade('10.5', scale)).toEqual({
-        numericGrade: 1.05,
+        numericGrade: 11,
         status: 'Lançada',
         scaleApplied: '0-100',
       });
     });
 
-    it('should strictly distinguish null/empty (Pendente) from explicit zero 0.00 (Lançada)', () => {
+    it('should strictly distinguish null/empty (Pendente) from explicit zero 0 (Lançada)', () => {
       expect(normalizeGrade(null, '0-10')).toEqual({
         numericGrade: null,
         status: 'Pendente',
@@ -82,13 +120,85 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
       });
     });
 
-    it('should cap converted grades safely within [0.00, 10.00]', () => {
-      expect(normalizeGrade('125', '0-100').numericGrade).toBe(10);
+    it('should cap converted grades safely within [0, 100] and compute additive phase sum ceiling', () => {
+      expect(normalizeGrade('125', '0-100').numericGrade).toBe(100);
       expect(normalizeGrade('invalid-text', 'auto')).toEqual({
         numericGrade: null,
         status: 'Pendente',
         scaleApplied: '0-10',
       });
+
+      expect(
+        computeAdditivePhaseSumGrade([
+          {
+            nome: '1ª VA',
+            status: 'Avaliado',
+            nota: '58.0',
+            notaMax: '60.0',
+            data: '-',
+          },
+          {
+            nome: 'Revisando',
+            status: 'Avaliado',
+            nota: '20.0',
+            notaMax: '20.0',
+            data: '-',
+          },
+          {
+            nome: 'APS1',
+            status: 'Avaliado',
+            nota: '2.1',
+            notaMax: '3.3',
+            data: '-',
+          },
+        ]),
+      ).toEqual({ rawSum: 80.1, roundedGrade: 81 });
+
+      expect(
+        computeAdditivePhaseSumGrade([
+          {
+            nome: '1ª VA',
+            status: 'Avaliado',
+            nota: '60.0',
+            notaMax: '60.0',
+            data: '-',
+          },
+          {
+            nome: 'Revisando',
+            status: 'Avaliado',
+            nota: '20.0',
+            notaMax: '20.0',
+            data: '-',
+          },
+          {
+            nome: 'APS1',
+            status: 'Avaliado',
+            nota: '13.8',
+            notaMax: '20.0',
+            data: '-',
+          },
+        ]),
+      ).toEqual({ rawSum: 93.8, roundedGrade: 94 });
+
+      // Modelo não-aditivo (notaMax > 100.5) retorna null para evitar soma indevida
+      expect(
+        computeAdditivePhaseSumGrade([
+          {
+            nome: 'Ativ 1',
+            status: 'Avaliado',
+            nota: '80',
+            notaMax: '100',
+            data: '-',
+          },
+          {
+            nome: 'Ativ 2',
+            status: 'Avaliado',
+            nota: '90',
+            notaMax: '100',
+            data: '-',
+          },
+        ]),
+      ).toBeNull();
     });
   });
 
@@ -186,6 +296,54 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
 
       const cutTail = 'APS1:8:10:10/08/2026|APS2:9:10';
       expect(detectListaNotasTruncated(cutTail)).toBe(true);
+    });
+
+    it('should reconcile truncated lista_notas using listaFase1..3 and progressoListaFase1..3 with chronological numeric order', () => {
+      const truncatedLista =
+        '1ª VA - VERIFICAÇÃO DE APRENDIZAGEM:54.0:60.0:13/06/2026|APS1 - Atividade:2.5:3.3:13/06/2026|APS10 - Atividade:3.3:3.3:14/06/2026|APS2 - Atividade:2.5:3.3:13/06/2026|Revisando Conteúdo - Fase 1:16.0:20.0:13/06/2026|R'.padEnd(
+          1030,
+          'x',
+        );
+
+      const result = reconcileStudentPhaseActivities({
+        listaNotas: truncatedLista,
+        listaFase1:
+          '1ª VA - VERIFICAÇÃO DE APRENDIZAGEM:54.0:60.0:13/06/2026|APS1 - Atividade:2.5:3.3:13/06/2026|Revisando Conteúdo - Fase 1:16.0:20.0:13/06/2026',
+        listaFase2:
+          '2ª VA - VERIFICAÇÃO DE APRENDIZAGEM:60.0:60.0:14/06/2026|APS2 - Atividade:2.5:3.3:13/06/2026|Revisando Conteúdo - Fase 2:20.0:20.0:14/06/2026',
+        listaFase3:
+          '3ª VA - VERIFICAÇÃO DE APRENDIZAGEM:54.0:60.0:14/06/2026|Revisando Conteúdo - Fase 3:12.0:20.0:14/06/2026',
+        progressoListaFase1:
+          'APS1 - Atividade:Concluído:13/06/2026|APS2 - Atividade:Concluído:13/06/2026|APS6 - Atividade:Concluído:13/06/2026|Revisando Conteúdo - Fase 1:Concluído:13/06/2026|1ª VA - VERIFICAÇÃO DE APRENDIZAGEM:Concluído:13/06/2026',
+        progressoListaFase2:
+          'APS10 - Atividade:Concluído:14/06/2026|Revisando Conteúdo - Fase 2:Concluído:14/06/2026|2ª VA - VERIFICAÇÃO DE APRENDIZAGEM:Concluído:14/06/2026',
+        progressoListaFase3:
+          'Revisando Conteúdo - Fase 3:Pendente:-|3ª VA - VERIFICAÇÃO DE APRENDIZAGEM:Concluído:14/06/2026',
+      });
+
+      expect(result.isTruncatedUncompensated).toBe(false);
+      // Ordem cronológica/numérica: APS1, APS2, APS6, Revisando Conteúdo, 1ª VA
+      expect(result.f1Activities.map((a) => a.nome)).toEqual([
+        'APS1 - Atividade',
+        'APS2 - Atividade',
+        'APS6 - Atividade',
+        'Revisando Conteúdo - Fase 1',
+        '1ª VA - VERIFICAÇÃO DE APRENDIZAGEM',
+      ]);
+      // APS2 tem nota recuperada mesmo Moodle colocando em listaFase2
+      expect(result.f1Activities[1].nota).toBe('2.5');
+      // Revisando Conteúdo Fase 2 e Fase 3 recuperados integralmente
+      expect(result.f2Activities.map((a) => a.nome)).toEqual([
+        'APS10 - Atividade',
+        'Revisando Conteúdo - Fase 2',
+        '2ª VA - VERIFICAÇÃO DE APRENDIZAGEM',
+      ]);
+      expect(result.f2Activities[1].nota).toBe('20.0');
+      expect(result.f3Activities.map((a) => a.nome)).toEqual([
+        'Revisando Conteúdo - Fase 3',
+        '3ª VA - VERIFICAÇÃO DE APRENDIZAGEM',
+      ]);
+      expect(result.f3Activities[0].nota).toBe('12.0');
     });
   });
 
@@ -431,13 +589,13 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
       // Aluno 2026001
       expect(notasUpserted[0]).toMatchObject({
         matricula: '2026001',
-        va1Nota: '8.5',
+        va1Nota: '85',
         va1Status: 'Lançada',
-        va2Nota: '0.9',
+        va2Nota: '9',
         va2Status: 'Lançada',
         va3Nota: '0',
         va3Status: 'Lançada',
-        mediaFinalNota: '6',
+        mediaFinalNota: '60',
         statusConsolidacao: 'sincronizado',
       });
       expect(JSON.parse(notasUpserted[0].itensVa1)).toHaveLength(1);
@@ -447,9 +605,9 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
       // Aluno 2026002
       expect(notasUpserted[1]).toMatchObject({
         matricula: '2026002',
-        va1Nota: '0.9',
+        va1Nota: '9',
         va1Status: 'Lançada',
-        va2Nota: '8',
+        va2Nota: '80',
         va2Status: 'Lançada',
         va3Nota: null,
         va3Status: 'Pendente',
@@ -538,17 +696,19 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
       const rows = insertedCalls[0];
       expect(rows[0]).toMatchObject({
         matricula: '2026901',
-        va1Nota: '0.9',
-        va2Nota: '8',
-        va3Nota: '7.5',
+        va1Nota: '9',
+        va2Nota: '80',
+        va3Nota: '75',
+        mediaFinalNota: '55',
         statusConsolidacao: 'divergente',
         divergenciaMotivo: 'lista_notas_truncada',
       });
       expect(rows[1]).toMatchObject({
         matricula: '2026902',
-        va1Nota: '9',
-        va2Nota: '9.5',
+        va1Nota: '90',
+        va2Nota: '95',
         va3Status: 'Pendente',
+        mediaFinalNota: '92',
         statusConsolidacao: 'sincronizado',
         divergenciaMotivo: null,
       });
@@ -602,7 +762,7 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
               bloqueioLancamento: true,
             },
             nota: {
-              va1Nota: '8.50',
+              va1Nota: '85.00',
               va1Raw: '85.0',
               va1Status: 'Lançada',
               va2Nota: null,
@@ -636,7 +796,7 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
             mat: { statusMatricula: 'suspenso', bloqueioLancamento: true },
             turma: turmaRow,
             nota: {
-              va1Nota: '8.50',
+              va1Nota: '85.00',
               va2Nota: null,
               va3Nota: null,
               mediaFinalNota: null,
@@ -661,7 +821,7 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
             nomeAluno: 'Ana Clara',
             statusMatricula: 'suspenso',
             bloqueioLancamento: true,
-            va1Nota: '8.50',
+            va1Nota: '85.00',
           },
         ],
       ]);
@@ -686,7 +846,7 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
         statusMatricula: 'suspenso',
         bloqueioLancamento: true,
       });
-      expect(studentsRes.alunos[0].notas.va1).toBe(8.5);
+      expect(studentsRes.alunos[0].notas.va1).toBe(85);
       expect(studentsRes.alunos[0].notas.itensVa1).toHaveLength(1);
 
       const histRes = await searchService.getStudentGradesHistory(
@@ -694,7 +854,7 @@ describe('AcademicGrades Submodule (Phase 2: Normalization, Status, Parsing & Se
         '2026-2',
       );
       expect(histRes).toHaveLength(1);
-      expect(histRes[0].va1).toBe(8.5);
+      expect(histRes[0].va1).toBe(85);
 
       const exportRes = await searchService.exportGradesData({
         periodo: '2026-2',

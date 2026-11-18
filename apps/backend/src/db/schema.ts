@@ -1093,11 +1093,11 @@ export const academicOnlineNotas = pgTable(
     va3Raw: text('va3_raw'),
     mediaRaw: text('media_raw'),
 
-    // Notas normalizadas em escala numérica institucional Lyceum (0.00 a 10.00)
-    va1Nota: numeric('va1_nota', { precision: 4, scale: 2 }),
-    va2Nota: numeric('va2_nota', { precision: 4, scale: 2 }),
-    va3Nota: numeric('va3_nota', { precision: 4, scale: 2 }),
-    mediaFinalNota: numeric('media_final_nota', { precision: 4, scale: 2 }),
+    // Notas normalizadas na escala 0 a 100 (arredondadas para cima)
+    va1Nota: numeric('va1_nota', { precision: 5, scale: 2 }),
+    va2Nota: numeric('va2_nota', { precision: 5, scale: 2 }),
+    va3Nota: numeric('va3_nota', { precision: 5, scale: 2 }),
+    mediaFinalNota: numeric('media_final_nota', { precision: 5, scale: 2 }),
 
     // Status individual de cada fase avaliativa
     va1Status: text('va1_status').notNull().default('Pendente'), // 'Pendente' | 'Lançada'

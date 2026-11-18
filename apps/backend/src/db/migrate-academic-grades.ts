@@ -120,10 +120,10 @@ export async function migrateAcademicGrades() {
         va2_raw text,
         va3_raw text,
         media_raw text,
-        va1_nota numeric(4, 2),
-        va2_nota numeric(4, 2),
-        va3_nota numeric(4, 2),
-        media_final_nota numeric(4, 2),
+        va1_nota numeric(5, 2),
+        va2_nota numeric(5, 2),
+        va3_nota numeric(5, 2),
+        media_final_nota numeric(5, 2),
         va1_status text NOT NULL DEFAULT 'Pendente',
         va2_status text NOT NULL DEFAULT 'Pendente',
         va3_status text NOT NULL DEFAULT 'Pendente',
@@ -138,6 +138,14 @@ export async function migrateAcademicGrades() {
         CONSTRAINT unq_ac_online_nota_turma_mat UNIQUE (turma_id, matricula),
         CONSTRAINT unq_ac_online_nota_mat_id UNIQUE (matricula_id)
       );
+    `);
+
+    await db.execute(sql`
+      ALTER TABLE academic_online_nota
+        ALTER COLUMN va1_nota TYPE numeric(5, 2),
+        ALTER COLUMN va2_nota TYPE numeric(5, 2),
+        ALTER COLUMN va3_nota TYPE numeric(5, 2),
+        ALTER COLUMN media_final_nota TYPE numeric(5, 2);
     `);
 
     await db.execute(

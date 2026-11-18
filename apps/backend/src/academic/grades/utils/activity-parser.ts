@@ -308,3 +308,308 @@ export function isEvaluativeActivity(name: string): boolean {
     norm.includes('envie aqui')
   );
 }
+
+export interface StudentActivitySources {
+  listaNotas?: string | null;
+  listaFase1?: string | null;
+  listaFase2?: string | null;
+  listaFase3?: string | null;
+  progressoListaFase1?: string | null;
+  progressoListaFase2?: string | null;
+  progressoListaFase3?: string | null;
+}
+
+export interface ReconciledStudentActivitiesResult {
+  f1Activities: ParsedGradeActivity[];
+  f2Activities: ParsedGradeActivity[];
+  f3Activities: ParsedGradeActivity[];
+  allActivities: ParsedGradeActivity[];
+  isTruncatedUncompensated: boolean;
+}
+
+function getActivityOrderBucket(normName: string): number {
+  if (
+    normName.includes('verificacao') ||
+    normName.includes('1a va') ||
+    normName.includes('2a va') ||
+    normName.includes('3a va') ||
+    normName.includes('va 1') ||
+    normName.includes('va 2') ||
+    normName.includes('va 3') ||
+    normName.includes('va1') ||
+    normName.includes('va2') ||
+    normName.includes('va3') ||
+    normName.includes('prova') ||
+    normName.includes('exame')
+  ) {
+    return 2;
+  }
+  if (normName.includes('revisando')) {
+    return 1;
+  }
+  return 0;
+}
+
+export function sortActivitiesByPhaseOrder(
+  activities: ParsedGradeActivity[],
+): ParsedGradeActivity[] {
+  return [...activities].sort((a, b) => {
+    const aNorm = normalizeName(a.nome);
+    const bNorm = normalizeName(b.nome);
+
+    const aBucket = getActivityOrderBucket(aNorm);
+    const bBucket = getActivityOrderBucket(bNorm);
+    if (aBucket !== bBucket) {
+      return aBucket - bBucket;
+    }
+
+    const aNumMatch = aNorm.match(/\d+/);
+    const bNumMatch = bNorm.match(/\d+/);
+    const aNum = aNumMatch ? parseInt(aNumMatch[0], 10) : 999;
+    const bNum = bNumMatch ? parseInt(bNumMatch[0], 10) : 999;
+
+    if (aNum !== bNum) {
+      return aNum - bNum;
+    }
+    return a.nome.localeCompare(b.nome, 'pt-BR');
+  });
+}
+
+function isCompletedActivityStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  if (
+    !s ||
+    s === '-' ||
+    s.includes('pend') ||
+    s.includes('sem') ||
+    s.includes('nunca')
+  ) {
+    return false;
+  }
+  return (
+    s.includes('conclu') ||
+    s.includes('feito') ||
+    s.includes('realiz') ||
+    s.includes('avaliad')
+  );
+}
+
+function addOrMergeActivity(
+  map: Map<string, ParsedGradeActivity>,
+  act: ParsedGradeActivity,
+  fase: 1 | 2 | 3,
+  overrideKey?: string,
+): void {
+  const key = overrideKey || normalizeName(act.nome);
+  if (!key) return;
+
+  if (!map.has(key)) {
+    map.set(key, { ...act, fase });
+    return;
+  }
+
+  const existing = map.get(key)!;
+  const existingHasGrade =
+    existing.nota !== null &&
+    existing.nota !== undefined &&
+    existing.nota !== '-';
+  const actHasGrade =
+    act.nota !== null && act.nota !== undefined && act.nota !== '-';
+
+  const resolvedNota = existingHasGrade
+    ? existing.nota
+    : actHasGrade
+      ? act.nota
+      : null;
+
+  const isExistingDone = isCompletedActivityStatus(existing.status);
+  const isActDone = isCompletedActivityStatus(act.status);
+
+  const resolvedStatus =
+    resolvedNota !== null
+      ? 'Avaliado'
+      : isActDone
+        ? act.status
+        : isExistingDone
+          ? existing.status
+          : existing.status && existing.status !== '-'
+            ? existing.status
+            : act.status;
+
+  map.set(key, {
+    nome: existing.nome.length >= act.nome.length ? existing.nome : act.nome,
+    status: resolvedStatus,
+    nota: resolvedNota,
+    notaMax: existing.notaMax || act.notaMax || null,
+    data: existing.data && existing.data !== '-' ? existing.data : act.data,
+    fase,
+  });
+}
+
+function findPrefixMatchKey(
+  map: Map<string, ParsedGradeActivity>,
+  key: string,
+): string | null {
+  if (key.length < 4) return null;
+  for (const existingKey of map.keys()) {
+    if (existingKey.startsWith(key)) {
+      const nextChar = existingKey.slice(key.length, key.length + 1);
+      if (!/^\d$/.test(nextChar)) return existingKey;
+    } else if (key.startsWith(existingKey)) {
+      const nextChar = key.slice(existingKey.length, existingKey.length + 1);
+      if (!/^\d$/.test(nextChar)) return existingKey;
+    }
+  }
+  return null;
+}
+
+export function reconcileStudentPhaseActivities(
+  sources: StudentActivitySources,
+): ReconciledStudentActivitiesResult {
+  const progF1 = parseActivities(sources.progressoListaFase1);
+  const progF2 = parseActivities(sources.progressoListaFase2);
+  const progF3 = parseActivities(sources.progressoListaFase3);
+
+  const authoritativeProgressMap = new Map<
+    string,
+    { phase: 1 | 2 | 3; act: ParsedGradeActivity }
+  >();
+  progF1.forEach((a) =>
+    authoritativeProgressMap.set(normalizeName(a.nome), { phase: 1, act: a }),
+  );
+  progF2.forEach((a) =>
+    authoritativeProgressMap.set(normalizeName(a.nome), { phase: 2, act: a }),
+  );
+  progF3.forEach((a) =>
+    authoritativeProgressMap.set(normalizeName(a.nome), { phase: 3, act: a }),
+  );
+
+  const f1Map = new Map<string, ParsedGradeActivity>();
+  const f2Map = new Map<string, ParsedGradeActivity>();
+  const f3Map = new Map<string, ParsedGradeActivity>();
+
+  progF1
+    .filter(
+      (a) =>
+        isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== '-'),
+    )
+    .forEach((act) => addOrMergeActivity(f1Map, act, 1));
+  progF2
+    .filter(
+      (a) =>
+        isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== '-'),
+    )
+    .forEach((act) => addOrMergeActivity(f2Map, act, 2));
+  progF3
+    .filter(
+      (a) =>
+        isEvaluativeActivity(a.nome) || (a.nota !== null && a.nota !== '-'),
+    )
+    .forEach((act) => addOrMergeActivity(f3Map, act, 3));
+
+  const hasAuthoritativePhases = authoritativeProgressMap.size > 0;
+
+  const allGradedActivities: Array<{
+    act: ParsedGradeActivity;
+    sourcePhase?: 1 | 2 | 3;
+  }> = [
+    ...parseActivities(sources.listaFase1).map((act) => ({
+      act,
+      sourcePhase: 1 as const,
+    })),
+    ...parseActivities(sources.listaFase2).map((act) => ({
+      act,
+      sourcePhase: 2 as const,
+    })),
+    ...parseActivities(sources.listaFase3).map((act) => ({
+      act,
+      sourcePhase: 3 as const,
+    })),
+    ...parseActivities(sources.listaNotas).map((act) => ({ act })),
+  ];
+
+  for (const { act, sourcePhase } of allGradedActivities) {
+    if (
+      hasAuthoritativePhases &&
+      !isEvaluativeActivity(act.nome) &&
+      (act.nota === null || act.nota === '-')
+    ) {
+      continue;
+    }
+
+    const key = normalizeName(act.nome);
+    if (!key) continue;
+
+    if (f1Map.has(key)) {
+      addOrMergeActivity(f1Map, act, 1, key);
+      continue;
+    }
+    if (f2Map.has(key)) {
+      addOrMergeActivity(f2Map, act, 2, key);
+      continue;
+    }
+    if (f3Map.has(key)) {
+      addOrMergeActivity(f3Map, act, 3, key);
+      continue;
+    }
+
+    const authEntry = authoritativeProgressMap.get(key);
+    if (authEntry) {
+      const targetMap =
+        authEntry.phase === 1 ? f1Map : authEntry.phase === 2 ? f2Map : f3Map;
+      addOrMergeActivity(targetMap, authEntry.act, authEntry.phase, key);
+      addOrMergeActivity(targetMap, act, authEntry.phase, key);
+      continue;
+    }
+
+    const p1 = findPrefixMatchKey(f1Map, key);
+    if (p1) {
+      addOrMergeActivity(f1Map, act, 1, p1);
+      continue;
+    }
+    const p2 = findPrefixMatchKey(f2Map, key);
+    if (p2) {
+      addOrMergeActivity(f2Map, act, 2, p2);
+      continue;
+    }
+    const p3 = findPrefixMatchKey(f3Map, key);
+    if (p3) {
+      addOrMergeActivity(f3Map, act, 3, p3);
+      continue;
+    }
+
+    const hasGrade = act.nota !== null && act.nota !== '-';
+    const isExam = key.includes('exame') || key.includes('substitutiva');
+    if (!hasAuthoritativePhases || hasGrade || isExam) {
+      const phase = classifyActivityPhase(act.nome, sourcePhase || 1);
+      const targetMap = phase === 1 ? f1Map : phase === 2 ? f2Map : f3Map;
+      addOrMergeActivity(targetMap, act, phase);
+    }
+  }
+
+  const f1Activities = sortActivitiesByPhaseOrder(Array.from(f1Map.values()));
+  const f2Activities = sortActivitiesByPhaseOrder(Array.from(f2Map.values()));
+  const f3Activities = sortActivitiesByPhaseOrder(Array.from(f3Map.values()));
+
+  const hasComplementaryPhaseLists = Boolean(
+    sources.listaFase1?.trim() ||
+    sources.listaFase2?.trim() ||
+    sources.listaFase3?.trim() ||
+    sources.progressoListaFase1?.trim() ||
+    sources.progressoListaFase2?.trim() ||
+    sources.progressoListaFase3?.trim(),
+  );
+
+  const isTruncatedUncompensated =
+    detectListaNotasTruncated(sources.listaNotas) &&
+    !hasComplementaryPhaseLists;
+
+  return {
+    f1Activities,
+    f2Activities,
+    f3Activities,
+    allActivities: [...f1Activities, ...f2Activities, ...f3Activities],
+    isTruncatedUncompensated,
+  };
+}

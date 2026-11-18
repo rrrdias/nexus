@@ -112,7 +112,7 @@ export class AcademicGradesMirrorService {
     const turmaUpsertPayloads = eligibleTurmas.map((t) => ({
       id: t.id,
       turma: (t.turma || t.codTurma || t.id).trim(),
-      codTurma: t.codTurma || t.turma || null,
+      codTurma: t.id,
       disciplina: (t.disciplina || t.codDisciplina || t.id).trim(),
       nomeDisciplina: (t.nomeDisciplina || t.disciplina || 'Disciplina').trim(),
       codDisciplina: t.codDisciplina || t.disciplina || null,
@@ -242,11 +242,20 @@ export class AcademicGradesMirrorService {
       ).trim();
 
       let enrolmentStatusAva: string | null = null;
+      const turmaIdToken = turmaMeta.id.toLowerCase();
       const turmaToken = turmaMeta.turma.toLowerCase();
       for (const [k, v] of avaStatusByMatAndCourse.entries()) {
-        if (k.startsWith(`${matriculaCode}::`) && k.includes(turmaToken)) {
+        if (k.startsWith(`${matriculaCode}::`) && k.includes(turmaIdToken)) {
           enrolmentStatusAva = v;
           break;
+        }
+      }
+      if (!enrolmentStatusAva) {
+        for (const [k, v] of avaStatusByMatAndCourse.entries()) {
+          if (k.startsWith(`${matriculaCode}::`) && k.includes(turmaToken)) {
+            enrolmentStatusAva = v;
+            break;
+          }
         }
       }
       if (!enrolmentStatusAva) {

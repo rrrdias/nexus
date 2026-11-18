@@ -7,7 +7,7 @@ export default async function AcademicGradesPage() {
   if (!session?.user) redirect("/login")
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       <AcademicGradesClient />
     </div>
   )

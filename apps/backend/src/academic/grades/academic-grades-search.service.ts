@@ -11,24 +11,49 @@ import {
 } from '../../db/schema';
 import {
   GradesTurmasQuery,
+  NormalizedGradeResult,
   ParsedGradeActivity,
   StudentGradeRow,
   TurmaGradesSummaryItem,
   TurmaStudentsQuery,
 } from './interfaces/academic-grades.types';
 import {
+  computeAdditivePhaseSumGrade,
   detectCohortPhaseScale,
   normalizeGrade,
 } from './utils/grade-normalizer';
 import {
-  classifyActivityPhase,
   detectListaNotasTruncated,
-  parseActivities,
+  reconcileStudentPhaseActivities,
+  ReconciledStudentActivitiesResult,
 } from './utils/activity-parser';
 import {
   getCandidateSourceInstitutions,
   getPeriodVariants,
 } from './utils/enrolment-resolver';
+
+function toCeilGrade(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined) return null;
+  const num = Number(raw);
+  if (isNaN(num)) return null;
+  return Math.ceil(Number(num.toFixed(2)));
+}
+
+function applyPhaseSumCeiling(
+  norm: NormalizedGradeResult,
+  scale: '0-10' | '0-100',
+  activities: ParsedGradeActivity[],
+): void {
+  if (scale !== '0-100' || norm.numericGrade === null) return;
+  const sum = computeAdditivePhaseSumGrade(activities);
+  if (
+    sum &&
+    sum.rawSum > norm.numericGrade &&
+    sum.roundedGrade - norm.numericGrade <= 1
+  ) {
+    norm.numericGrade = sum.roundedGrade;
+  }
+}
 
 function parseStoredItems(
   rawJson: string | null | undefined,
@@ -92,11 +117,14 @@ export class AcademicGradesSearchService {
 
     const matriculaCodes = matriculas.map((m) => m.matricula);
     const turmaCodigo = matriculas[0].turmaCodigo;
+    const avaCourseCode = matriculas[0].turmaId.includes(turmaCodigo)
+      ? matriculas[0].turmaId
+      : turmaCodigo;
     const periodVariants = getPeriodVariants(matriculas[0].periodo);
     const primaryInst = matriculas[0].sourceInstitution || 'ead';
     const candidateInstitutions = getCandidateSourceInstitutions(primaryInst);
 
-    // 2. Consultar ava_grades_report por matrícula, variantes de período, instituição e código da turma
+    // 2. Consultar ava_grades_report por matrícula, variantes de período, instituição e código exato do curso no AVA
     const avaRecords = await this.db
       .select()
       .from(avaGradesReport)
@@ -106,8 +134,8 @@ export class AcademicGradesSearchService {
           inArray(avaGradesReport.periodo, periodVariants),
           inArray(avaGradesReport.sourceInstitution, candidateInstitutions),
           or(
-            sql`${avaGradesReport.courseFullname} ILIKE '%' || ${turmaCodigo} || '%'`,
-            sql`${avaGradesReport.courseShortname} ILIKE '%' || ${turmaCodigo} || '%'`,
+            sql`${avaGradesReport.courseFullname} ILIKE '%' || ${avaCourseCode} || '%'`,
+            sql`${avaGradesReport.courseShortname} ILIKE '%' || ${avaCourseCode} || '%'`,
           ),
         ),
       )
@@ -127,31 +155,42 @@ export class AcademicGradesSearchService {
       }
     }
 
-    // 2b. Fallback em ava_consolidated_report para estudantes ausentes em ava_grades_report
+    // 2b. Fallback em ava_consolidated_report para ausentes ou para recuperar progresso_lista_fase1..3 quando lista_notas vier truncada
     const missingMats = matriculaCodes.filter((mat) => !avaMap.has(mat));
+    const hasTruncatedWithRichSchema = avaRecords.some(
+      (r) => 'listaFase1' in r && detectListaNotasTruncated(r.listaNotas),
+    );
+    const targetConsMats = hasTruncatedWithRichSchema
+      ? matriculaCodes
+      : missingMats;
     const consolidatedMap = new Map<
       string,
       typeof avaConsolidatedReport.$inferSelect
     >();
 
-    if (missingMats.length > 0) {
+    if (targetConsMats.length > 0) {
       const consRecords = await this.db
         .select()
         .from(avaConsolidatedReport)
         .where(
           and(
-            inArray(avaConsolidatedReport.matricula, missingMats),
+            inArray(avaConsolidatedReport.matricula, targetConsMats),
             inArray(avaConsolidatedReport.periodo, periodVariants),
             inArray(
               avaConsolidatedReport.sourceInstitution,
               candidateInstitutions,
             ),
-            sql`${avaConsolidatedReport.curso} ILIKE '%' || ${turmaCodigo} || '%'`,
+            sql`${avaConsolidatedReport.curso} ILIKE '%' || ${avaCourseCode} || '%'`,
           ),
         )
         .orderBy(desc(avaConsolidatedReport.updatedAt));
 
-      for (const cRec of consRecords) {
+      const sortedConsRecords = [...consRecords].sort((a, b) => {
+        const aPrimary = a.sourceInstitution === primaryInst ? 0 : 1;
+        const bPrimary = b.sourceInstitution === primaryInst ? 0 : 1;
+        return aPrimary - bPrimary;
+      });
+      for (const cRec of sortedConsRecords) {
         const key = (cRec.matricula || '').trim();
         if (key && !consolidatedMap.has(key)) {
           consolidatedMap.set(key, cRec);
@@ -159,7 +198,7 @@ export class AcademicGradesSearchService {
       }
     }
 
-    // 3. Resolução de Escala no nível da Turma/Cohort por fase (evita inversão de notas <= 10.0 e contaminação entre fases)
+    // 3. Reconciliação de atividades por fase e resolução de escala no nível da Turma/Cohort
     const allF1Raw: (string | null | undefined)[] = [];
     const allF2Raw: (string | null | undefined)[] = [];
     const allF3Raw: (string | null | undefined)[] = [];
@@ -167,6 +206,17 @@ export class AcademicGradesSearchService {
     let maxPhase1Grade: number | null = null;
     let maxPhase2Grade: number | null = null;
     let maxPhase3Grade: number | null = null;
+    const reconciledMap = new Map<string, ReconciledStudentActivitiesResult>();
+
+    const updateMaxPhaseGrade = (
+      currentMax: number | null,
+      notaMax?: string | null,
+    ): number | null => {
+      if (!notaMax) return currentMax;
+      const parsedMax = parseFloat(notaMax.replace(',', '.'));
+      if (isNaN(parsedMax)) return currentMax;
+      return currentMax === null ? parsedMax : Math.max(currentMax, parsedMax);
+    };
 
     for (const m of matriculas) {
       const g = avaMap.get(m.matricula);
@@ -176,32 +226,26 @@ export class AcademicGradesSearchService {
       allF3Raw.push(g?.fase3 ?? c?.notaFase3);
       allMediaRaw.push(g?.media ?? c?.mediaFinal);
 
-      const rawLista = g?.listaNotas ?? c?.listaNotas;
-      if (rawLista) {
-        for (const act of parseActivities(rawLista)) {
-          const parsedMax = act.notaMax
-            ? parseFloat(act.notaMax.replace(',', '.'))
-            : NaN;
-          if (!isNaN(parsedMax)) {
-            const phase = classifyActivityPhase(act.nome);
-            if (phase === 1) {
-              maxPhase1Grade =
-                maxPhase1Grade === null
-                  ? parsedMax
-                  : Math.max(maxPhase1Grade, parsedMax);
-            } else if (phase === 2) {
-              maxPhase2Grade =
-                maxPhase2Grade === null
-                  ? parsedMax
-                  : Math.max(maxPhase2Grade, parsedMax);
-            } else {
-              maxPhase3Grade =
-                maxPhase3Grade === null
-                  ? parsedMax
-                  : Math.max(maxPhase3Grade, parsedMax);
-            }
-          }
-        }
+      const rawLista = g?.listaNotas ?? c?.listaNotas ?? null;
+      const reconciled = reconcileStudentPhaseActivities({
+        listaNotas: rawLista,
+        listaFase1: g?.listaFase1 ?? c?.notasListaFase1 ?? null,
+        listaFase2: g?.listaFase2 ?? c?.notasListaFase2 ?? null,
+        listaFase3: g?.listaFase3 ?? c?.notasListaFase3 ?? null,
+        progressoListaFase1: c?.progressoListaFase1 ?? null,
+        progressoListaFase2: c?.progressoListaFase2 ?? null,
+        progressoListaFase3: c?.progressoListaFase3 ?? null,
+      });
+      reconciledMap.set(m.matricula, reconciled);
+
+      for (const act of reconciled.f1Activities) {
+        maxPhase1Grade = updateMaxPhaseGrade(maxPhase1Grade, act.notaMax);
+      }
+      for (const act of reconciled.f2Activities) {
+        maxPhase2Grade = updateMaxPhaseGrade(maxPhase2Grade, act.notaMax);
+      }
+      for (const act of reconciled.f3Activities) {
+        maxPhase3Grade = updateMaxPhaseGrade(maxPhase3Grade, act.notaMax);
       }
     }
 
@@ -228,34 +272,27 @@ export class AcademicGradesSearchService {
       const va3Norm = normalizeGrade(rawF3, fase3Scale);
       const mediaNorm = normalizeGrade(rawMedia, mediaScale);
 
-      let itensVa1Json: string | null = null;
-      let itensVa2Json: string | null = null;
-      let itensVa3Json: string | null = null;
-      let divergenciaMotivo: string | null = null;
-
-      if (rawLista) {
-        if (detectListaNotasTruncated(rawLista)) {
-          divergenciaMotivo = 'lista_notas_truncada';
-        }
-
-        const activities = parseActivities(rawLista);
-        const f1Activities = activities
-          .filter((a) => classifyActivityPhase(a.nome) === 1)
-          .map((a) => ({ ...a, fase: 1 as const }));
-        const f2Activities = activities
-          .filter((a) => classifyActivityPhase(a.nome) === 2)
-          .map((a) => ({ ...a, fase: 2 as const }));
-        const f3Activities = activities
-          .filter((a) => classifyActivityPhase(a.nome) === 3)
-          .map((a) => ({ ...a, fase: 3 as const }));
-
-        itensVa1Json =
-          f1Activities.length > 0 ? JSON.stringify(f1Activities) : null;
-        itensVa2Json =
-          f2Activities.length > 0 ? JSON.stringify(f2Activities) : null;
-        itensVa3Json =
-          f3Activities.length > 0 ? JSON.stringify(f3Activities) : null;
+      const reconciled = reconciledMap.get(m.matricula);
+      if (reconciled) {
+        applyPhaseSumCeiling(va1Norm, fase1Scale, reconciled.f1Activities);
+        applyPhaseSumCeiling(va2Norm, fase2Scale, reconciled.f2Activities);
+        applyPhaseSumCeiling(va3Norm, fase3Scale, reconciled.f3Activities);
       }
+      const itensVa1Json =
+        reconciled && reconciled.f1Activities.length > 0
+          ? JSON.stringify(reconciled.f1Activities)
+          : null;
+      const itensVa2Json =
+        reconciled && reconciled.f2Activities.length > 0
+          ? JSON.stringify(reconciled.f2Activities)
+          : null;
+      const itensVa3Json =
+        reconciled && reconciled.f3Activities.length > 0
+          ? JSON.stringify(reconciled.f3Activities)
+          : null;
+      const divergenciaMotivo = reconciled?.isTruncatedUncompensated
+        ? 'lista_notas_truncada'
+        : null;
 
       return {
         turmaId: m.turmaId,
@@ -347,6 +384,15 @@ export class AcademicGradesSearchService {
           updatedAt: now,
         })
         .where(eq(academicOnlineTurmas.id, turmaId));
+    } else if (avaRecords.length === 0) {
+      await this.db
+        .update(academicOnlineTurmas)
+        .set({
+          moodleCourseId: null,
+          moodleCourseFullname: null,
+          updatedAt: now,
+        })
+        .where(eq(academicOnlineTurmas.id, turmaId));
     }
 
     this.logger.log(
@@ -425,10 +471,13 @@ export class AcademicGradesSearchService {
       const s = `%${query.search.trim()}%`;
       conditions.push(
         or(
+          ilike(academicOnlineTurmas.id, s),
+          ilike(academicOnlineTurmas.codTurma, s),
           ilike(academicOnlineTurmas.turma, s),
           ilike(academicOnlineTurmas.nomeDisciplina, s),
           ilike(academicOnlineTurmas.disciplina, s),
           ilike(academicOnlineTurmas.cursoNome, s),
+          ilike(academicOnlineTurmas.moodleCourseFullname, s),
         ),
       );
     }
@@ -655,28 +704,16 @@ export class AcademicGradesSearchService {
       enrolmentStatusAva: mat.enrolmentStatusAva,
       bloqueioLancamento: mat.bloqueioLancamento,
       notas: {
-        va1:
-          nota?.va1Nota !== null && nota?.va1Nota !== undefined
-            ? Number(nota.va1Nota)
-            : null,
+        va1: toCeilGrade(nota?.va1Nota),
         va1Raw: nota?.va1Raw || null,
         va1Status: (nota?.va1Status as any) || 'Pendente',
-        va2:
-          nota?.va2Nota !== null && nota?.va2Nota !== undefined
-            ? Number(nota.va2Nota)
-            : null,
+        va2: toCeilGrade(nota?.va2Nota),
         va2Raw: nota?.va2Raw || null,
         va2Status: (nota?.va2Status as any) || 'Pendente',
-        va3:
-          nota?.va3Nota !== null && nota?.va3Nota !== undefined
-            ? Number(nota.va3Nota)
-            : null,
+        va3: toCeilGrade(nota?.va3Nota),
         va3Raw: nota?.va3Raw || null,
         va3Status: (nota?.va3Status as any) || 'Pendente',
-        mediaFinal:
-          nota?.mediaFinalNota !== null && nota?.mediaFinalNota !== undefined
-            ? Number(nota.mediaFinalNota)
-            : null,
+        mediaFinal: toCeilGrade(nota?.mediaFinalNota),
         mediaRaw: nota?.mediaRaw || null,
         itensVa1: parseStoredItems(nota?.itensVa1),
         itensVa2: parseStoredItems(nota?.itensVa2),
@@ -742,22 +779,10 @@ export class AcademicGradesSearchService {
       periodo: turma.periodo,
       statusMatricula: mat.statusMatricula,
       bloqueioLancamento: mat.bloqueioLancamento,
-      va1:
-        nota?.va1Nota !== null && nota?.va1Nota !== undefined
-          ? Number(nota.va1Nota)
-          : null,
-      va2:
-        nota?.va2Nota !== null && nota?.va2Nota !== undefined
-          ? Number(nota.va2Nota)
-          : null,
-      va3:
-        nota?.va3Nota !== null && nota?.va3Nota !== undefined
-          ? Number(nota.va3Nota)
-          : null,
-      mediaFinal:
-        nota?.mediaFinalNota !== null && nota?.mediaFinalNota !== undefined
-          ? Number(nota.mediaFinalNota)
-          : null,
+      va1: toCeilGrade(nota?.va1Nota),
+      va2: toCeilGrade(nota?.va2Nota),
+      va3: toCeilGrade(nota?.va3Nota),
+      mediaFinal: toCeilGrade(nota?.mediaFinalNota),
       va1Status: nota?.va1Status || 'Pendente',
       va2Status: nota?.va2Status || 'Pendente',
       va3Status: nota?.va3Status || 'Pendente',
@@ -799,8 +824,11 @@ export class AcademicGradesSearchService {
       const s = `%${filters.search.trim()}%`;
       conditions.push(
         or(
+          ilike(academicOnlineTurmas.id, s),
+          ilike(academicOnlineTurmas.codTurma, s),
           ilike(academicOnlineTurmas.turma, s),
           ilike(academicOnlineTurmas.nomeDisciplina, s),
+          ilike(academicOnlineTurmas.moodleCourseFullname, s),
           ilike(academicOnlineMatriculas.nomeAluno, s),
           ilike(academicOnlineMatriculas.matricula, s),
         ),
@@ -809,8 +837,12 @@ export class AcademicGradesSearchService {
 
     const rows = await this.db
       .select({
+        turmaId: academicOnlineTurmas.id,
+        codTurma: academicOnlineTurmas.codTurma,
         turma: academicOnlineTurmas.turma,
         disciplina: academicOnlineTurmas.nomeDisciplina,
+        moodleCourseId: academicOnlineTurmas.moodleCourseId,
+        moodleCourseFullname: academicOnlineTurmas.moodleCourseFullname,
         periodo: academicOnlineTurmas.periodo,
         matricula: academicOnlineMatriculas.matricula,
         nomeAluno: academicOnlineMatriculas.nomeAluno,
