@@ -193,6 +193,7 @@ export function UserFormDialog({
                       id="password" 
                       name="password" 
                       type="password" 
+                      autoComplete="new-password"
                       placeholder="••••••••••••" 
                       required={mode === "create"} 
                       className="h-10 rounded-xl border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-green-dark focus:ring-2 focus:ring-green-500/20 transition-all shadow-xs"
@@ -270,6 +271,7 @@ export function UserFormDialog({
                             <Checkbox
                               id={`group-${g.id}`}
                               checked={isSelected}
+                              onClick={(e) => e.stopPropagation()}
                               onCheckedChange={() => toggleItem(g.id, selectedGroups, setSelectedGroups)}
                               className="data-[state=checked]:bg-navy data-[state=checked]:border-navy shrink-0"
                             />
@@ -320,6 +322,7 @@ export function UserFormDialog({
                             <Checkbox
                               id={`module-${m.id}`}
                               checked={isSelected}
+                              onClick={(e) => e.stopPropagation()}
                               onCheckedChange={() => toggleItem(m.id, selectedModules, setSelectedModules)}
                               className="data-[state=checked]:bg-green-dark data-[state=checked]:border-green-dark shrink-0"
                             />

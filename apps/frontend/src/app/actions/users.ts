@@ -49,17 +49,34 @@ export async function createUser(formData: FormData): Promise<ActionResult> {
 
 export async function updateUser(userId: string, formData: FormData): Promise<ActionResult> {
   try {
-    const name = formData.get("name") as string;
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const userid = formData.get("userid") as string;
+    const name = String(formData.get("name") ?? "").trim();
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "").trim();
+    const userid = String(formData.get("userid") ?? "").trim();
     const isActive = formData.get("isActive") === "on";
     const groupIds = formData.getAll("groupIds") as string[];
     const moduleIds = formData.getAll("moduleIds") as string[];
 
+    const payload: {
+      name: string;
+      email: string;
+      isActive: boolean;
+      groupIds: string[];
+      moduleIds: string[];
+      password?: string;
+      userid?: string;
+    } = { name, email, isActive, groupIds, moduleIds };
+
+    if (password) {
+      payload.password = password;
+    }
+    if (userid) {
+      payload.userid = userid;
+    }
+
     const res = await fetchFromApi(`/api/users/${userId}`, {
       method: 'PUT',
-      body: JSON.stringify({ name, email, password, userid, isActive, groupIds, moduleIds })
+      body: JSON.stringify(payload)
     });
     revalidatePath("/admin/users");
     return { success: true, data: res };
