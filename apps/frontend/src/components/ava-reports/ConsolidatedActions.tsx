@@ -4,7 +4,7 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, Download, CheckCircle2, Clock } from "lucide-react"
-import { exportConsolidatedAvaData } from "@/app/actions/ava-reports"
+import { exportConsolidatedAvaData, refreshAvaDataFromMoodle } from "@/app/actions/ava-reports"
 
 function formatTimePtBr(dateIso?: string | null) {
   if (!dateIso) return null
@@ -41,16 +41,30 @@ export function ConsolidatedActions({
 }) {
   const router = useRouter()
   const [isRefreshing, startTransition] = useTransition()
+  const [isFetchingAva, setIsFetchingAva] = useState(false)
   const [justRefreshed, setJustRefreshed] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const isBusy = isFetchingAva || isRefreshing
 
-  const handleRefreshData = () => {
+  const handleRefreshData = async () => {
     setJustRefreshed(false)
-    startTransition(() => {
-      router.refresh()
-      setJustRefreshed(true)
-      setTimeout(() => setJustRefreshed(false), 3000)
-    })
+    setIsFetchingAva(true)
+    try {
+      const res = await refreshAvaDataFromMoodle(institution)
+      if (!res?.success) {
+        alert(res?.error || "Não foi possível buscar os dados mais recentes no AVA.")
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar dados do AVA:", error)
+      alert("Erro ao buscar os dados mais recentes no AVA.")
+    } finally {
+      setIsFetchingAva(false)
+      startTransition(() => {
+        router.refresh()
+        setJustRefreshed(true)
+        setTimeout(() => setJustRefreshed(false), 3000)
+      })
+    }
   }
 
   const handleExport = async () => {
@@ -125,7 +139,8 @@ export function ConsolidatedActions({
           variant="outline" 
           size="sm" 
           onClick={handleRefreshData} 
-          disabled={isRefreshing}
+          disabled={isBusy}
+          title="Busca os dados mais recentes já disponíveis no AVA (sem disparar nova geração no Moodle)"
           className="text-navy border-navy/20 hover:bg-navy/5 font-semibold text-xs h-10 px-3 rounded-lg"
         >
           {justRefreshed ? (
@@ -135,8 +150,8 @@ export function ConsolidatedActions({
             </>
           ) : (
             <>
-              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
-              {isRefreshing ? "Atualizando..." : "Atualizar Dados"}
+              <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isBusy ? "animate-spin" : ""}`} />
+              {isBusy ? "Atualizando..." : "Atualizar Dados"}
             </>
           )}
         </Button>

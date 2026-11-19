@@ -573,6 +573,7 @@ export class AvaReportsService {
     user: SessionUser,
     institution?: string,
     type?: 'grades' | 'progress',
+    options?: { skipAttTrigger?: boolean },
   ) {
     await this.assertAvaAccess(user);
 
@@ -660,17 +661,18 @@ export class AvaReportsService {
 
       const results: any[] = [];
       for (const task of tasksToProcess) {
+        const attUrl = options?.skipAttTrigger ? undefined : task.att;
         const res =
           task.type === 'grades'
             ? await this.avaSyncService.syncGrades(
                 task.name,
                 task.get,
-                task.att,
+                attUrl,
               )
             : await this.avaSyncService.syncProgress(
                 task.name,
                 task.get,
-                task.att,
+                attUrl,
               );
         results.push(res);
       }

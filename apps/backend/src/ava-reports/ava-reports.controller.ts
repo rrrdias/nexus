@@ -58,6 +58,16 @@ export class AvaReportsController {
     };
   }
 
+  @Post('refresh')
+  async refreshFromAva(@Req() req: any, @Body() dto: SyncMoodleDto) {
+    return this.avaReportsService.syncMoodleData(
+      req.user,
+      dto.institution,
+      dto.type,
+      { skipAttTrigger: true },
+    );
+  }
+
   @Post('grades')
   async getGradesData(@Req() req: any, @Body() dto: ReportQueryDto) {
     return this.avaReportsService.getGradesData(
