@@ -203,6 +203,11 @@ export default async function DashboardPage() {
       redirect("/tutoria")
     }
 
+    // C2. Possui acesso apenas ao submódulo de Teologia -> Redirecionar para Teologia
+    if (allowedModules.some(m => m.slug === 'tutoria-teologia')) {
+      redirect("/tutoria/teologia")
+    }
+
     // D. Possui acesso a outros módulos (ex: backoffice) mas não ao AVA -> Mostrar página básica
     return (
       <DashboardSemVinculo 

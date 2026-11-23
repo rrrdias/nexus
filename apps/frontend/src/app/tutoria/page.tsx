@@ -21,12 +21,17 @@ export default async function TutoriaPage() {
   }
 
   const isSuperAdmin = !!(session.user as any)?.isSuperAdmin
+  let canAccessTeologia = isSuperAdmin
   if (!isSuperAdmin) {
     const modules = await getSidebarModules().catch(() => [])
     const hasAccess = modules.some(
       (m: any) => m.slug === "tutoria" || m.code === "tutoria" || m.name === "Tutoria"
     )
+    canAccessTeologia = modules.some((m: any) => m.slug === "tutoria-teologia")
     if (!hasAccess) {
+      if (canAccessTeologia) {
+        redirect("/tutoria/teologia")
+      }
       redirect("/")
     }
   }
@@ -40,7 +45,12 @@ export default async function TutoriaPage() {
 
   return (
     <div className="space-y-6">
-      <TutoriaDashboard sessionUser={safeSessionUser} />
+      <TutoriaDashboard
+        sessionUser={safeSessionUser}
+        variant="geral"
+        canAccessGeral={true}
+        canAccessTeologia={canAccessTeologia}
+      />
     </div>
   )
 }

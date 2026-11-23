@@ -72,7 +72,10 @@ export class MailService implements OnModuleInit {
         );
       }
     } catch (err: any) {
-      this.logger.error(`Falha ao instanciar transportador SMTP: ${err.message}`, err.stack);
+      this.logger.error(
+        `Falha ao instanciar transportador SMTP: ${err.message}`,
+        err.stack,
+      );
     }
   }
 
@@ -160,7 +163,11 @@ export class MailService implements OnModuleInit {
       configured.includes('127.0.0.1');
 
     let chosen = configured || 'http://localhost:3002';
-    if (isConfiguredLocalhost && originUrl && /^https?:\/\//i.test(originUrl.trim())) {
+    if (
+      isConfiguredLocalhost &&
+      originUrl &&
+      /^https?:\/\//i.test(originUrl.trim())
+    ) {
       chosen = originUrl.trim().replace(/\/+$/, '');
     }
 

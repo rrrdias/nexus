@@ -129,7 +129,10 @@ function baseLayout(title: string, contentHtml: string): string {
 /**
  * 1. Template de Recuperação de Senha
  */
-export function getPasswordResetTemplate(name: string, resetUrl: string): { subject: string; html: string; text: string } {
+export function getPasswordResetTemplate(
+  name: string,
+  resetUrl: string,
+): { subject: string; html: string; text: string } {
   const subject = 'Recuperação de Acesso — NexusHub';
   const firstName = name?.split(' ')[0] || 'Usuário';
 
@@ -152,7 +155,7 @@ export function getPasswordResetTemplate(name: string, resetUrl: string): { subj
         <strong>Importante:</strong> Este link é válido por <strong>1 hora</strong>. Se você não solicitou esta redefinição, nenhuma ação é necessária e sua senha permanecerá inalterada.
       </p>
     </div>
-    `
+    `,
   );
 
   const text = `Olá, ${firstName}!\n\nRecebemos uma solicitação para redefinir sua senha no NexusHub.\n\nAcesse o link abaixo para criar uma nova senha (válido por 1 hora):\n${resetUrl}\n\nSe você não solicitou, desconsidere este e-mail.\n\nSistemas TED - NexusHub`;
@@ -209,7 +212,7 @@ export function getWelcomeUserTemplate(
         ? `<p style="font-size: 13px; color: #64748b;">Recomendamos alterar sua senha no primeiro acesso à plataforma.</p>`
         : ''
     }
-    `
+    `,
   );
 
   const text = `Olá, ${name}!\n\nSeu acesso à plataforma NexusHub foi liberado.\nUsuário: ${login}\n${temporaryPassword ? `Senha inicial: ${temporaryPassword}\n` : ''}Acesse: ${accessUrl}\n\nSistemas TED - NexusHub`;
@@ -235,7 +238,9 @@ export interface SchedulingConfirmationParams {
   isReschedule?: boolean;
 }
 
-export function getSchedulingConfirmationTemplate(params: SchedulingConfirmationParams): {
+export function getSchedulingConfirmationTemplate(
+  params: SchedulingConfirmationParams,
+): {
   subject: string;
   html: string;
   text: string;
@@ -244,7 +249,9 @@ export function getSchedulingConfirmationTemplate(params: SchedulingConfirmation
     ? `Confirmação de Remarcação de Prova — Polo ${params.poloNome}`
     : `Confirmação de Agendamento de Prova — Polo ${params.poloNome}`;
   const firstName = params.studentName?.split(' ')[0] || 'Estudante';
-  const heading = params.isReschedule ? 'Remarcação Confirmada!' : 'Agendamento Confirmado!';
+  const heading = params.isReschedule
+    ? 'Remarcação Confirmada!'
+    : 'Agendamento Confirmado!';
   const introText = params.isReschedule
     ? 'Sua remarcação para a realização de provas presenciais foi registrada com sucesso no sistema institucional com os novos dados abaixo.'
     : 'Seu agendamento para a realização de provas presenciais foi registrado com sucesso no sistema institucional.';
@@ -364,7 +371,7 @@ export function getSchedulingConfirmationTemplate(params: SchedulingConfirmation
         • Em caso de dúvidas, procure a coordenação do seu polo de apoio.
       </p>
     </div>
-    `
+    `,
   );
 
   const text = `Olá, ${firstName}!\n\n${introText}\n\nMatrícula: ${params.matricula}\nPolo: ${params.poloNome}\n${params.poloEndereco ? `Endereço: ${params.poloEndereco}\n` : ''}${params.poloTelefone ? `Telefone: ${params.poloTelefone}\n` : ''}${params.linkLocal ? `Link do Polo: ${params.linkLocal}\n` : ''}Data: ${params.data}\nHorário: ${params.hora}\n${params.sala ? `Sala: ${params.sala}\n` : ''}\nCompareça com 20 minutos de antecedência portando documento com foto.\n\nSistemas TED - AEE`;
@@ -387,14 +394,19 @@ export interface TutoriaOrientationParams {
   linkAva?: string;
 }
 
-export function getTutoriaOrientationTemplate(params: TutoriaOrientationParams): {
+export function getTutoriaOrientationTemplate(
+  params: TutoriaOrientationParams,
+): {
   subject: string;
   html: string;
   text: string;
 } {
-  const finalDisciplina = params.disciplina || params.disciplinaNome || 'Sua Disciplina EaD';
-  const finalStudentName = params.studentName || params.alunoNome || 'Estudante';
-  const finalTutorName = params.tutorName || params.tutorNome || 'Tutor Pedagógico';
+  const finalDisciplina =
+    params.disciplina || params.disciplinaNome || 'Sua Disciplina EaD';
+  const finalStudentName =
+    params.studentName || params.alunoNome || 'Estudante';
+  const finalTutorName =
+    params.tutorName || params.tutorNome || 'Tutor Pedagógico';
   const subject = `Orientações de Estudos — ${finalDisciplina} | Tutoria EaD`;
   const firstName = finalStudentName?.split(' ')[0] || 'Estudante';
   const avaUrl = params.linkAva || 'https://avaead.unievangelica.edu.br';
@@ -421,7 +433,7 @@ export function getTutoriaOrientationTemplate(params: TutoriaOrientationParams):
       <strong>${finalTutorName}</strong><br>
       Equipe de Tutoria & Tecnologias Educacionais (TED)
     </p>
-    `
+    `,
   );
 
   const text = `Olá, ${firstName}!\n\nSou o seu tutor ${finalTutorName} na disciplina ${finalDisciplina}.\n\n${params.mensagem}\n\nAcesse o AVA: ${avaUrl}\n\nAtenciosamente,\n${finalTutorName} - Tutoria TED`;

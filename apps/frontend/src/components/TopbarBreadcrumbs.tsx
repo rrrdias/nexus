@@ -31,6 +31,9 @@ export function TopbarBreadcrumbs() {
       admin: "Administração",
       users: "Usuários",
       groups: "Grupos",
+      tutoria: "Tutoria",
+      kanban: "Atendimentos Kanban",
+      teologia: "Teologia",
     }
 
     return (

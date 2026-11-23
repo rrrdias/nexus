@@ -19,6 +19,12 @@ import {
   DEFAULT_PERIOD,
   getAcademicPhaseDates,
 } from "./academic-config"
+import {
+  getOnlineTurmasAction,
+  getTurmaGradesWithStudentsAction,
+  triggerSyncGradesMirrorAction,
+  exportAcademicGradesAction,
+} from "../app/actions/academic-grades"
 
 async function runCoreUtilsTests() {
   console.log("Starting tests for core-utils (course-utils, student-session, password, academic-config)...")
@@ -138,6 +144,67 @@ async function runCoreUtilsTests() {
     }
 
     console.log("✓ Test 4: academic-config period & phase dates passed")
+  }
+
+  // 5. academic-grades.ts Server Actions
+  {
+    const prevFetch = globalThis.fetch
+    const prevToken = process.env.TEST_AUTH_TOKEN
+    const prevUrl = process.env.NEXT_API_URL
+
+    process.env.TEST_AUTH_TOKEN = "mock-jwt-grades-test"
+    process.env.NEXT_API_URL = "http://127.0.0.1:3999"
+
+    const calls: { url: string; method: string; body: any }[] = []
+    let nextStatus = 200
+    let nextBody: any = { data: [], meta: { total: 0 } }
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString()
+      const method = init?.method || "GET"
+      const body = init?.body ? JSON.parse(init.body as string) : null
+      calls.push({ url, method, body })
+      return new Response(JSON.stringify(nextBody), { status: nextStatus })
+    }) as any
+
+    try {
+      nextStatus = 200
+      nextBody = { data: [{ id: "t1", turma: "DIR-ON-20262" }], meta: { total: 1 } }
+      const listRes = await getOnlineTurmasAction({ periodo: "2026-2", search: "DIR" })
+      assert.equal(listRes.success, true)
+      assert.match(calls[0].url, /\/api\/academic\/grades\/turmas\?periodo=2026-2&search=DIR$/)
+
+      nextBody = { turma: { id: "t1" }, alunos: [], meta: { total: 0 } }
+      const studentsRes = await getTurmaGradesWithStudentsAction("t1", {
+        statusMatricula: "suspenso",
+        statusNota: "pendente",
+      })
+      assert.equal(studentsRes.success, true)
+      assert.match(
+        calls[1].url,
+        /\/api\/academic\/grades\/turmas\/t1\/alunos\?statusMatricula=suspenso&statusNota=pendente$/,
+      )
+
+      nextBody = { status: "completed", mirror: { turmasEspelhadas: 2 } }
+      const syncRes = await triggerSyncGradesMirrorAction({ periodo: "2026-2", correlateAfter: true })
+      assert.equal(syncRes.success, true)
+      assert.equal(calls[2].method, "POST")
+      assert.deepEqual(calls[2].body, { periodo: "2026-2", correlateAfter: true })
+
+      nextStatus = 500
+      nextBody = { message: "Erro simulado no espelho" }
+      const errRes = await exportAcademicGradesAction({ periodo: "2026-2" })
+      assert.equal(errRes.success, false)
+      assert.match(errRes.error || "", /Erro simulado no espelho/)
+
+      console.log("✓ Test 5: academic-grades Server Actions (happy path & error resilience) passed")
+    } finally {
+      globalThis.fetch = prevFetch
+      if (prevToken === undefined) delete process.env.TEST_AUTH_TOKEN
+      else process.env.TEST_AUTH_TOKEN = prevToken
+      if (prevUrl === undefined) delete process.env.NEXT_API_URL
+      else process.env.NEXT_API_URL = prevUrl
+    }
   }
 
   console.log("\nAll core-utils tests passed successfully!")

@@ -68,6 +68,7 @@ async function processInChunks<T>(
 export class TutoriaSyncService {
   private readonly logger = new Logger(TutoriaSyncService.name);
   private isSyncing = false;
+  private hasEnsuredEngajamentoSchema = false;
   private lastSyncTime: Date | null = null;
   private lastSyncStatus: {
     status: 'idle' | 'running' | 'success' | 'failed';
@@ -291,7 +292,13 @@ export class TutoriaSyncService {
                 : null,
               updatedAt: new Date(),
             }))
-            .filter((r) => r.disciplinaId && r.alunoId && r.atividadeId);
+            .filter(
+              (r) =>
+                r.disciplinaId &&
+                r.alunoId &&
+                r.atividadeId &&
+                !this.isAvisosCourse(r.disciplinaCodigo, r.disciplinaNome),
+            );
 
           if (rowsToInsert.length === 0) return;
 
@@ -394,13 +401,94 @@ export class TutoriaSyncService {
     }
   }
 
+  private isAvisosCourse(codigo?: string | null, nome?: string | null): boolean {
+    const code = String(codigo || '').trim().toUpperCase();
+    const name = String(nome || '').trim().toLowerCase();
+    return code.startsWith('SM_AVISOS') || name.includes('sala de avisos');
+  }
+
+  async ensureEngajamentoSchema() {
+    if (this.hasEnsuredEngajamentoSchema) return;
+    try {
+      if (!this.db || typeof this.db.execute !== 'function') return;
+      await this.db.execute(sql`
+        ALTER TABLE tutoria_engajamento_aluno
+        ADD COLUMN IF NOT EXISTS enrolment_status text DEFAULT 'Ativo';
+        CREATE INDEX IF NOT EXISTS idx_tutoria_engaj_enrolment_status
+          ON tutoria_engajamento_aluno (enrolment_status);
+      `);
+      this.hasEnsuredEngajamentoSchema = true;
+    } catch (err: any) {
+      this.logger.warn(
+        `[TutoriaSyncService] Aviso ao garantir schema de engajamento: ${err?.message}`,
+      );
+    }
+  }
+
+  // Reconcilia o status real da matrícula (ava_progress_report como fonte primária, fallback ava_grades_report)
+  async syncEnrolmentStatuses(institution = 'ead', periodo?: string) {
+    if (!this.db || typeof this.db.execute !== 'function') return;
+    await this.ensureEngajamentoSchema();
+    const engPeriodoFilter = periodo ? sql`AND e.periodo = ${periodo}` : sql``;
+
+    await this.db.execute(sql`
+      UPDATE tutoria_engajamento_aluno e
+      SET enrolment_status = COALESCE(
+        (
+          SELECT p.enrolment_status
+          FROM ava_progress_report p
+          WHERE p."sourceInstitution" = e."sourceInstitution"
+            AND p.aluno_id = e.aluno_id
+            AND regexp_replace(p.curso, '[^a-zA-Z0-9]', '', 'g') = regexp_replace(e.disciplina_nome, '[^a-zA-Z0-9]', '', 'g')
+          ORDER BY p."updatedAt" DESC
+          LIMIT 1
+        ),
+        (
+          SELECT g.enrolment_status
+          FROM ava_grades_report g
+          WHERE g."sourceInstitution" = e."sourceInstitution"
+            AND g.user_id = e.aluno_id
+            AND g.course_id = e.disciplina_id
+          ORDER BY g."updatedAt" DESC
+          LIMIT 1
+        ),
+        'Ativo'
+      )
+      WHERE e."sourceInstitution" = ${institution}
+        ${engPeriodoFilter};
+    `);
+  }
+
   // Consolidação automática da tabela tutoria_engajamento_aluno
   async refreshEngagementSnapshot(institution = 'ead', periodo?: string) {
     this.logger.log(
       `🔄 [AGREGAÇÃO] Atualizando tabela de engajamento consolidado (${institution})...`,
     );
 
+    await this.ensureEngajamentoSchema();
+
+    const engPeriodoFilter = periodo ? sql`AND periodo = ${periodo}` : sql``;
     const periodoFilter = periodo ? sql`AND l.periodo = ${periodo}` : sql``;
+
+    // 0. Limpeza de Salas de Avisos legadas (ex.: SM_AVISOS_20261_EAD)
+    await this.db.execute(sql`
+      DELETE FROM tutoria_engajamento_aluno
+      WHERE "sourceInstitution" = ${institution}
+        ${engPeriodoFilter}
+        AND (
+          COALESCE(disciplina_codigo, '') ILIKE 'SM_AVISOS%'
+          OR COALESCE(disciplina_nome, '') ILIKE '%Sala de Avisos%'
+        );
+    `);
+    await this.db.execute(sql`
+      DELETE FROM tutoria_logs_atividades
+      WHERE "sourceInstitution" = ${institution}
+        ${engPeriodoFilter}
+        AND (
+          COALESCE(disciplina_codigo, '') ILIKE 'SM_AVISOS%'
+          OR COALESCE(disciplina_nome, '') ILIKE '%Sala de Avisos%'
+        );
+    `);
 
     await this.db.execute(sql`
       INSERT INTO tutoria_engajamento_aluno (
@@ -466,6 +554,8 @@ export class TutoriaSyncService {
       FROM tutoria_logs_atividades l
       WHERE l."sourceInstitution" = ${institution}
         ${periodoFilter}
+        AND COALESCE(l.disciplina_codigo, '') NOT ILIKE 'SM_AVISOS%'
+        AND COALESCE(l.disciplina_nome, '') NOT ILIKE '%Sala de Avisos%'
       GROUP BY
         l."sourceInstitution",
         l.periodo,
@@ -498,6 +588,92 @@ export class TutoriaSyncService {
         data_ultimo_login = EXCLUDED.data_ultimo_login,
         "updatedAt" = now();
     `);
+
+    const gradePeriodoFilter = periodo ? sql`AND g.periodo = ${periodo}` : sql``;
+
+    // 2. Garantir que disciplinas ativas sem nenhum acesso/clique no AVA também apareçam no acompanhamento (risco crítico / 0 acessos)
+    await this.db.execute(sql`
+      INSERT INTO tutoria_engajamento_aluno (
+        id,
+        "sourceInstitution",
+        periodo,
+        disciplina_id,
+        disciplina_codigo,
+        disciplina_nome,
+        aluno_id,
+        matricula,
+        aluno_nome,
+        aluno_email,
+        tempo_total_minutos,
+        tempo_fase1_minutos,
+        tempo_fase2_minutos,
+        tempo_fase3_minutos,
+        tempo_apresentacao_minutos,
+        tempo_outros_minutos,
+        total_cliques,
+        total_atividades_acessadas,
+        tempo_leitura_minutos,
+        tempo_avaliacoes_minutos,
+        grupo_risco_calculado,
+        score_engajamento,
+        data_ultimo_acesso,
+        data_ultimo_login,
+        "updatedAt"
+      )
+      SELECT
+        gen_random_uuid(),
+        g."sourceInstitution",
+        g.periodo,
+        g.course_id,
+        COALESCE(NULLIF(trim(g.course_shortname), ''), g.course_id),
+        COALESCE(NULLIF(trim(g.course_fullname), ''), NULLIF(trim(g.course_shortname), ''), g.course_id),
+        g.user_id,
+        g.user_identification,
+        g.student_name,
+        g.user_email,
+        '0.00',
+        '0.00',
+        '0.00',
+        '0.00',
+        '0.00',
+        '0.00',
+        0,
+        0,
+        '0.00',
+        '0.00',
+        'critico',
+        '0',
+        NULL,
+        (
+          SELECT MAX(l2.data_ultimo_login)
+          FROM tutoria_logs_atividades l2
+          WHERE l2."sourceInstitution" = g."sourceInstitution"
+            AND l2.aluno_id = g.user_id
+        ),
+        now()
+      FROM ava_grades_report g
+      WHERE g."sourceInstitution" = ${institution}
+        ${gradePeriodoFilter}
+        AND g.periodo IS NOT NULL AND trim(g.periodo) <> ''
+        AND g.course_id IS NOT NULL AND trim(g.course_id) <> ''
+        AND g.user_id IS NOT NULL AND trim(g.user_id) <> ''
+        AND g.user_identification IS NOT NULL AND trim(g.user_identification) <> ''
+        AND COALESCE(g.course_shortname, '') NOT ILIKE 'SM_AVISOS%'
+        AND COALESCE(g.course_fullname, '') NOT ILIKE '%Sala de Avisos%'
+        AND (
+          g.enrolment_status IS NULL
+          OR trim(g.enrolment_status) = ''
+          OR (
+            lower(g.enrolment_status) NOT LIKE '%cancel%'
+            AND lower(g.enrolment_status) NOT LIKE '%tranc%'
+            AND lower(g.enrolment_status) NOT LIKE '%deslig%'
+          )
+        )
+      ON CONFLICT ("sourceInstitution", periodo, disciplina_id, aluno_id) DO NOTHING;
+    `);
+
+    // 3. Reconciliar status real da matrícula (ava_progress_report -> fallback ava_grades_report)
+    await this.syncEnrolmentStatuses(institution, periodo);
 
     this.logger.log(
       `✅ [AGREGAÇÃO] Tabela de engajamento consolidado atualizada.`,

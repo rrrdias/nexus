@@ -15,6 +15,19 @@ export async function syncMoodleData(institution?: string, type?: 'grades' | 'pr
   }
 }
 
+export async function refreshAvaDataFromMoodle(institution?: string, type?: 'grades' | 'progress') {
+  try {
+    const data = await fetchFromApi('/api/ava-reports/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ institution, type })
+    });
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("[refreshAvaDataFromMoodle Action Error]:", error);
+    return { success: false, error: error.message || 'Falha ao buscar dados no AVA' };
+  }
+}
+
 export async function getConsolidatedAvaData(page: number, size: number, filters: any) {
   try {
     return await fetchFromApi('/api/ava-reports/consolidated', {

@@ -27,6 +27,9 @@ export default async function TutoriaKanbanPage() {
       (m: any) => m.slug === "tutoria" || m.code === "tutoria" || m.name === "Tutoria"
     )
     if (!hasAccess) {
+      if (modules.some((m: any) => m.slug === "tutoria-teologia")) {
+        redirect("/tutoria/teologia")
+      }
       redirect("/")
     }
   }

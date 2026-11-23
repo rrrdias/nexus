@@ -18,6 +18,7 @@ import { UpdateKanbanCardDto } from './dto/update-kanban-card.dto';
 import { CreateIntervencaoDto } from './dto/create-intervencao.dto';
 import { TransferirTutorDto } from './dto/transferir-tutor.dto';
 import { SendTutoriaEmailDto } from './dto/send-tutoria-email.dto';
+import { AddGrupoAlunosDto } from './dto/manage-grupo-alunos.dto';
 import { MailService } from '../mail/mail.service';
 
 export {
@@ -28,12 +29,15 @@ export {
   CreateIntervencaoDto,
   TransferirTutorDto,
   SendTutoriaEmailDto,
+  AddGrupoAlunosDto,
 };
 
 @Injectable()
 export class TutoriaService implements OnModuleInit {
   private hasEnsuredKanbanTable = false;
   private hasEnsuredTimelineTable = false;
+  private hasEnsuredEngajamentoColumns = false;
+  private hasEnsuredTeologiaGrupoSchema = false;
   private tutorInfoCache = new Map<
     string,
     { name: string; email: string | null; timestamp: number }
@@ -89,6 +93,106 @@ export class TutoriaService implements OnModuleInit {
   async onModuleInit() {
     await this.ensureKanbanTable();
     await this.ensureTimelineTable();
+    await this.ensureEngajamentoColumns();
+    await this.ensureTeologiaGrupoSchema();
+  }
+
+  async ensureTeologiaGrupoSchema() {
+    if (this.hasEnsuredTeologiaGrupoSchema) return;
+    try {
+      if (!this.db || typeof this.db.execute !== 'function') {
+        return;
+      }
+
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS tutoria_grupos (
+          id text PRIMARY KEY DEFAULT gen_random_uuid(),
+          slug text NOT NULL UNIQUE,
+          nome text NOT NULL,
+          descricao text,
+          ativo boolean DEFAULT true NOT NULL,
+          created_at timestamp with time zone DEFAULT now() NOT NULL,
+          updated_at timestamp with time zone DEFAULT now() NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS tutoria_grupo_alunos (
+          id text PRIMARY KEY DEFAULT gen_random_uuid(),
+          grupo_id text NOT NULL REFERENCES tutoria_grupos(id) ON DELETE CASCADE,
+          "sourceInstitution" text DEFAULT 'ead' NOT NULL,
+          matricula text NOT NULL,
+          adicionado_por_id text REFERENCES "user"(id) ON DELETE SET NULL,
+          observacoes text,
+          created_at timestamp with time zone DEFAULT now() NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS unq_tutoria_grupo_alunos
+          ON tutoria_grupo_alunos (grupo_id, "sourceInstitution", matricula);
+        CREATE INDEX IF NOT EXISTS idx_tutoria_grupo_alunos_grupo
+          ON tutoria_grupo_alunos (grupo_id);
+        CREATE INDEX IF NOT EXISTS idx_tutoria_grupo_alunos_mat
+          ON tutoria_grupo_alunos (matricula);
+        CREATE INDEX IF NOT EXISTS idx_tutoria_grupo_alunos_inst_mat
+          ON tutoria_grupo_alunos ("sourceInstitution", matricula);
+
+        INSERT INTO tutoria_grupos (id, slug, nome, descricao, ativo)
+        VALUES (
+          gen_random_uuid()::text,
+          'teologia',
+          'Teologia',
+          'Submódulo de acompanhamento específico de alunos de Teologia',
+          true
+        )
+        ON CONFLICT (slug) DO NOTHING;
+
+        INSERT INTO system_module (id, name, slug, description, "pathUrl", "iconClass", "isActive")
+        SELECT
+          gen_random_uuid()::text,
+          'Tutoria - Teologia',
+          'tutoria-teologia',
+          'Acesso restrito ao submódulo de Acompanhamento de Teologia (apenas diagnóstico AVA).',
+          '/tutoria/teologia',
+          'BookOpen',
+          true
+        WHERE NOT EXISTS (
+          SELECT 1 FROM system_module WHERE slug = 'tutoria-teologia'
+        );
+
+        INSERT INTO group_system_access ("groupId", "systemModuleId")
+        SELECT g.id, sm.id
+        FROM "group" g
+        CROSS JOIN system_module sm
+        WHERE g.name = 'Super Admin' AND sm.slug = 'tutoria-teologia'
+        ON CONFLICT DO NOTHING;
+      `);
+
+      this.hasEnsuredTeologiaGrupoSchema = true;
+    } catch (err: any) {
+      console.warn(
+        '[TutoriaService] Erro ao garantir schema do grupo de Teologia:',
+        err?.message,
+      );
+    }
+  }
+
+  async ensureEngajamentoColumns() {
+    if (this.hasEnsuredEngajamentoColumns) return;
+    try {
+      if (!this.db || typeof this.db.execute !== 'function') {
+        return;
+      }
+
+      await this.db.execute(sql`
+        ALTER TABLE tutoria_engajamento_aluno
+        ADD COLUMN IF NOT EXISTS enrolment_status text DEFAULT 'Ativo';
+      `);
+
+      this.hasEnsuredEngajamentoColumns = true;
+    } catch (err: any) {
+      console.warn(
+        '[TutoriaService] Erro ao garantir colunas em tutoria_engajamento_aluno:',
+        err?.message,
+      );
+    }
   }
 
   // Garante que a tabela e todas as colunas necessárias existam no banco de dados
@@ -248,7 +352,9 @@ export class TutoriaService implements OnModuleInit {
         ROUND(AVG(COALESCE(score_engajamento::numeric, 0)), 1)::float AS media_score_engajamento
       FROM tutoria_engajamento_aluno
       WHERE "sourceInstitution" = ${institution}
-        AND periodo = ${periodo};
+        AND periodo = ${periodo}
+        AND COALESCE(disciplina_codigo, '') NOT ILIKE 'SM_AVISOS%'
+        AND COALESCE(disciplina_nome, '') NOT ILIKE '%Sala de Avisos%';
     `);
 
     const summary = res[0] || {
@@ -271,7 +377,9 @@ export class TutoriaService implements OnModuleInit {
 
   // Helper para montagem unificada de filtros de engajamento
   private buildEngagementConditions(filters: EngagementFilterDto) {
-    const conditions: any[] = [];
+    const conditions: any[] = [
+      sql`(COALESCE(e.disciplina_codigo, '') NOT ILIKE 'SM_AVISOS%' AND COALESCE(e.disciplina_nome, '') NOT ILIKE '%Sala de Avisos%')`,
+    ];
     if (filters.periodo) {
       conditions.push(sql`e.periodo = ${filters.periodo}`);
     } else {
@@ -333,6 +441,46 @@ export class TutoriaService implements OnModuleInit {
       }
     }
 
+    if (filters.enrolmentStatus && filters.enrolmentStatus !== 'todos') {
+      if (filters.enrolmentStatus === 'ativo') {
+        conditions.push(
+          sql`(e.enrolment_status IS NULL OR lower(e.enrolment_status) LIKE '%ativ%' OR lower(e.enrolment_status) LIKE '%matriculad%')`,
+        );
+      } else if (filters.enrolmentStatus === 'suspenso') {
+        conditions.push(
+          sql`(lower(COALESCE(e.enrolment_status, '')) LIKE '%suspens%' OR lower(COALESCE(e.enrolment_status, '')) LIKE '%tranc%' OR lower(COALESCE(e.enrolment_status, '')) LIKE '%inativ%')`,
+        );
+      } else if (filters.enrolmentStatus === 'cancelado') {
+        conditions.push(
+          sql`(lower(COALESCE(e.enrolment_status, '')) LIKE '%cancel%' OR lower(COALESCE(e.enrolment_status, '')) LIKE '%deslig%')`,
+        );
+      }
+    }
+
+    if (filters.teologiaFilter && filters.teologiaFilter !== 'todos') {
+      if (filters.teologiaFilter === 'in') {
+        conditions.push(sql`EXISTS (
+          SELECT 1
+          FROM tutoria_grupo_alunos tga
+          INNER JOIN tutoria_grupos tg ON tg.id = tga.grupo_id
+          WHERE tg.slug = 'teologia'
+            AND tg.ativo = true
+            AND tga.matricula = e.matricula
+            AND tga."sourceInstitution" = e."sourceInstitution"
+        )`);
+      } else if (filters.teologiaFilter === 'out') {
+        conditions.push(sql`NOT EXISTS (
+          SELECT 1
+          FROM tutoria_grupo_alunos tga
+          INNER JOIN tutoria_grupos tg ON tg.id = tga.grupo_id
+          WHERE tg.slug = 'teologia'
+            AND tg.ativo = true
+            AND tga.matricula = e.matricula
+            AND tga."sourceInstitution" = e."sourceInstitution"
+        )`);
+      }
+    }
+
     if (filters.search) {
       const term = `%${filters.search}%`;
       conditions.push(
@@ -346,6 +494,8 @@ export class TutoriaService implements OnModuleInit {
   // 2. Lista paginada de engajamento dos alunos com filtros avançados
   async getEngagementList(filters: EngagementFilterDto) {
     await this.ensureKanbanTable();
+    await this.ensureEngajamentoColumns();
+    await this.ensureTeologiaGrupoSchema();
 
     const page = Math.max(1, Number(filters.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(filters.limit) || 20));
@@ -377,6 +527,16 @@ export class TutoriaService implements OnModuleInit {
           e.matricula,
           e.aluno_nome,
           e.aluno_email,
+          COALESCE(e.enrolment_status, 'Ativo') AS enrolment_status,
+          EXISTS (
+            SELECT 1
+            FROM tutoria_grupo_alunos tga
+            INNER JOIN tutoria_grupos tg ON tg.id = tga.grupo_id
+            WHERE tg.slug = 'teologia'
+              AND tg.ativo = true
+              AND tga.matricula = e.matricula
+              AND tga."sourceInstitution" = e."sourceInstitution"
+          ) AS in_teologia_group,
           e.tempo_total_minutos,
           e.tempo_fase1_minutos,
           e.tempo_fase2_minutos,
@@ -441,7 +601,10 @@ export class TutoriaService implements OnModuleInit {
               disciplina_codigo,
               disciplina_nome
             FROM tutoria_engajamento_aluno
-            WHERE "sourceInstitution" = ${institution} AND periodo = ${periodo}
+            WHERE "sourceInstitution" = ${institution}
+              AND periodo = ${periodo}
+              AND COALESCE(disciplina_codigo, '') NOT ILIKE 'SM_AVISOS%'
+              AND COALESCE(disciplina_nome, '') NOT ILIKE '%Sala de Avisos%'
             ORDER BY disciplina_nome ASC;
           `);
         },
@@ -455,93 +618,183 @@ export class TutoriaService implements OnModuleInit {
         disciplina_codigo,
         disciplina_nome
       FROM tutoria_engajamento_aluno
-      WHERE "sourceInstitution" = ${institution} AND periodo = ${periodo}
+      WHERE "sourceInstitution" = ${institution}
+        AND periodo = ${periodo}
+        AND COALESCE(disciplina_codigo, '') NOT ILIKE 'SM_AVISOS%'
+        AND COALESCE(disciplina_nome, '') NOT ILIKE '%Sala de Avisos%'
       ORDER BY disciplina_nome ASC;
     `);
   }
 
   // 2.2. Exportação completa dos dados filtrados para Excel/CSV
   async getExportData(filters: EngagementFilterDto) {
+    await this.ensureKanbanTable();
+    await this.ensureEngajamentoColumns();
+    await this.ensureTeologiaGrupoSchema();
+
     const conditions = this.buildEngagementConditions(filters);
     const whereClause = sql.join(conditions, sql` AND `);
 
     return this.db.execute(sql`
       SELECT
-        id,
-        "sourceInstitution",
-        periodo,
-        disciplina_id,
-        disciplina_codigo,
-        disciplina_nome,
-        aluno_id,
-        matricula,
-        aluno_nome,
-        aluno_email,
-        tempo_total_minutos,
-        tempo_fase1_minutos,
-        tempo_fase2_minutos,
-        tempo_fase3_minutos,
-        tempo_apresentacao_minutos,
-        total_cliques,
-        total_atividades_acessadas,
-        tempo_leitura_minutos,
-        tempo_avaliacoes_minutos,
-        grupo_risco_calculado,
-        score_engajamento,
-        data_ultimo_acesso,
-        data_ultimo_login,
-        "updatedAt"
-      FROM tutoria_engajamento_aluno
+        e.id,
+        e."sourceInstitution",
+        e.periodo,
+        e.disciplina_id,
+        e.disciplina_codigo,
+        e.disciplina_nome,
+        e.aluno_id,
+        e.matricula,
+        e.aluno_nome,
+        e.aluno_email,
+        COALESCE(e.enrolment_status, 'Ativo') AS enrolment_status,
+        EXISTS (
+          SELECT 1
+          FROM tutoria_grupo_alunos tga
+          INNER JOIN tutoria_grupos tg ON tg.id = tga.grupo_id
+          WHERE tg.slug = 'teologia'
+            AND tg.ativo = true
+            AND tga.matricula = e.matricula
+            AND tga."sourceInstitution" = e."sourceInstitution"
+        ) AS in_teologia_group,
+        e.tempo_total_minutos,
+        e.tempo_fase1_minutos,
+        e.tempo_fase2_minutos,
+        e.tempo_fase3_minutos,
+        e.tempo_apresentacao_minutos,
+        e.total_cliques,
+        e.total_atividades_acessadas,
+        e.tempo_leitura_minutos,
+        e.tempo_avaliacoes_minutos,
+        e.grupo_risco_calculado,
+        e.score_engajamento,
+        e.data_ultimo_acesso,
+        e.data_ultimo_login,
+        e."updatedAt",
+        k.status_kanban
+      FROM tutoria_engajamento_aluno e
+      LEFT JOIN tutoria_atendimentos_kanban k
+        ON k.matricula = e.matricula
+        AND k.periodo = e.periodo
+        AND k."sourceInstitution" = e."sourceInstitution"
+        AND (k.disciplina_codigo = e.disciplina_codigo OR k.disciplina_codigo IS NULL)
       WHERE ${whereClause}
       ORDER BY
-        CASE WHEN grupo_risco_calculado = 'critico' THEN 1
-             WHEN grupo_risco_calculado = 'atencao' THEN 2
+        CASE WHEN e.grupo_risco_calculado = 'critico' THEN 1
+             WHEN e.grupo_risco_calculado = 'atencao' THEN 2
              ELSE 3 END ASC,
-        COALESCE(tempo_total_minutos::numeric, 0) ASC
+        COALESCE(e.tempo_total_minutos::numeric, 0) ASC
       LIMIT 5000;
     `);
   }
 
-  // 3. Raio-X detalhado de atividades do aluno + contato discente + cartão kanban
-  async getStudentActivityLogs(matricula: string, disciplinaId?: string) {
-    const conditions = [sql`l.matricula = ${matricula}`];
+  // Consulta o catálogo completo de conteúdos/atividades da disciplina com LEFT JOIN nos acessos do aluno
+  async queryStudentActivityLogsWithCatalog(
+    matricula: string,
+    disciplinaId?: string,
+    institution = 'ead',
+  ): Promise<any[]> {
+    const cleanMat = String(matricula || '').trim();
+    if (!cleanMat) return [];
+    const inst = (institution || 'ead').trim().toLowerCase();
+
     if (disciplinaId) {
-      conditions.push(sql`l.disciplina_id = ${disciplinaId}`);
-    }
-
-    const whereClause = sql.join(conditions, sql` AND `);
-
-    const [logs, discenteRows, kanbanRows] = await Promise.all([
-      this.db.execute(sql`
+      return (await this.db.execute(sql`
+        WITH course_activities AS (
+          SELECT DISTINCT ON (c.disciplina_id, c.atividade_id)
+            c.periodo,
+            c.disciplina_id,
+            c.disciplina_codigo,
+            c.disciplina_nome,
+            c.unidade_tematica_nome,
+            c.atividade_id,
+            c.tipo_modulo,
+            c.conteudo_nome
+          FROM tutoria_logs_atividades c
+          WHERE c."sourceInstitution" = ${inst}
+            AND c.disciplina_id = ${disciplinaId}
+          ORDER BY c.disciplina_id, c.atividade_id, c."updatedAt" DESC
+        )
         SELECT
-          l.id,
-          l.periodo,
-          l.disciplina_id,
-          l.disciplina_codigo,
-          l.disciplina_nome,
-          l.unidade_tematica_nome,
-          l.atividade_id,
-          l.tipo_modulo,
-          l.conteudo_nome,
-          l.qtd_cliques_acessos,
-          l.tempo_conteudo_minutos,
+          COALESCE(l.id, 'catalog-' || ca.disciplina_id || '-' || ca.atividade_id) AS id,
+          COALESCE(l.periodo, ca.periodo) AS periodo,
+          ca.disciplina_id,
+          COALESCE(l.disciplina_codigo, ca.disciplina_codigo) AS disciplina_codigo,
+          COALESCE(l.disciplina_nome, ca.disciplina_nome) AS disciplina_nome,
+          COALESCE(l.unidade_tematica_nome, ca.unidade_tematica_nome) AS unidade_tematica_nome,
+          ca.atividade_id,
+          COALESCE(l.tipo_modulo, ca.tipo_modulo) AS tipo_modulo,
+          COALESCE(l.conteudo_nome, ca.conteudo_nome) AS conteudo_nome,
+          COALESCE(l.qtd_cliques_acessos, 0)::int AS qtd_cliques_acessos,
+          COALESCE(l.tempo_conteudo_minutos, '0') AS tempo_conteudo_minutos,
           l.data_primeiro_acesso_conteudo,
           l.data_ultimo_acesso_conteudo,
           l.data_ultimo_acesso_disciplina,
           l.data_ultimo_login,
           l."updatedAt"
-        FROM tutoria_logs_atividades l
-        WHERE ${whereClause}
+        FROM course_activities ca
+        LEFT JOIN tutoria_logs_atividades l
+          ON l."sourceInstitution" = ${inst}
+          AND l.disciplina_id = ca.disciplina_id
+          AND l.atividade_id = ca.atividade_id
+          AND upper(l.matricula) = upper(${cleanMat})
         ORDER BY
-          CASE 
-            WHEN l.unidade_tematica_nome ILIKE 'Fase 1%' THEN 1
-            WHEN l.unidade_tematica_nome ILIKE 'Fase 2%' THEN 2
-            WHEN l.unidade_tematica_nome ILIKE 'Fase 3%' THEN 3
-            WHEN l.unidade_tematica_nome ILIKE '%Apresenta%' THEN 0
+          CASE
+            WHEN COALESCE(l.unidade_tematica_nome, ca.unidade_tematica_nome) ILIKE '%Apresenta%' THEN 0
+            WHEN COALESCE(l.unidade_tematica_nome, ca.unidade_tematica_nome) ILIKE 'Fase 1%' THEN 1
+            WHEN COALESCE(l.unidade_tematica_nome, ca.unidade_tematica_nome) ILIKE 'Fase 2%' THEN 2
+            WHEN COALESCE(l.unidade_tematica_nome, ca.unidade_tematica_nome) ILIKE 'Fase 3%' THEN 3
             ELSE 4
           END ASC,
-          COALESCE(l.tempo_conteudo_minutos::numeric, 0) DESC;
-      `),
+          NULLIF(regexp_replace(ca.atividade_id, '[^0-9]', '', 'g'), '')::bigint ASC NULLS LAST;
+      `)) as any[];
+    }
+
+    return (await this.db.execute(sql`
+      SELECT
+        l.id,
+        l.periodo,
+        l.disciplina_id,
+        l.disciplina_codigo,
+        l.disciplina_nome,
+        l.unidade_tematica_nome,
+        l.atividade_id,
+        l.tipo_modulo,
+        l.conteudo_nome,
+        l.qtd_cliques_acessos,
+        l.tempo_conteudo_minutos,
+        l.data_primeiro_acesso_conteudo,
+        l.data_ultimo_acesso_conteudo,
+        l.data_ultimo_acesso_disciplina,
+        l.data_ultimo_login,
+        l."updatedAt"
+      FROM tutoria_logs_atividades l
+      WHERE upper(l.matricula) = upper(${cleanMat})
+        AND l."sourceInstitution" = ${inst}
+      ORDER BY
+        CASE
+          WHEN l.unidade_tematica_nome ILIKE '%Apresenta%' THEN 0
+          WHEN l.unidade_tematica_nome ILIKE 'Fase 1%' THEN 1
+          WHEN l.unidade_tematica_nome ILIKE 'Fase 2%' THEN 2
+          WHEN l.unidade_tematica_nome ILIKE 'Fase 3%' THEN 3
+          ELSE 4
+        END ASC,
+        COALESCE(l.tempo_conteudo_minutos::numeric, 0) DESC;
+    `)) as any[];
+  }
+
+  // 3. Raio-X detalhado de atividades do aluno + contato discente + cartão kanban
+  async getStudentActivityLogs(
+    matricula: string,
+    disciplinaId?: string,
+    institution = 'ead',
+  ) {
+    const [logs, discenteRows, kanbanRows] = await Promise.all([
+      this.queryStudentActivityLogsWithCatalog(
+        matricula,
+        disciplinaId,
+        institution,
+      ),
       this.db
         .execute(
           sql`
@@ -615,11 +868,14 @@ export class TutoriaService implements OnModuleInit {
           tempo_total_minutos,
           aluno_nome,
           aluno_email,
-          data_ultimo_acesso
+          data_ultimo_acesso,
+          COALESCE(enrolment_status, 'Ativo') AS enrolment_status
         FROM tutoria_engajamento_aluno
         WHERE matricula = ${cleanMatricula}
           AND "sourceInstitution" = ${institution}
           AND periodo = ${periodo}
+          AND COALESCE(disciplina_codigo, '') NOT ILIKE 'SM_AVISOS%'
+          AND COALESCE(disciplina_nome, '') NOT ILIKE '%Sala de Avisos%'
         ORDER BY 
           CASE 
             WHEN grupo_risco_calculado = 'critico' THEN 1
@@ -649,6 +905,7 @@ export class TutoriaService implements OnModuleInit {
       grupoRisco: r.grupo_risco_calculado as string,
       tempoMinutos: r.tempo_total_minutos,
       ultimoAcesso: r.data_ultimo_acesso as string,
+      enrolmentStatus: (r.enrolment_status as string) || 'Ativo',
     }));
 
     const found = !!(nome || disciplinas.length > 0);
@@ -1605,13 +1862,16 @@ export class TutoriaService implements OnModuleInit {
     // Disparar e-mail via MailService se configurado
     let mailResult: any = { success: true, messageId: 'simulated-mail-id' };
     if (this.mailService) {
-      mailResult = await this.mailService.sendTutoriaOrientation(dto.alunoEmail.trim(), {
-        alunoNome: dto.alunoNome || 'Estudante',
-        tutorNome,
-        disciplinaNome: dto.disciplinaNome || 'Sua Disciplina EAD',
-        mensagem: dto.mensagem.trim(),
-        periodo: dto.periodo || '2026-2',
-      });
+      mailResult = await this.mailService.sendTutoriaOrientation(
+        dto.alunoEmail.trim(),
+        {
+          alunoNome: dto.alunoNome || 'Estudante',
+          tutorNome,
+          disciplinaNome: dto.disciplinaNome || 'Sua Disciplina EAD',
+          mensagem: dto.mensagem.trim(),
+          periodo: dto.periodo || '2026-2',
+        },
+      );
 
       if (!mailResult.success) {
         throw new BadRequestException(
@@ -1686,7 +1946,150 @@ export class TutoriaService implements OnModuleInit {
       messageId: mailResult.messageId,
       eventoId: eventId,
       cardId: card?.id || null,
-      message: 'E-mail pedagógico enviado com sucesso e registrado na linha do tempo.',
+      message:
+        'E-mail pedagógico enviado com sucesso e registrado na linha do tempo.',
+    };
+  }
+
+  // Gestão administrativa de grupos de acompanhamento (ex.: Teologia)
+  private async findActiveGrupoBySlug(slug: string) {
+    await this.ensureTeologiaGrupoSchema();
+    const cleanSlug = (slug || '').trim().toLowerCase();
+    if (!cleanSlug) {
+      throw new BadRequestException('Identificador do grupo é obrigatório.');
+    }
+
+    const rows = (await this.db.execute(sql`
+      SELECT id, slug, nome, ativo
+      FROM tutoria_grupos
+      WHERE slug = ${cleanSlug}
+        AND ativo = true
+      LIMIT 1;
+    `)) as any[];
+
+    if (!rows || rows.length === 0) {
+      throw new NotFoundException(`Grupo "${cleanSlug}" não encontrado ou inativo.`);
+    }
+
+    return rows[0];
+  }
+
+  async listGrupoAlunos(slug: string, institution = 'ead') {
+    const grupo = await this.findActiveGrupoBySlug(slug);
+    const inst = (institution || 'ead').trim().toLowerCase();
+
+    return this.db.execute(sql`
+      SELECT
+        tga.id,
+        tga.matricula,
+        tga."sourceInstitution",
+        tga.observacoes,
+        tga.created_at AS "createdAt",
+        tga.adicionado_por_id AS "adicionadoPorId",
+        u.name AS "adicionadoPorNome"
+      FROM tutoria_grupo_alunos tga
+      LEFT JOIN "user" u ON u.id = tga.adicionado_por_id
+      WHERE tga.grupo_id = ${grupo.id}
+        AND tga."sourceInstitution" = ${inst}
+      ORDER BY tga.created_at DESC;
+    `);
+  }
+
+  async addAlunosToGrupo(
+    slug: string,
+    dto: AddGrupoAlunosDto,
+    actorUserId?: string,
+  ) {
+    const grupo = await this.findActiveGrupoBySlug(slug);
+    const inst = (dto.institution || 'ead').trim().toLowerCase();
+
+    const uniqueMatriculas = Array.from(
+      new Set(
+        (dto.matriculas || [])
+          .map((m) => String(m || '').trim())
+          .filter((m) => m.length > 0),
+      ),
+    );
+
+    if (uniqueMatriculas.length === 0) {
+      throw new BadRequestException(
+        'Informe ao menos uma matrícula válida para adicionar ao grupo.',
+      );
+    }
+
+    const obs = dto.observacoes ? String(dto.observacoes).trim() : null;
+
+    const valueTuples = uniqueMatriculas.map(
+      (mat) =>
+        sql`(gen_random_uuid()::text, ${grupo.id}, ${inst}, ${mat}, ${actorUserId || null}, ${obs}, now())`,
+    );
+
+    const inserted = (await this.db.execute(sql`
+      INSERT INTO tutoria_grupo_alunos (
+        id,
+        grupo_id,
+        "sourceInstitution",
+        matricula,
+        adicionado_por_id,
+        observacoes,
+        created_at
+      )
+      VALUES ${sql.join(valueTuples, sql`, `)}
+      ON CONFLICT (grupo_id, "sourceInstitution", matricula) DO NOTHING
+      RETURNING matricula;
+    `)) as any[];
+
+    if (this.cacheService) {
+      await Promise.all([
+        this.cacheService.delByPattern('tutoria:*'),
+      ]).catch(() => {});
+    }
+
+    const addedMatriculas = (inserted || []).map((r: any) => String(r.matricula));
+    const addedCount = addedMatriculas.length;
+    const skippedCount = uniqueMatriculas.length - addedCount;
+
+    return {
+      success: true,
+      grupo: grupo.slug,
+      addedCount,
+      skippedCount,
+      matriculas: uniqueMatriculas,
+      addedMatriculas,
+    };
+  }
+
+  async removeAlunoFromGrupo(
+    slug: string,
+    matricula: string,
+    institution = 'ead',
+  ) {
+    const grupo = await this.findActiveGrupoBySlug(slug);
+    const cleanMat = String(matricula || '').trim();
+    if (!cleanMat) {
+      throw new BadRequestException('Matrícula é obrigatória.');
+    }
+    const inst = (institution || 'ead').trim().toLowerCase();
+
+    const deleted = (await this.db.execute(sql`
+      DELETE FROM tutoria_grupo_alunos
+      WHERE grupo_id = ${grupo.id}
+        AND "sourceInstitution" = ${inst}
+        AND matricula = ${cleanMat}
+      RETURNING matricula;
+    `)) as any[];
+
+    if (this.cacheService) {
+      await Promise.all([
+        this.cacheService.delByPattern('tutoria:*'),
+      ]).catch(() => {});
+    }
+
+    return {
+      success: true,
+      grupo: grupo.slug,
+      removed: (deleted || []).length > 0,
+      matricula: cleanMat,
     };
   }
 }

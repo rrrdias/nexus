@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   index,
   integer,
+  numeric,
 } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 
@@ -40,7 +41,10 @@ export const passwordResetTokens = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     email: text('email').notNull(),
     token: text('token').unique().notNull(),
-    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    expiresAt: timestamp('expires_at', {
+      withTimezone: true,
+      mode: 'date',
+    }).notNull(),
     usedAt: timestamp('used_at', { withTimezone: true, mode: 'date' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
       .defaultNow()
@@ -710,6 +714,7 @@ export const tutoriaEngajamentoAluno = pgTable(
     matricula: text('matricula'),
     alunoNome: text('aluno_nome'),
     alunoEmail: text('aluno_email'),
+    enrolmentStatus: text('enrolment_status').default('Ativo'),
 
     // Métricas calculadas
     tempoTotalMinutos: text('tempo_total_minutos').default('0'),
@@ -744,6 +749,7 @@ export const tutoriaEngajamentoAluno = pgTable(
     index('idx_tutoria_engaj_inst_periodo').on(t.sourceInstitution, t.periodo),
     index('idx_tutoria_engaj_mat').on(t.matricula),
     index('idx_tutoria_engaj_disc_cod').on(t.disciplinaCodigo),
+    index('idx_tutoria_engaj_enrolment_status').on(t.enrolmentStatus),
     index('idx_tutoria_engaj_grupo_risco').on(t.grupoRiscoCalculado),
     index('idx_tutoria_engaj_aluno_trgm').using(
       'gin',
@@ -955,6 +961,73 @@ export type TutoriaAtendimentoKanban =
 export type NewTutoriaAtendimentoKanban =
   typeof tutoriaAtendimentosKanban.$inferInsert;
 
+export const tutoriaGrupos = pgTable('tutoria_grupos', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  slug: text('slug').notNull().unique(),
+  nome: text('nome').notNull(),
+  descricao: text('descricao'),
+  ativo: boolean('ativo').default(true).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+});
+
+export const tutoriaGrupoAlunos = pgTable(
+  'tutoria_grupo_alunos',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    grupoId: text('grupo_id')
+      .notNull()
+      .references(() => tutoriaGrupos.id, { onDelete: 'cascade' }),
+    sourceInstitution: text('sourceInstitution').default('ead').notNull(),
+    matricula: text('matricula').notNull(),
+    adicionadoPorId: text('adicionado_por_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    observacoes: text('observacoes'),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('unq_tutoria_grupo_alunos').on(
+      t.grupoId,
+      t.sourceInstitution,
+      t.matricula,
+    ),
+    index('idx_tutoria_grupo_alunos_grupo').on(t.grupoId),
+    index('idx_tutoria_grupo_alunos_mat').on(t.matricula),
+    index('idx_tutoria_grupo_alunos_inst_mat').on(
+      t.sourceInstitution,
+      t.matricula,
+    ),
+  ],
+);
+
+export const tutoriaGruposRelations = relations(tutoriaGrupos, ({ many }) => ({
+  alunos: many(tutoriaGrupoAlunos),
+}));
+
+export const tutoriaGrupoAlunosRelations = relations(
+  tutoriaGrupoAlunos,
+  ({ one }) => ({
+    grupo: one(tutoriaGrupos, {
+      fields: [tutoriaGrupoAlunos.grupoId],
+      references: [tutoriaGrupos.id],
+    }),
+    adicionadoPor: one(users, {
+      fields: [tutoriaGrupoAlunos.adicionadoPorId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export type TutoriaGrupo = typeof tutoriaGrupos.$inferSelect;
+export type NewTutoriaGrupo = typeof tutoriaGrupos.$inferInsert;
+export type TutoriaGrupoAluno = typeof tutoriaGrupoAlunos.$inferSelect;
+export type NewTutoriaGrupoAluno = typeof tutoriaGrupoAlunos.$inferInsert;
+
 export type TutoriaTipoEvento =
   | 'abertura'
   | 'mudanca_status'
@@ -970,3 +1043,217 @@ export type TutoriaCanalContato =
   | 'telefone'
   | 'ava'
   | 'outro';
+
+// ============================================================================
+// SUBMÓDULO: ACADEMIC GRADES (ESPELHAMENTO DE NOTAS E TURMAS 100% ONLINE)
+// ============================================================================
+
+export const academicOnlineTurmas = pgTable(
+  'academic_online_turma',
+  {
+    id: text('id').primaryKey(), // ID original da turma no Lyceum (VW_AVA_TURMA.ID)
+    turma: text('turma').notNull(), // Código da turma, ex: 'S01020114-INT-B20262'
+    codTurma: text('cod_turma'),
+    disciplina: text('disciplina').notNull(), // Código da disciplina, ex: '095440037'
+    nomeDisciplina: text('nome_disciplina').notNull(),
+    codDisciplina: text('cod_disciplina'),
+    curso: text('curso'),
+    cursoNome: text('curso_nome'),
+    cursoInstituicao: text('curso_instituicao'),
+    periodo: text('periodo').notNull(), // Ex: '2026/2'
+    modelagem: text('modelagem').notNull().default('DISCIPLINA 100% ONLINE'),
+    sourceInstitution: text('sourceInstitution').notNull().default('ead'),
+    moodleCourseId: text('moodle_course_id'),
+    moodleCourseFullname: text('moodle_course_fullname'),
+
+    // Contadores agregados para renderização de dashboard sem count() síncrono
+    totalAlunos: integer('total_alunos').notNull().default(0),
+    totalMatriculados: integer('total_matriculados').notNull().default(0),
+    totalSuspensos: integer('total_suspensos').notNull().default(0),
+    totalCancelados: integer('total_cancelados').notNull().default(0),
+
+    syncedAt: timestamp('synced_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_ac_online_turma_periodo').on(t.periodo),
+    index('idx_ac_online_turma_inst').on(t.sourceInstitution),
+    index('idx_ac_online_turma_disc').on(t.disciplina),
+    index('idx_ac_online_turma_codigo').on(t.turma),
+    index('idx_ac_online_turma_nome_trgm').using(
+      'gin',
+      t.nomeDisciplina.op('gin_trgm_ops'),
+    ),
+    index('idx_ac_online_turma_cod_trgm').using(
+      'gin',
+      t.turma.op('gin_trgm_ops'),
+    ),
+  ],
+);
+
+export const academicOnlineMatriculas = pgTable(
+  'academic_online_matricula',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    turmaId: text('turma_id')
+      .notNull()
+      .references(() => academicOnlineTurmas.id, { onDelete: 'cascade' }),
+    usuarioId: text('usuario_id').notNull(), // ID discente no Lyceum (VW_AVA_DISCENTE.ID)
+    matricula: text('matricula').notNull(), // Número de matrícula institucional
+    nomeAluno: text('nome_aluno').notNull(),
+    emailAluno: text('email_aluno'),
+    cpfAluno: text('cpf_aluno'),
+    periodo: text('periodo').notNull(),
+
+    // Status original Lyceum
+    situacaoLyceum: text('situacao_lyceum'), // Ex: 'Matriculado', 'Suspenso', 'Cancelado', 'Trancado'
+    ativoLyceum: text('ativo_lyceum'), // 'S' ou 'N'
+
+    // Status normalizado para o submódulo
+    statusMatricula: text('status_matricula').notNull(), // 'matriculado' | 'suspenso' | 'cancelado'
+    enrolmentStatusAva: text('enrolment_status_ava'), // Status espelhado do Moodle
+
+    // Regra de segurança institucional
+    bloqueioLancamento: boolean('bloqueio_lancamento').notNull().default(false),
+
+    syncedAt: timestamp('synced_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('unq_ac_online_mat_turma_aluno').on(t.turmaId, t.matricula),
+    index('idx_ac_online_mat_turma').on(t.turmaId),
+    index('idx_ac_online_mat_matricula').on(t.matricula),
+    index('idx_ac_online_mat_usuario').on(t.usuarioId),
+    index('idx_ac_online_mat_status').on(t.statusMatricula),
+    index('idx_ac_online_mat_bloqueio').on(t.bloqueioLancamento),
+    index('idx_ac_online_mat_aluno_trgm').using(
+      'gin',
+      t.nomeAluno.op('gin_trgm_ops'),
+    ),
+    index('idx_ac_online_mat_mat_trgm').using(
+      'gin',
+      t.matricula.op('gin_trgm_ops'),
+    ),
+  ],
+);
+
+export const academicOnlineNotas = pgTable(
+  'academic_online_nota',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    turmaId: text('turma_id')
+      .notNull()
+      .references(() => academicOnlineTurmas.id, { onDelete: 'cascade' }),
+    matriculaId: text('matricula_id')
+      .notNull()
+      .references(() => academicOnlineMatriculas.id, { onDelete: 'cascade' }),
+    matricula: text('matricula').notNull(),
+    sourceInstitution: text('sourceInstitution').notNull().default('ead'),
+    moodleCourseId: text('moodle_course_id'),
+    moodleUserId: text('moodle_user_id'),
+
+    // Notas textuais brutas do AVA (para preservação de histórico e auditoria)
+    va1Raw: text('va1_raw'),
+    va2Raw: text('va2_raw'),
+    va3Raw: text('va3_raw'),
+    mediaRaw: text('media_raw'),
+
+    // Notas normalizadas na escala 0 a 100 (arredondadas para cima)
+    va1Nota: numeric('va1_nota', { precision: 5, scale: 2 }),
+    va2Nota: numeric('va2_nota', { precision: 5, scale: 2 }),
+    va3Nota: numeric('va3_nota', { precision: 5, scale: 2 }),
+    mediaFinalNota: numeric('media_final_nota', { precision: 5, scale: 2 }),
+
+    // Status individual de cada fase avaliativa
+    va1Status: text('va1_status').notNull().default('Pendente'), // 'Pendente' | 'Lançada'
+    va2Status: text('va2_status').notNull().default('Pendente'),
+    va3Status: text('va3_status').notNull().default('Pendente'),
+
+    // Detalhamento de atividades individuais (parseadas de lista_notas)
+    itensVa1: text('itens_va1'),
+    itensVa2: text('itens_va2'),
+    itensVa3: text('itens_va3'),
+    rawListaNotas: text('raw_lista_notas'),
+
+    // Status de integração
+    statusConsolidacao: text('status_consolidacao')
+      .notNull()
+      .default('pendente'), // 'sincronizado' | 'pendente' | 'divergente'
+    divergenciaMotivo: text('divergencia_motivo'),
+
+    lastAvaSyncAt: timestamp('last_ava_sync_at', { mode: 'date' }),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('unq_ac_online_nota_turma_mat').on(t.turmaId, t.matricula),
+    unique('unq_ac_online_nota_mat_id').on(t.matriculaId),
+    index('idx_ac_online_nota_turma').on(t.turmaId),
+    index('idx_ac_online_nota_mat').on(t.matricula),
+    index('idx_ac_online_nota_mat_id').on(t.matriculaId),
+    index('idx_ac_online_nota_status_cons').on(t.statusConsolidacao),
+    index('idx_ac_online_nota_fase_status').on(
+      t.va1Status,
+      t.va2Status,
+      t.va3Status,
+    ),
+  ],
+);
+
+export const academicOnlineTurmasRelations = relations(
+  academicOnlineTurmas,
+  ({ many }) => ({
+    matriculas: many(academicOnlineMatriculas),
+    notas: many(academicOnlineNotas),
+  }),
+);
+
+export const academicOnlineMatriculasRelations = relations(
+  academicOnlineMatriculas,
+  ({ one }) => ({
+    turma: one(academicOnlineTurmas, {
+      fields: [academicOnlineMatriculas.turmaId],
+      references: [academicOnlineTurmas.id],
+    }),
+    nota: one(academicOnlineNotas),
+  }),
+);
+
+export const academicOnlineNotasRelations = relations(
+  academicOnlineNotas,
+  ({ one }) => ({
+    turma: one(academicOnlineTurmas, {
+      fields: [academicOnlineNotas.turmaId],
+      references: [academicOnlineTurmas.id],
+    }),
+    matricula: one(academicOnlineMatriculas, {
+      fields: [academicOnlineNotas.matriculaId],
+      references: [academicOnlineMatriculas.id],
+    }),
+  }),
+);
+
+export type AcademicOnlineStatusMatricula =
+  | 'matriculado'
+  | 'suspenso'
+  | 'cancelado';
+export type AcademicOnlineStatusNota = 'Pendente' | 'Lançada';
+export type AcademicOnlineStatusConsolidacao =
+  | 'sincronizado'
+  | 'pendente'
+  | 'divergente';
+
+export type AcademicOnlineTurma = typeof academicOnlineTurmas.$inferSelect;
+export type AcademicOnlineTurmaInsert =
+  typeof academicOnlineTurmas.$inferInsert;
+
+export type AcademicOnlineMatricula =
+  typeof academicOnlineMatriculas.$inferSelect;
+export type AcademicOnlineMatriculaInsert =
+  typeof academicOnlineMatriculas.$inferInsert;
+
+export type AcademicOnlineNota = typeof academicOnlineNotas.$inferSelect;
+export type AcademicOnlineNotaInsert = typeof academicOnlineNotas.$inferInsert;

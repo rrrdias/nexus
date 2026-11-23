@@ -14,7 +14,8 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Bookmark,
-  RefreshCw
+  RefreshCw,
+  Award
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,8 +24,9 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getStudents, getStudentDisciplines, getTeachers, getTeacherDisciplines, getClasses, getMatriculas, syncAcademicData } from "@/app/actions/academic"
 import { getJobStatus } from "@/app/actions/jobs"
+import { AcademicGradesClient } from "./notas/AcademicGradesClient"
 
-type TabType = "discentes" | "docentes" | "turmas" | "matriculas"
+type TabType = "discentes" | "docentes" | "turmas" | "matriculas" | "notas-online"
 
 export function AcademicDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>("discentes")
@@ -55,6 +57,7 @@ export function AcademicDashboard() {
 
   // Fetch data dynamically on tab or query change
   const fetchData = useCallback(async () => {
+    if (activeTab === "notas-online") return
     setLoading(true)
     try {
       let res: any
@@ -393,8 +396,22 @@ export function AcademicDashboard() {
         >
           <FileSpreadsheet className="w-4 h-4" /> Matrículas (Vínculos)
         </button>
+        <button
+          onClick={() => { setActiveTab("notas-online"); setSearch(""); setPage(1); setHasSearched(false); setListData([]); }}
+          className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 focus:outline-none shrink-0 ${
+            activeTab === "notas-online"
+              ? "border-[#5E35B1] text-[#5E35B1]"
+              : "border-transparent text-[#5F6775] hover:text-navy hover:border-gray-300"
+          }`}
+        >
+          <Award className="w-4 h-4" /> Notas 100% Online (AVA)
+        </button>
       </div>
 
+      {activeTab === "notas-online" ? (
+        <AcademicGradesClient embedded />
+      ) : (
+        <>
       {/* Filter and Search Card */}
       <Card className="bg-white border-gray-200 shadow-sm overflow-hidden">
         <CardContent className="p-5">
@@ -699,6 +716,8 @@ export function AcademicDashboard() {
           </div>
         )}
       </Card>
+        </>
+      )}
 
       {/* --- PREMIUM SLIDE-OVER DRAWER FOR LINKED DISCIPLINES --- */}
       <div className={`fixed inset-0 z-50 flex justify-end transition-opacity duration-300 ease-in-out ${
