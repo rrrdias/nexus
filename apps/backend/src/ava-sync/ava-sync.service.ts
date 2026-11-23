@@ -398,6 +398,38 @@ export class AvaSyncService implements OnModuleInit {
         `[AvaSyncService] Snapshot consolidado atualizado com sucesso em ${Date.now() - t0}ms.`,
       );
 
+      if (institution && typeof this.db?.execute === 'function') {
+        try {
+          await this.db.execute(sql`
+            UPDATE tutoria_engajamento_aluno e
+            SET enrolment_status = COALESCE(
+              (
+                SELECT p.enrolment_status
+                FROM ava_progress_report p
+                WHERE p."sourceInstitution" = e."sourceInstitution"
+                  AND p.aluno_id = e.aluno_id
+                  AND regexp_replace(p.curso, '[^a-zA-Z0-9]', '', 'g') = regexp_replace(e.disciplina_nome, '[^a-zA-Z0-9]', '', 'g')
+                ORDER BY p."updatedAt" DESC
+                LIMIT 1
+              ),
+              (
+                SELECT g.enrolment_status
+                FROM ava_grades_report g
+                WHERE g."sourceInstitution" = e."sourceInstitution"
+                  AND g.user_id = e.aluno_id
+                  AND g.course_id = e.disciplina_id
+                ORDER BY g."updatedAt" DESC
+                LIMIT 1
+              ),
+              'Ativo'
+            )
+            WHERE e."sourceInstitution" = ${institution};
+          `);
+        } catch {
+          // Ignora silenciosamente se a coluna/tabela da tutoria ainda não existir no ambiente
+        }
+      }
+
       if (this.cacheService) {
         await Promise.all([
           this.cacheService.delByPattern('ava:dropdowns:*'),
@@ -733,7 +765,7 @@ export class AvaSyncService implements OnModuleInit {
           UPDATE ava_grades_report
           SET enrolment_status = 'Cancelado'
           WHERE "sourceInstitution" = ${institution}
-            AND "updatedAt" < ${syncStartTime}
+            AND "updatedAt" < ${syncStartTime.toISOString()}::timestamp
             AND (
               enrolment_status IS NULL
               OR enrolment_status = ''
@@ -1045,7 +1077,7 @@ export class AvaSyncService implements OnModuleInit {
           UPDATE ava_progress_report
           SET enrolment_status = 'Cancelado'
           WHERE "sourceInstitution" = ${institution}
-            AND "updatedAt" < ${syncStartTime}
+            AND "updatedAt" < ${syncStartTime.toISOString()}::timestamp
             AND (
               enrolment_status IS NULL
               OR enrolment_status = ''

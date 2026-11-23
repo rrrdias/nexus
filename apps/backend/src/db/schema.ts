@@ -714,6 +714,7 @@ export const tutoriaEngajamentoAluno = pgTable(
     matricula: text('matricula'),
     alunoNome: text('aluno_nome'),
     alunoEmail: text('aluno_email'),
+    enrolmentStatus: text('enrolment_status').default('Ativo'),
 
     // Métricas calculadas
     tempoTotalMinutos: text('tempo_total_minutos').default('0'),
@@ -748,6 +749,7 @@ export const tutoriaEngajamentoAluno = pgTable(
     index('idx_tutoria_engaj_inst_periodo').on(t.sourceInstitution, t.periodo),
     index('idx_tutoria_engaj_mat').on(t.matricula),
     index('idx_tutoria_engaj_disc_cod').on(t.disciplinaCodigo),
+    index('idx_tutoria_engaj_enrolment_status').on(t.enrolmentStatus),
     index('idx_tutoria_engaj_grupo_risco').on(t.grupoRiscoCalculado),
     index('idx_tutoria_engaj_aluno_trgm').using(
       'gin',
@@ -958,6 +960,73 @@ export type TutoriaAtendimentoKanban =
   typeof tutoriaAtendimentosKanban.$inferSelect;
 export type NewTutoriaAtendimentoKanban =
   typeof tutoriaAtendimentosKanban.$inferInsert;
+
+export const tutoriaGrupos = pgTable('tutoria_grupos', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  slug: text('slug').notNull().unique(),
+  nome: text('nome').notNull(),
+  descricao: text('descricao'),
+  ativo: boolean('ativo').default(true).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+});
+
+export const tutoriaGrupoAlunos = pgTable(
+  'tutoria_grupo_alunos',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    grupoId: text('grupo_id')
+      .notNull()
+      .references(() => tutoriaGrupos.id, { onDelete: 'cascade' }),
+    sourceInstitution: text('sourceInstitution').default('ead').notNull(),
+    matricula: text('matricula').notNull(),
+    adicionadoPorId: text('adicionado_por_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    observacoes: text('observacoes'),
+    createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique('unq_tutoria_grupo_alunos').on(
+      t.grupoId,
+      t.sourceInstitution,
+      t.matricula,
+    ),
+    index('idx_tutoria_grupo_alunos_grupo').on(t.grupoId),
+    index('idx_tutoria_grupo_alunos_mat').on(t.matricula),
+    index('idx_tutoria_grupo_alunos_inst_mat').on(
+      t.sourceInstitution,
+      t.matricula,
+    ),
+  ],
+);
+
+export const tutoriaGruposRelations = relations(tutoriaGrupos, ({ many }) => ({
+  alunos: many(tutoriaGrupoAlunos),
+}));
+
+export const tutoriaGrupoAlunosRelations = relations(
+  tutoriaGrupoAlunos,
+  ({ one }) => ({
+    grupo: one(tutoriaGrupos, {
+      fields: [tutoriaGrupoAlunos.grupoId],
+      references: [tutoriaGrupos.id],
+    }),
+    adicionadoPor: one(users, {
+      fields: [tutoriaGrupoAlunos.adicionadoPorId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export type TutoriaGrupo = typeof tutoriaGrupos.$inferSelect;
+export type NewTutoriaGrupo = typeof tutoriaGrupos.$inferInsert;
+export type TutoriaGrupoAluno = typeof tutoriaGrupoAlunos.$inferSelect;
+export type NewTutoriaGrupoAluno = typeof tutoriaGrupoAlunos.$inferInsert;
 
 export type TutoriaTipoEvento =
   | 'abertura'

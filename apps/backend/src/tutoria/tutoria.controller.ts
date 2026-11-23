@@ -19,6 +19,7 @@ import { UpdateKanbanCardDto } from './dto/update-kanban-card.dto';
 import { CreateIntervencaoDto } from './dto/create-intervencao.dto';
 import { TransferirTutorDto } from './dto/transferir-tutor.dto';
 import { SendTutoriaEmailDto } from './dto/send-tutoria-email.dto';
+import { AddGrupoAlunosDto } from './dto/manage-grupo-alunos.dto';
 import { RequireModule, RequireAdmin } from '../auth/rbac.decorators';
 
 @RequireModule('tutoria')
@@ -62,8 +63,13 @@ export class TutoriaController {
   async getStudentLogs(
     @Param('matricula') matricula: string,
     @Query('disciplinaId') disciplinaId?: string,
+    @Query('institution') institution?: string,
   ) {
-    return this.tutoriaService.getStudentActivityLogs(matricula, disciplinaId);
+    return this.tutoriaService.getStudentActivityLogs(
+      matricula,
+      disciplinaId,
+      institution || 'ead',
+    );
   }
 
   @Get('aluno/:matricula/lookup')
@@ -182,5 +188,39 @@ export class TutoriaController {
     @Req() req: any,
   ): Promise<any> {
     return this.tutoriaService.enviarEmailPedagogico(dto, req.user);
+  }
+
+  @RequireAdmin()
+  @Get('grupos/:slug/alunos')
+  async listGrupoAlunos(
+    @Param('slug') slug: string,
+    @Query('institution') institution?: string,
+  ): Promise<any> {
+    return this.tutoriaService.listGrupoAlunos(slug, institution || 'ead');
+  }
+
+  @RequireAdmin()
+  @Post('grupos/:slug/alunos')
+  @HttpCode(HttpStatus.OK)
+  async addAlunosToGrupo(
+    @Param('slug') slug: string,
+    @Body() dto: AddGrupoAlunosDto,
+    @Req() req: any,
+  ): Promise<any> {
+    return this.tutoriaService.addAlunosToGrupo(slug, dto, req.user?.id);
+  }
+
+  @RequireAdmin()
+  @Delete('grupos/:slug/alunos/:matricula')
+  async removeAlunoFromGrupo(
+    @Param('slug') slug: string,
+    @Param('matricula') matricula: string,
+    @Query('institution') institution?: string,
+  ): Promise<any> {
+    return this.tutoriaService.removeAlunoFromGrupo(
+      slug,
+      matricula,
+      institution || 'ead',
+    );
   }
 }

@@ -11,8 +11,30 @@ export interface TutoriaEngagementFilters {
   faixaTempo?: string
   recenciaAcesso?: 'todos' | 'mais_7_dias' | 'mais_14_dias' | 'mais_30_dias' | 'sem_acesso'
   statusKanban?: string
+  enrolmentStatus?: 'todos' | 'ativo' | 'suspenso' | 'cancelado'
+  teologiaFilter?: 'todos' | 'in' | 'out'
   page?: number
   limit?: number
+}
+
+export interface TeologiaEngagementFilters {
+  periodo?: string
+  institution?: string
+  disciplinaId?: string
+  disciplinaCodigo?: string
+  grupoRisco?: 'critico' | 'atencao' | 'procrastinacao' | 'autonomo'
+  search?: string
+  faixaTempo?: string
+  recenciaAcesso?: 'todos' | 'mais_7_dias' | 'mais_14_dias' | 'mais_30_dias' | 'sem_acesso'
+  enrolmentStatus?: 'todos' | 'ativo' | 'suspenso' | 'cancelado'
+  page?: number
+  limit?: number
+}
+
+export interface TeologiaStudentGrades {
+  fase1: string | null
+  fase2: string | null
+  fase3: string | null
 }
 
 export async function getTutoriaDashboardSummary(periodo = '2026-2', institution = 'ead') {
@@ -46,6 +68,8 @@ export async function getTutoriaEngagementList(filters: TutoriaEngagementFilters
     if (filters.faixaTempo && filters.faixaTempo !== 'todos') query.set('faixaTempo', filters.faixaTempo)
     if (filters.recenciaAcesso && filters.recenciaAcesso !== 'todos') query.set('recenciaAcesso', filters.recenciaAcesso)
     if (filters.statusKanban && filters.statusKanban !== 'todos') query.set('statusKanban', filters.statusKanban)
+    if (filters.enrolmentStatus && filters.enrolmentStatus !== 'todos') query.set('enrolmentStatus', filters.enrolmentStatus)
+    if (filters.teologiaFilter && filters.teologiaFilter !== 'todos') query.set('teologiaFilter', filters.teologiaFilter)
     if (filters.page) query.set('page', String(filters.page))
     if (filters.limit) query.set('limit', String(filters.limit))
 
@@ -88,6 +112,8 @@ export async function getTutoriaExportData(filters: TutoriaEngagementFilters) {
     if (filters.faixaTempo && filters.faixaTempo !== 'todos') query.set('faixaTempo', filters.faixaTempo)
     if (filters.recenciaAcesso && filters.recenciaAcesso !== 'todos') query.set('recenciaAcesso', filters.recenciaAcesso)
     if (filters.statusKanban && filters.statusKanban !== 'todos') query.set('statusKanban', filters.statusKanban)
+    if (filters.enrolmentStatus && filters.enrolmentStatus !== 'todos') query.set('enrolmentStatus', filters.enrolmentStatus)
+    if (filters.teologiaFilter && filters.teologiaFilter !== 'todos') query.set('teologiaFilter', filters.teologiaFilter)
 
     return await fetchFromApi(`/api/tutoria/exportar?${query.toString()}`, {
       method: 'GET',
@@ -571,5 +597,182 @@ export async function sendTutoriaEmailAction(payload: SendTutoriaEmailPayload) {
       success: false,
       error: err?.message || 'Falha ao enviar e-mail da tutoria.',
     }
+  }
+}
+
+export async function getTutoriaTeologiaSummary(periodo = '2026-2', institution = 'ead') {
+  try {
+    return await fetchFromApi(`/api/tutoria/teologia/summary?periodo=${encodeURIComponent(periodo)}&institution=${encodeURIComponent(institution)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    })
+  } catch (err: any) {
+    console.error("[getTutoriaTeologiaSummary] Erro:", err?.message)
+    return {
+      success: false,
+      error: err?.message,
+      total_alunos_disciplinas: 0,
+      total_alunos_unicos: 0,
+      total_disciplinas: 0,
+      total_critico: 0,
+      total_atencao: 0,
+      total_autonomo: 0,
+      media_tempo_minutos: 0,
+      media_score_engajamento: 0,
+    }
+  }
+}
+
+export async function getTutoriaTeologiaEngagementList(filters: TeologiaEngagementFilters) {
+  try {
+    const query = new URLSearchParams()
+    if (filters.periodo) query.set('periodo', filters.periodo)
+    if (filters.institution) query.set('institution', filters.institution)
+    if (filters.disciplinaId) query.set('disciplinaId', filters.disciplinaId)
+    if (filters.disciplinaCodigo) query.set('disciplinaCodigo', filters.disciplinaCodigo)
+    if (filters.grupoRisco) query.set('grupoRisco', filters.grupoRisco)
+    if (filters.search) query.set('search', filters.search)
+    if (filters.faixaTempo && filters.faixaTempo !== 'todos') query.set('faixaTempo', filters.faixaTempo)
+    if (filters.recenciaAcesso && filters.recenciaAcesso !== 'todos') query.set('recenciaAcesso', filters.recenciaAcesso)
+    if (filters.enrolmentStatus && filters.enrolmentStatus !== 'todos') query.set('enrolmentStatus', filters.enrolmentStatus)
+    if (filters.page) query.set('page', String(filters.page))
+    if (filters.limit) query.set('limit', String(filters.limit))
+
+    return await fetchFromApi(`/api/tutoria/teologia/engajamento?${query.toString()}`, {
+      method: 'GET',
+      cache: 'no-store',
+    })
+  } catch (err: any) {
+    console.error("[getTutoriaTeologiaEngagementList] Erro:", err?.message)
+    return {
+      success: false,
+      error: err?.message,
+      data: [],
+      pagination: { total: 0, page: 1, limit: 15, totalPages: 1 },
+    }
+  }
+}
+
+export async function getTutoriaTeologiaDisciplinas(periodo = '2026-2', institution = 'ead') {
+  try {
+    const res = await fetchFromApi(`/api/tutoria/teologia/disciplinas?periodo=${encodeURIComponent(periodo)}&institution=${encodeURIComponent(institution)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    })
+    return { success: true, data: Array.isArray(res) ? res : res?.data || [] }
+  } catch (err: any) {
+    console.error("[getTutoriaTeologiaDisciplinas] Erro:", err?.message)
+    return { success: false, data: [], error: err?.message }
+  }
+}
+
+export async function getTutoriaTeologiaExportData(filters: TeologiaEngagementFilters) {
+  try {
+    const query = new URLSearchParams()
+    if (filters.periodo) query.set('periodo', filters.periodo)
+    if (filters.institution) query.set('institution', filters.institution)
+    if (filters.disciplinaId) query.set('disciplinaId', filters.disciplinaId)
+    if (filters.disciplinaCodigo) query.set('disciplinaCodigo', filters.disciplinaCodigo)
+    if (filters.grupoRisco) query.set('grupoRisco', filters.grupoRisco)
+    if (filters.search) query.set('search', filters.search)
+    if (filters.faixaTempo && filters.faixaTempo !== 'todos') query.set('faixaTempo', filters.faixaTempo)
+    if (filters.recenciaAcesso && filters.recenciaAcesso !== 'todos') query.set('recenciaAcesso', filters.recenciaAcesso)
+    if (filters.enrolmentStatus && filters.enrolmentStatus !== 'todos') query.set('enrolmentStatus', filters.enrolmentStatus)
+
+    return await fetchFromApi(`/api/tutoria/teologia/exportar?${query.toString()}`, {
+      method: 'GET',
+      cache: 'no-store',
+    })
+  } catch (err: any) {
+    console.error("[getTutoriaTeologiaExportData] Erro:", err?.message)
+    return []
+  }
+}
+
+export async function getTutoriaTeologiaStudentLogs(
+  matricula: string,
+  disciplinaId?: string,
+  institution = 'ead',
+) {
+  try {
+    const query = new URLSearchParams({ institution })
+    if (disciplinaId) query.set('disciplinaId', disciplinaId)
+    return await fetchFromApi<{
+      logs: any[]
+      discente: any | null
+      grades: TeologiaStudentGrades | null
+      error?: string
+    }>(`/api/tutoria/teologia/aluno/${encodeURIComponent(matricula.trim())}/logs?${query.toString()}`, {
+      method: 'GET',
+      cache: 'no-store',
+    })
+  } catch (err: any) {
+    console.error("[getTutoriaTeologiaStudentLogs] Erro:", err?.message)
+    return { logs: [], discente: null, grades: null, error: err?.message }
+  }
+}
+
+export async function getTutoriaGrupoAlunos(slug: string, institution = 'ead') {
+  try {
+    const res = await fetchFromApi(
+      `/api/tutoria/grupos/${encodeURIComponent(slug.trim())}/alunos?institution=${encodeURIComponent(institution)}`,
+      { method: 'GET', cache: 'no-store' },
+    )
+    return { success: true, data: Array.isArray(res) ? res : res?.data || [] }
+  } catch (err: any) {
+    console.error("[getTutoriaGrupoAlunos] Erro:", err?.message)
+    return { success: false, data: [], error: err?.message }
+  }
+}
+
+export interface ManageGrupoAlunosResult {
+  success: boolean
+  grupo?: string
+  addedCount?: number
+  skippedCount?: number
+  matriculas?: string[]
+  addedMatriculas?: string[]
+  removed?: boolean
+  matricula?: string
+  error?: string
+}
+
+export async function addAlunosToTutoriaGrupo(
+  slug: string,
+  matriculas: string[],
+  observacoes?: string,
+  institution = 'ead',
+): Promise<ManageGrupoAlunosResult> {
+  try {
+    return await fetchFromApi<ManageGrupoAlunosResult>(
+      `/api/tutoria/grupos/${encodeURIComponent(slug.trim())}/alunos`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ matriculas, observacoes, institution }),
+        cache: 'no-store',
+      },
+    )
+  } catch (err: any) {
+    console.error("[addAlunosToTutoriaGrupo] Erro:", err?.message)
+    return { success: false, error: err?.message || "Erro ao adicionar alunos ao grupo." }
+  }
+}
+
+export async function removeAlunoFromTutoriaGrupo(
+  slug: string,
+  matricula: string,
+  institution = 'ead',
+): Promise<ManageGrupoAlunosResult> {
+  try {
+    return await fetchFromApi<ManageGrupoAlunosResult>(
+      `/api/tutoria/grupos/${encodeURIComponent(slug.trim())}/alunos/${encodeURIComponent(matricula.trim())}?institution=${encodeURIComponent(institution)}`,
+      {
+        method: 'DELETE',
+        cache: 'no-store',
+      },
+    )
+  } catch (err: any) {
+    console.error("[removeAlunoFromTutoriaGrupo] Erro:", err?.message)
+    return { success: false, error: err?.message || "Erro ao remover aluno do grupo." }
   }
 }

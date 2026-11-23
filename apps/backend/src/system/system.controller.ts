@@ -14,7 +14,10 @@ export class SystemController {
   @Get('sidebar-modules')
   getSidebarModules(@Req() req: any) {
     this.systemService.recordUserActivity(req.user.id);
-    return this.systemService.getSidebarModules(req.user.id);
+    return this.systemService.getSidebarModules(
+      req.user.id,
+      Boolean(req.user?.isSuperAdmin),
+    );
   }
 
   @RequireAdmin()

@@ -79,7 +79,7 @@ describe('AvaSyncService (Moodle Sync & Deduplication)', () => {
     );
 
     expect(result.status).toBe('success');
-    // 1) UPDATE ava_progress_report SET enrolment_status = 'Cancelado', 2) INSERT INTO ava_consolidated_report ... ON CONFLICT DO UPDATE
-    expect(db.execute).toHaveBeenCalledTimes(2);
+    // 1) UPDATE ava_progress_report SET enrolment_status = 'Cancelado', 2) INSERT INTO ava_consolidated_report ... ON CONFLICT DO UPDATE, 3) UPDATE tutoria_engajamento_aluno SET enrolment_status
+    expect(db.execute).toHaveBeenCalledTimes(3);
   });
 });

@@ -164,7 +164,14 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
         </Link>
 
         {/* Módulos do Usuário */}
-        {modules.map((sys) => {
+        {(() => {
+          const hasTutoriaGeral = modules.some((m) => m.slug === 'tutoria' || m.name === 'Tutoria')
+          const hasTutoriaTeologia = modules.some((m) => m.slug === 'tutoria-teologia')
+          const firstTutoriaModuleId = modules.find(
+            (m) => m.slug === 'tutoria' || m.name === 'Tutoria' || m.slug === 'tutoria-teologia'
+          )?.id
+
+          return modules.map((sys) => {
           const isActive = pathname.startsWith(sys.pathUrl) || (sys.name === 'AVA Reports' && pathname.startsWith('/relatorios'))
           
           if (sys.name === 'AVA Reports') {
@@ -394,10 +401,13 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
             )
           }
 
-          if (sys.slug === 'tutoria' || sys.name === 'Tutoria') {
+          if (sys.slug === 'tutoria' || sys.name === 'Tutoria' || sys.slug === 'tutoria-teologia') {
+            if (sys.id !== firstTutoriaModuleId) {
+              return null
+            }
             const isSubActive = pathname.startsWith('/tutoria')
             return (
-              <div key={sys.id} className="group relative w-full text-left">
+              <div key="tutoria-group" className="group relative w-full text-left">
                 <button 
                   onClick={() => {
                     if (!collapsedState) {
@@ -413,7 +423,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                   <div className="flex items-center">
                     <Sparkles className="w-5 h-5 shrink-0 transition-transform duration-300 group-hover:scale-110" />
                     <span className={`text-[12px] font-medium whitespace-nowrap transition-all duration-300 ease-in-out overflow-hidden ${collapsedState ? "max-w-0 opacity-0 pointer-events-none ml-0" : "max-w-[180px] opacity-100 ml-3"}`}>
-                      {sys.name}
+                      Tutoria
                     </span>
                   </div>
                   <ChevronRight 
@@ -430,15 +440,24 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                     isTransitioning || justCollapsed ? "!opacity-0 !invisible !pointer-events-none" : ""
                   }`}>
                     <div className="px-4 py-1.5 border-b border-white/5 text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2 select-none">
-                      {sys.name}
+                      Tutoria
                     </div>
                     <div className="px-2 py-1 space-y-1">
-                      <Link href="/tutoria" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/tutoria' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
-                        Acompanhamento
-                      </Link>
-                      <Link href="/tutoria/kanban" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/tutoria/kanban' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
-                        Atendimentos Kanban
-                      </Link>
+                      {hasTutoriaGeral && (
+                        <>
+                          <Link href="/tutoria" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/tutoria' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                            Acompanhamento
+                          </Link>
+                          <Link href="/tutoria/kanban" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/tutoria/kanban' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                            Atendimentos Kanban
+                          </Link>
+                        </>
+                      )}
+                      {hasTutoriaTeologia && (
+                        <Link href="/tutoria/teologia" className={`block text-[11px] hover:text-white px-3 py-1.5 rounded-md transition-colors ${pathname === '/tutoria/teologia' ? 'bg-navy-light text-green-brand font-semibold' : 'text-white/80 hover:bg-navy-light/40 font-medium'}`}>
+                          Teologia
+                        </Link>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -448,12 +467,21 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
                       isTutoriaOpen && !isTransitioning ? "max-h-[300px] opacity-100 py-2" : "max-h-0 opacity-0 py-0 pointer-events-none"
                     }`}
                   >
-                    <Link href="/tutoria" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/tutoria' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
-                      Acompanhamento
-                    </Link>
-                    <Link href="/tutoria/kanban" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/tutoria/kanban' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
-                      Atendimentos Kanban
-                    </Link>
+                    {hasTutoriaGeral && (
+                      <>
+                        <Link href="/tutoria" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/tutoria' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
+                          Acompanhamento
+                        </Link>
+                        <Link href="/tutoria/kanban" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/tutoria/kanban' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
+                          Atendimentos Kanban
+                        </Link>
+                      </>
+                    )}
+                    {hasTutoriaTeologia && (
+                      <Link href="/tutoria/teologia" className={`block text-[11px] hover:text-white py-1.5 px-2.5 rounded-md transition-colors ${pathname === '/tutoria/teologia' ? 'text-green-brand font-semibold bg-navy-light' : 'text-white/70 hover:bg-navy-light/40 font-medium'}`}>
+                        Teologia
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>
@@ -490,7 +518,8 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
               )}
             </Link>
           )
-        })}
+        })
+        })()}
 
         {/* Administração do SuperAdmin */}
         {session?.user?.isSuperAdmin && (

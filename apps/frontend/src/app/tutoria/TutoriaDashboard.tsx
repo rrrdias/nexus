@@ -30,10 +30,14 @@ import {
   Send,
   Kanban,
   XCircle,
+  UserPlus,
+  UserMinus,
+  Award,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
   Table,
@@ -50,20 +54,38 @@ import {
   triggerTutoriaManualSync,
   getTutoriaDisciplinas,
   getTutoriaExportData,
+  getTutoriaTeologiaSummary,
+  getTutoriaTeologiaEngagementList,
+  getTutoriaTeologiaStudentLogs,
+  getTutoriaTeologiaDisciplinas,
+  getTutoriaTeologiaExportData,
+  addAlunosToTutoriaGrupo,
+  removeAlunoFromTutoriaGrupo,
   createTutoriaKanbanCard,
   updateTutoriaKanbanCard,
   getTutoriaTimeline,
   sendTutoriaEmailAction,
   type TimelineEvent,
+  type TeologiaStudentGrades,
 } from "@/app/actions/tutoria"
 import { TutoriaTimeline } from "@/components/tutoria/TutoriaTimeline"
 import { TutoriaInterventionForm } from "@/components/tutoria/TutoriaInterventionForm"
 
 interface TutoriaDashboardProps {
   sessionUser: any
+  variant?: "geral" | "teologia"
+  canAccessTeologia?: boolean
+  canAccessGeral?: boolean
 }
 
-export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
+export function TutoriaDashboard({
+  sessionUser,
+  variant = "geral",
+  canAccessTeologia = false,
+  canAccessGeral = true,
+}: TutoriaDashboardProps) {
+  const isTeologia = variant === "teologia"
+  const showAdminTeologiaControls = !isTeologia && Boolean(sessionUser?.isSuperAdmin)
   // Estados principais
   const [summary, setSummary] = useState<any>(null)
   const [students, setStudents] = useState<any[]>([])
@@ -83,11 +105,15 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
   const [faixaTempo, setFaixaTempo] = useState<string>("todos")
   const [recenciaAcesso, setRecenciaAcesso] = useState<string>("todos")
   const [statusKanbanFilter, setStatusKanbanFilter] = useState<string>("todos")
+  const [enrolmentStatusFilter, setEnrolmentStatusFilter] = useState<string>("todos")
+  const [teologiaFilter, setTeologiaFilter] = useState<"todos" | "in" | "out">("todos")
   const [selectedDisciplina, setSelectedDisciplina] = useState<string>("todas")
   const [disciplinas, setDisciplinas] = useState<any[]>([])
   const [exporting, setExporting] = useState(false)
   const [page, setPage] = useState(1)
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 15, totalPages: 1 })
+  const [selectedMatriculas, setSelectedMatriculas] = useState<string[]>([])
+  const [updatingTeologiaGroup, setUpdatingTeologiaGroup] = useState(false)
 
   // Debounce na busca para evitar requisições a cada tecla digitada
   useEffect(() => {
@@ -102,6 +128,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null)
   const [studentLogs, setStudentLogs] = useState<any[]>([])
   const [studentDiscente, setStudentDiscente] = useState<any | null>(null)
+  const [studentGrades, setStudentGrades] = useState<TeologiaStudentGrades | null>(null)
   const [logsLoading, setLogsLoading] = useState(false)
   const [activeTemplate, setActiveTemplate] = useState<"critico" | "atencao" | "autonomo">("critico")
   const [customMessage, setCustomMessage] = useState("")
@@ -137,55 +164,90 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
 
   // Carrega a timeline quando a aba 'historico' estiver ativa
   useEffect(() => {
-    if (detailTab === "historico" && selectedStudent?.matricula) {
+    if (!isTeologia && detailTab === "historico" && selectedStudent?.matricula) {
       loadTimeline(selectedStudent.matricula, selectedStudent.kanban_card_id)
     }
-  }, [detailTab, selectedStudent?.matricula, selectedStudent?.kanban_card_id, loadTimeline])
+  }, [isTeologia, detailTab, selectedStudent?.matricula, selectedStudent?.kanban_card_id, loadTimeline])
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type })
     setTimeout(() => setToast({ message: "", type: null }), 4500)
   }
 
+  const isInactiveEnrolment = (status?: string | null) => {
+    const norm = String(status || "Ativo").toLowerCase()
+    return (
+      norm.includes("suspens") ||
+      norm.includes("trancad") ||
+      norm.includes("inativ") ||
+      norm.includes("cancel") ||
+      norm.includes("deslig")
+    )
+  }
+
+  const isSelectedInactive = selectedStudent
+    ? isInactiveEnrolment(selectedStudent.enrolment_status)
+    : false
+  const isRestrictedDetails = isTeologia || isSelectedInactive
+
   // Carregar lista de disciplinas disponíveis do período
   const loadDisciplinas = useCallback(async () => {
     try {
-      const res: any = await getTutoriaDisciplinas(periodo, "ead")
+      const res: any = isTeologia
+        ? await getTutoriaTeologiaDisciplinas(periodo, "ead")
+        : await getTutoriaDisciplinas(periodo, "ead")
       const list = Array.isArray(res) ? res : res?.data || []
       setDisciplinas(list)
     } catch (err) {
       console.error("Erro ao carregar disciplinas:", err)
     }
-  }, [periodo])
+  }, [isTeologia, periodo])
 
   // Carregar KPIs do Dashboard
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true)
     try {
-      const data = await getTutoriaDashboardSummary(periodo, "ead")
+      const data = isTeologia
+        ? await getTutoriaTeologiaSummary(periodo, "ead")
+        : await getTutoriaDashboardSummary(periodo, "ead")
       setSummary(data)
     } catch (err: any) {
       console.error("Erro ao carregar resumo de tutoria:", err)
     } finally {
       setSummaryLoading(false)
     }
-  }, [periodo])
+  }, [isTeologia, periodo])
 
   // Carregar lista de alunos e engajamento
   const loadStudents = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await getTutoriaEngagementList({
-        periodo,
-        disciplinaCodigo: selectedDisciplina === "todas" ? undefined : selectedDisciplina,
-        grupoRisco: grupoRisco === "todos" ? undefined : (grupoRisco as any),
-        faixaTempo: faixaTempo === "todos" ? undefined : faixaTempo,
-        recenciaAcesso: recenciaAcesso === "todos" ? undefined : (recenciaAcesso as any),
-        statusKanban: statusKanbanFilter === "todos" ? undefined : statusKanbanFilter,
-        search: debouncedSearch.trim() || undefined,
-        page,
-        limit: 15,
-      })
+      const res = isTeologia
+        ? await getTutoriaTeologiaEngagementList({
+            periodo,
+            institution: "ead",
+            disciplinaCodigo: selectedDisciplina === "todas" ? undefined : selectedDisciplina,
+            grupoRisco: grupoRisco === "todos" ? undefined : (grupoRisco as any),
+            faixaTempo: faixaTempo === "todos" ? undefined : faixaTempo,
+            recenciaAcesso: recenciaAcesso === "todos" ? undefined : (recenciaAcesso as any),
+            enrolmentStatus: enrolmentStatusFilter === "todos" ? undefined : (enrolmentStatusFilter as any),
+            search: debouncedSearch.trim() || undefined,
+            page,
+            limit: 15,
+          })
+        : await getTutoriaEngagementList({
+            periodo,
+            disciplinaCodigo: selectedDisciplina === "todas" ? undefined : selectedDisciplina,
+            grupoRisco: grupoRisco === "todos" ? undefined : (grupoRisco as any),
+            faixaTempo: faixaTempo === "todos" ? undefined : faixaTempo,
+            recenciaAcesso: recenciaAcesso === "todos" ? undefined : (recenciaAcesso as any),
+            statusKanban: statusKanbanFilter === "todos" ? undefined : statusKanbanFilter,
+            enrolmentStatus: enrolmentStatusFilter === "todos" ? undefined : (enrolmentStatusFilter as any),
+            teologiaFilter: showAdminTeologiaControls && teologiaFilter !== "todos" ? teologiaFilter : undefined,
+            search: debouncedSearch.trim() || undefined,
+            page,
+            limit: 15,
+          })
 
       if (res && res.data) {
         setStudents(res.data)
@@ -197,7 +259,20 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     } finally {
       setLoading(false)
     }
-  }, [periodo, selectedDisciplina, grupoRisco, faixaTempo, recenciaAcesso, statusKanbanFilter, debouncedSearch, page])
+  }, [
+    isTeologia,
+    showAdminTeologiaControls,
+    periodo,
+    selectedDisciplina,
+    grupoRisco,
+    faixaTempo,
+    recenciaAcesso,
+    statusKanbanFilter,
+    enrolmentStatusFilter,
+    teologiaFilter,
+    debouncedSearch,
+    page,
+  ])
 
   // 1. Efeito unificado para carregar resumo e disciplinas ao mudar o período
   useEffect(() => {
@@ -230,15 +305,28 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     setExporting(true)
     try {
       showToast("Gerando arquivo Excel com os filtros aplicados...", "success")
-      const rows = await getTutoriaExportData({
-        periodo,
-        disciplinaCodigo: selectedDisciplina === "todas" ? undefined : selectedDisciplina,
-        grupoRisco: grupoRisco === "todos" ? undefined : (grupoRisco as any),
-        faixaTempo: faixaTempo === "todos" ? undefined : faixaTempo,
-        recenciaAcesso: recenciaAcesso === "todos" ? undefined : (recenciaAcesso as any),
-        statusKanban: statusKanbanFilter === "todos" ? undefined : statusKanbanFilter,
-        search: debouncedSearch.trim() || undefined,
-      })
+      const rows = isTeologia
+        ? await getTutoriaTeologiaExportData({
+            periodo,
+            institution: "ead",
+            disciplinaCodigo: selectedDisciplina === "todas" ? undefined : selectedDisciplina,
+            grupoRisco: grupoRisco === "todos" ? undefined : (grupoRisco as any),
+            faixaTempo: faixaTempo === "todos" ? undefined : faixaTempo,
+            recenciaAcesso: recenciaAcesso === "todos" ? undefined : (recenciaAcesso as any),
+            enrolmentStatus: enrolmentStatusFilter === "todos" ? undefined : (enrolmentStatusFilter as any),
+            search: debouncedSearch.trim() || undefined,
+          })
+        : await getTutoriaExportData({
+            periodo,
+            disciplinaCodigo: selectedDisciplina === "todas" ? undefined : selectedDisciplina,
+            grupoRisco: grupoRisco === "todos" ? undefined : (grupoRisco as any),
+            faixaTempo: faixaTempo === "todos" ? undefined : faixaTempo,
+            recenciaAcesso: recenciaAcesso === "todos" ? undefined : (recenciaAcesso as any),
+            statusKanban: statusKanbanFilter === "todos" ? undefined : statusKanbanFilter,
+            enrolmentStatus: enrolmentStatusFilter === "todos" ? undefined : (enrolmentStatusFilter as any),
+            teologiaFilter: showAdminTeologiaControls && teologiaFilter !== "todos" ? teologiaFilter : undefined,
+            search: debouncedSearch.trim() || undefined,
+          })
 
       if (!rows || !Array.isArray(rows) || rows.length === 0) {
         showToast("Nenhum registro encontrado para exportar.", "error")
@@ -246,52 +334,104 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
       }
 
       // Monta CSV com BOM UTF-8 (\uFEFF) para abrir formatado no Excel
-      const headers = [
-        "Período",
-        "Código Disciplina",
-        "Nome Disciplina",
-        "Matrícula",
-        "Nome Aluno",
-        "E-mail",
-        "Classificação Risco",
-        "Fluxo Atendimento",
-        "Score Engajamento",
-        "Tempo Total",
-        "Fase 1",
-        "Fase 2",
-        "Fase 3",
-        "Tempo Leitura",
-        "Tempo Avaliações",
-        "Total Cliques",
-        "Atividades Acessadas",
-        "Último Acesso Disciplina",
-        "Último Login AVA",
-      ]
+      const headers = isTeologia
+        ? [
+            "Período",
+            "Código Disciplina",
+            "Nome Disciplina",
+            "Situação Matrícula",
+            "Matrícula",
+            "Nome Aluno",
+            "E-mail",
+            "Classificação Risco",
+            "Score Engajamento",
+            "Tempo Total",
+            "Fase 1",
+            "Fase 2",
+            "Fase 3",
+            "Nota Fase 1",
+            "Nota Fase 2",
+            "Nota Fase 3",
+            "Tempo Leitura",
+            "Tempo Avaliações",
+            "Total Cliques",
+            "Atividades Acessadas",
+            "Último Acesso Disciplina",
+            "Último Login AVA",
+          ]
+        : [
+            "Período",
+            "Código Disciplina",
+            "Nome Disciplina",
+            "Situação Matrícula",
+            "Matrícula",
+            "Nome Aluno",
+            "E-mail",
+            "Classificação Risco",
+            "Fluxo Atendimento",
+            "Score Engajamento",
+            "Tempo Total",
+            "Fase 1",
+            "Fase 2",
+            "Fase 3",
+            "Tempo Leitura",
+            "Tempo Avaliações",
+            "Total Cliques",
+            "Atividades Acessadas",
+            "Último Acesso Disciplina",
+            "Último Login AVA",
+          ]
 
       const csvRows = [headers.join(";")]
 
       for (const r of rows) {
-        const row = [
-          `"${r.periodo || ""}"`,
-          `"${r.disciplina_codigo || ""}"`,
-          `"${(r.disciplina_nome || "").replace(/"/g, '""')}"`,
-          `"${r.matricula || ""}"`,
-          `"${(r.aluno_nome || "").replace(/"/g, '""')}"`,
-          `"${r.aluno_email || ""}"`,
-          `"${r.grupo_risco_calculado || ""}"`,
-          `"${r.status_kanban || "sem_atendimento"}"`,
-          `"${r.score_engajamento || "0"}"`,
-          `"${formatFriendlyDuration(r.tempo_total_minutos)}"`,
-          `"${formatFriendlyDuration(r.tempo_fase1_minutos)}"`,
-          `"${formatFriendlyDuration(r.tempo_fase2_minutos)}"`,
-          `"${formatFriendlyDuration(r.tempo_fase3_minutos)}"`,
-          `"${formatFriendlyDuration(r.tempo_leitura_minutos)}"`,
-          `"${formatFriendlyDuration(r.tempo_avaliacoes_minutos)}"`,
-          `"${r.total_cliques || 0}"`,
-          `"${r.total_atividades_acessadas || 0}"`,
-          `"${r.data_ultimo_acesso || ""}"`,
-          `"${r.data_ultimo_login || ""}"`,
-        ]
+        const row = isTeologia
+          ? [
+              `"${r.periodo || ""}"`,
+              `"${r.disciplina_codigo || ""}"`,
+              `"${(r.disciplina_nome || "").replace(/"/g, '""')}"`,
+              `"${r.enrolment_status || "Ativo"}"`,
+              `"${r.matricula || ""}"`,
+              `"${(r.aluno_nome || "").replace(/"/g, '""')}"`,
+              `"${r.aluno_email || ""}"`,
+              `"${r.grupo_risco_calculado || ""}"`,
+              `"${r.score_engajamento || "0"}"`,
+              `"${formatFriendlyDuration(r.tempo_total_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_fase1_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_fase2_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_fase3_minutos)}"`,
+              `"${r.nota_fase1 ?? ""}"`,
+              `"${r.nota_fase2 ?? ""}"`,
+              `"${r.nota_fase3 ?? ""}"`,
+              `"${formatFriendlyDuration(r.tempo_leitura_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_avaliacoes_minutos)}"`,
+              `"${r.total_cliques || 0}"`,
+              `"${r.total_atividades_acessadas || 0}"`,
+              `"${r.data_ultimo_acesso || ""}"`,
+              `"${r.data_ultimo_login || ""}"`,
+            ]
+          : [
+              `"${r.periodo || ""}"`,
+              `"${r.disciplina_codigo || ""}"`,
+              `"${(r.disciplina_nome || "").replace(/"/g, '""')}"`,
+              `"${r.enrolment_status || "Ativo"}"`,
+              `"${r.matricula || ""}"`,
+              `"${(r.aluno_nome || "").replace(/"/g, '""')}"`,
+              `"${r.aluno_email || ""}"`,
+              `"${r.grupo_risco_calculado || ""}"`,
+              `"${r.status_kanban || (isInactiveEnrolment(r.enrolment_status) ? "nao_aplicavel" : "sem_atendimento")}"`,
+              `"${r.score_engajamento || "0"}"`,
+              `"${formatFriendlyDuration(r.tempo_total_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_fase1_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_fase2_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_fase3_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_leitura_minutos)}"`,
+              `"${formatFriendlyDuration(r.tempo_avaliacoes_minutos)}"`,
+              `"${r.total_cliques || 0}"`,
+              `"${r.total_atividades_acessadas || 0}"`,
+              `"${r.data_ultimo_acesso || ""}"`,
+              `"${r.data_ultimo_login || ""}"`,
+            ]
         csvRows.push(row.join(";"))
       }
 
@@ -302,7 +442,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
       link.setAttribute("href", url)
       link.setAttribute(
         "download",
-        `tutoria_acompanhamento_${periodo}_${new Date().toISOString().slice(0, 10)}.csv`,
+        `${isTeologia ? "tutoria_teologia" : "tutoria_acompanhamento"}_${periodo}_${new Date().toISOString().slice(0, 10)}.csv`,
       )
       document.body.appendChild(link)
       link.click()
@@ -333,13 +473,104 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     }
   }
 
+  // Gestão de grupo de Teologia (Apenas Super Admin no Acompanhamento Geral)
+  const pageValidMatriculas = Array.from(
+    new Set(
+      students
+        .map((s) => String(s.matricula || "").trim())
+        .filter((m) => m.length > 0),
+    ),
+  )
+  const allPageSelected =
+    pageValidMatriculas.length > 0 &&
+    pageValidMatriculas.every((m) => selectedMatriculas.includes(m))
+
+  const toggleSelectMatricula = (matricula?: string | null) => {
+    const clean = String(matricula || "").trim()
+    if (!clean) return
+    setSelectedMatriculas((prev) =>
+      prev.includes(clean) ? prev.filter((m) => m !== clean) : [...prev, clean],
+    )
+  }
+
+  const toggleSelectAllPage = () => {
+    if (allPageSelected) {
+      setSelectedMatriculas((prev) => prev.filter((m) => !pageValidMatriculas.includes(m)))
+    } else {
+      setSelectedMatriculas((prev) => Array.from(new Set([...prev, ...pageValidMatriculas])))
+    }
+  }
+
+  const handleBatchAddTeologia = async () => {
+    if (selectedMatriculas.length === 0) return
+    setUpdatingTeologiaGroup(true)
+    try {
+      const res = await addAlunosToTutoriaGrupo("teologia", selectedMatriculas)
+      if (!res?.success) {
+        showToast(res?.error || "Falha ao adicionar alunos ao grupo de Teologia.", "error")
+        return
+      }
+      showToast(
+        `${res.addedCount || 0} aluno(s) adicionado(s) ao grupo de Teologia${res.skippedCount ? ` (${res.skippedCount} já vinculados)` : ""}.`,
+        "success",
+      )
+      setSelectedMatriculas([])
+      await loadStudents()
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao adicionar alunos à Teologia.", "error")
+    } finally {
+      setUpdatingTeologiaGroup(false)
+    }
+  }
+
+  const handleToggleSingleTeologia = async (student: any) => {
+    const cleanMat = String(student?.matricula || "").trim()
+    if (!cleanMat) {
+      showToast("Este registro não possui matrícula vinculada.", "error")
+      return
+    }
+    setUpdatingTeologiaGroup(true)
+    try {
+      if (student.in_teologia_group) {
+        const res = await removeAlunoFromTutoriaGrupo("teologia", cleanMat)
+        if (!res?.success) {
+          showToast(res?.error || "Falha ao remover aluno do grupo de Teologia.", "error")
+          return
+        }
+        showToast(`Aluno ${cleanMat} removido do grupo de Teologia.`, "success")
+      } else {
+        const res = await addAlunosToTutoriaGrupo("teologia", [cleanMat])
+        if (!res?.success) {
+          showToast(res?.error || "Falha ao adicionar aluno ao grupo de Teologia.", "error")
+          return
+        }
+        showToast(`Aluno ${cleanMat} adicionado ao grupo de Teologia!`, "success")
+      }
+      setSelectedMatriculas((prev) => prev.filter((m) => m !== cleanMat))
+      await loadStudents()
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao atualizar grupo de Teologia.", "error")
+    } finally {
+      setUpdatingTeologiaGroup(false)
+    }
+  }
+
   // Abrir Detalhes do Estudante
   const handleOpenStudentLogs = async (student: any) => {
     setSelectedStudent(student)
-    setDetailTab("acolhimento")
+    setDetailTab(isTeologia || isInactiveEnrolment(student.enrolment_status) ? "diagnostico" : "acolhimento")
     setKanbanSent(!!student.kanban_card_id || !!student.status_kanban)
     setLogsLoading(true)
     setStudentDiscente(null)
+    setStudentGrades(
+      isTeologia
+        ? {
+            fase1: student.nota_fase1 ?? null,
+            fase2: student.nota_fase2 ?? null,
+            fase3: student.nota_fase3 ?? null,
+          }
+        : null,
+    )
     const initialTpl =
       student.grupo_risco_calculado === "atencao"
         ? "atencao"
@@ -350,11 +581,19 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     setCustomMessage(getMessageTemplate(initialTpl, student))
 
     try {
-      const res = await getTutoriaStudentLogs(student.matricula, student.disciplina_id)
+      const res: any = isTeologia
+        ? await getTutoriaTeologiaStudentLogs(student.matricula, student.disciplina_id)
+        : await getTutoriaStudentLogs(student.matricula, student.disciplina_id)
+      if (res?.error) {
+        showToast(res.error, "error")
+      }
       if (res && res.logs) {
         setStudentLogs(Array.isArray(res.logs) ? res.logs : [])
         setStudentDiscente(res.discente || null)
-        if (res.kanban) {
+        if (isTeologia && res.grades) {
+          setStudentGrades(res.grades)
+        }
+        if (!isTeologia && res.kanban) {
           setSelectedStudent((prev: any) => ({
             ...prev,
             kanban_card_id: res.kanban.id || prev?.kanban_card_id,
@@ -497,7 +736,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
 
   // Atualizar Status do Aluno no Kanban diretamente do Drawer
   const handleUpdateStudentKanbanStatus = async (newStatus: string) => {
-    if (!selectedStudent) return
+    if (!selectedStudent || isInactiveEnrolment(selectedStudent.enrolment_status)) return
     const cardId = selectedStudent.kanban_card_id
     setSendingToKanban(true)
     try {
@@ -577,7 +816,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
 
   // Encaminhar Aluno ao Kanban de Atendimentos
   const handleSendToKanban = async () => {
-    if (!selectedStudent) return
+    if (!selectedStudent || isInactiveEnrolment(selectedStudent.enrolment_status)) return
     setSendingToKanban(true)
     try {
       const res: any = await createTutoriaKanbanCard({
@@ -677,6 +916,31 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     }
   }
 
+  // Helper para renderizar badge de situação da matrícula na disciplina
+  const renderEnrolmentStatusBadge = (status?: string | null) => {
+    const raw = String(status || "Ativo").trim()
+    const norm = raw.toLowerCase()
+    if (norm.includes("suspens") || norm.includes("trancad") || norm.includes("inativ")) {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+          {raw || "Suspenso"}
+        </span>
+      )
+    }
+    if (norm.includes("cancel") || norm.includes("deslig")) {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+          {raw || "Cancelado"}
+        </span>
+      )
+    }
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+        {raw || "Ativo"}
+      </span>
+    )
+  }
+
   // Helper para renderizar badge de grupo de risco
   const renderRiskBadge = (risk: string) => {
     switch (risk) {
@@ -764,6 +1028,19 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
     return `${hours}h ${remainingMins}min`
   }
 
+  // Helper para formatar notas por fase do AVA (pt-BR, 2 casas decimais)
+  const formatPhaseGrade = (val: string | number | null | undefined): string | null => {
+    if (val === null || val === undefined) return null
+    const raw = String(val).trim()
+    if (!raw) return null
+    const parsed = parseFloat(raw.replace(",", "."))
+    return !isNaN(parsed) ? parsed.toFixed(2).replace(".", ",") : null
+  }
+
+  // Helper para identificar se um item do catálogo da disciplina foi acessado pelo aluno
+  const isLogAccessed = (log: any): boolean =>
+    Number(log?.qtd_cliques_acessos || 0) > 0 || parseFloat(log?.tempo_conteudo_minutos || "0") > 0
+
   // Helper visual para recência do último acesso
   const renderAccessRecency = (dateStr: string | null | undefined, loginStr?: string | null) => {
     if (!dateStr || dateStr === "0" || dateStr.startsWith("1970")) {
@@ -833,39 +1110,73 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
         <div>
           <div className="flex items-center gap-2">
             <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600">
-              <Sparkles className="w-6 h-6" />
+              {isTeologia ? <BookOpen className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
             </span>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                Módulo de Tutoria & Engajamento
+                {isTeologia
+                  ? "Tutoria & Engajamento — Teologia"
+                  : "Módulo de Tutoria & Engajamento"}
               </h1>
               <p className="text-sm text-gray-500">
-                Acompanhamento contínuo de tempo em tela, detecção de padrões de risco e apoio pedagógico com IA.
+                {isTeologia
+                  ? "Acompanhamento dedicado aos estudantes vinculados ao grupo de Teologia (diagnóstico AVA e notas por fase)."
+                  : "Acompanhamento contínuo de tempo em tela, detecção de padrões de risco e apoio pedagógico com IA."}
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/tutoria/kanban">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-purple-200 text-purple-700 bg-purple-50/50 hover:bg-purple-100 font-medium shadow-2xs transition-all cursor-pointer gap-2"
-            >
-              <Kanban className="w-4 h-4 text-purple-600" />
-              Atendimentos Kanban
-            </Button>
-          </Link>
+          {isTeologia && canAccessGeral && (
+            <Link href="/tutoria">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-medium shadow-2xs transition-all cursor-pointer gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                Acompanhamento Geral
+              </Button>
+            </Link>
+          )}
 
-          <Button
-            onClick={handleSync}
-            disabled={syncing}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm transition-all cursor-pointer gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sincronizando..." : "Atualizar Logs do AVA"}
-          </Button>
+          {!isTeologia && canAccessTeologia && (
+            <Link href="/tutoria/teologia">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-medium shadow-2xs transition-all cursor-pointer gap-2"
+              >
+                <BookOpen className="w-4 h-4 text-indigo-600" />
+                Teologia
+              </Button>
+            </Link>
+          )}
+
+          {!isTeologia && (
+            <>
+              <Link href="/tutoria/kanban">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-purple-200 text-purple-700 bg-purple-50/50 hover:bg-purple-100 font-medium shadow-2xs transition-all cursor-pointer gap-2"
+                >
+                  <Kanban className="w-4 h-4 text-purple-600" />
+                  Atendimentos Kanban
+                </Button>
+              </Link>
+
+              <Button
+                onClick={handleSync}
+                disabled={syncing}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm transition-all cursor-pointer gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Sincronizando..." : "Atualizar Logs do AVA"}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1142,24 +1453,59 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                 <option value="sem_acesso">Nunca acessou</option>
               </select>
 
-              {/* Seletor de Fluxo de Atendimento */}
+              {/* Seletor de Fluxo de Atendimento (oculto no submódulo Teologia) */}
+              {!isTeologia && (
+                <select
+                  value={statusKanbanFilter}
+                  onChange={(e) => {
+                    setStatusKanbanFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  className="h-9 px-3 text-xs bg-gray-100 border-none rounded-lg text-gray-700 font-medium focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  title="Filtrar por status no fluxo de atendimento"
+                >
+                  <option value="todos">Todos os fluxos</option>
+                  <option value="sem_atendimento">Sem Atendimento</option>
+                  <option value="pendente">A Contatar</option>
+                  <option value="em_contato">Em Contato</option>
+                  <option value="em_recuperacao">Em Acompanhamento</option>
+                  <option value="revertido">Regularizado</option>
+                  <option value="evadido">Não Localizado</option>
+                </select>
+              )}
+
+              {/* Seletor de Situação de Matrícula */}
               <select
-                value={statusKanbanFilter}
+                value={enrolmentStatusFilter}
                 onChange={(e) => {
-                  setStatusKanbanFilter(e.target.value)
+                  setEnrolmentStatusFilter(e.target.value)
                   setPage(1)
                 }}
                 className="h-9 px-3 text-xs bg-gray-100 border-none rounded-lg text-gray-700 font-medium focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                title="Filtrar por status no fluxo de atendimento"
+                title="Filtrar por situação da matrícula na disciplina"
               >
-                <option value="todos">Todos os fluxos</option>
-                <option value="sem_atendimento">Sem Atendimento</option>
-                <option value="pendente">A Contatar</option>
-                <option value="em_contato">Em Contato</option>
-                <option value="em_recuperacao">Em Acompanhamento</option>
-                <option value="revertido">Regularizado</option>
-                <option value="evadido">Não Localizado</option>
+                <option value="todos">Todas as matrículas</option>
+                <option value="ativo">Matrícula Ativa</option>
+                <option value="suspenso">Matrícula Suspensa</option>
+                <option value="cancelado">Matrícula Cancelada</option>
               </select>
+
+              {/* Seletor de Grupo Teologia (Apenas Super Admin no Acompanhamento Geral) */}
+              {showAdminTeologiaControls && (
+                <select
+                  value={teologiaFilter}
+                  onChange={(e) => {
+                    setTeologiaFilter(e.target.value as "todos" | "in" | "out")
+                    setPage(1)
+                  }}
+                  className="h-9 px-3 text-xs bg-purple-50 border border-purple-200 rounded-lg text-purple-800 font-medium focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                  title="Filtrar por vínculo ao grupo de Teologia"
+                >
+                  <option value="todos">Grupo Teologia: Todos</option>
+                  <option value="in">No grupo Teologia</option>
+                  <option value="out">Fora de Teologia</option>
+                </select>
+              )}
             </div>
 
             {/* Botão de Exportação Excel */}
@@ -1180,6 +1526,40 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
         </CardContent>
       </Card>
 
+      {/* Barra de Ação em Lote para Administradores (Grupo Teologia) */}
+      {showAdminTeologiaControls && selectedMatriculas.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl bg-purple-50 border border-purple-200 shadow-2xs">
+          <div className="flex items-center gap-2 text-xs font-semibold text-purple-900">
+            <BookOpen className="w-4 h-4 text-purple-700" />
+            <span>
+              <strong>{selectedMatriculas.length}</strong> aluno(s) único(s) selecionado(s)
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedMatriculas([])}
+              disabled={updatingTeologiaGroup}
+              className="h-8 px-3 text-xs text-purple-700 hover:bg-purple-100 cursor-pointer"
+            >
+              Limpar seleção
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleBatchAddTeologia}
+              disabled={updatingTeologiaGroup}
+              className="h-8 px-3.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white cursor-pointer gap-1.5"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              {updatingTeologiaGroup ? "Adicionando..." : "Adicionar ao grupo Teologia"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Tabela de Engajamento Discente */}
       <Card className="border border-gray-100 shadow-sm rounded-xl overflow-hidden relative">
         {loading && students.length > 0 && (
@@ -1190,30 +1570,47 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
         <Table className={`min-w-[1150px] w-full ${loading && students.length > 0 ? "opacity-50 pointer-events-none transition-opacity duration-200" : "transition-opacity duration-200"}`}>
           <TableHeader className="bg-gray-50/75">
             <TableRow>
-              <TableHead className="text-xs font-semibold text-gray-600 uppercase min-w-[180px] max-w-[210px] pl-4">Estudante</TableHead>
+              {showAdminTeologiaControls && (
+                <TableHead className="w-[42px] pl-4 pr-1 text-center">
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={allPageSelected}
+                      disabled={pageValidMatriculas.length === 0}
+                      onCheckedChange={toggleSelectAllPage}
+                      aria-label="Selecionar todos da página"
+                    />
+                  </div>
+                </TableHead>
+              )}
+              <TableHead className={`text-xs font-semibold text-gray-600 uppercase min-w-[180px] max-w-[210px] ${showAdminTeologiaControls ? "pl-2" : "pl-4"}`}>Estudante</TableHead>
               <TableHead className="text-xs font-semibold text-gray-600 uppercase min-w-[170px] max-w-[210px]">Disciplina</TableHead>
               <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center min-w-[115px] w-[115px]">Classificação</TableHead>
-              <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center min-w-[125px] w-[125px]">Fluxo Atendimento</TableHead>
+              {!isTeologia && (
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center min-w-[125px] w-[125px]">Fluxo Atendimento</TableHead>
+              )}
               <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center min-w-[95px] w-[95px]">Último Acesso</TableHead>
               <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center min-w-[75px] w-[75px]">Tempo Total</TableHead>
               <TableHead className="text-xs font-semibold text-gray-600 uppercase min-w-[105px] w-[105px]">Tempo por Fase</TableHead>
+              {isTeologia && (
+                <TableHead className="text-xs font-semibold text-gray-600 uppercase min-w-[105px] w-[105px]">Notas por Fase</TableHead>
+              )}
               <TableHead className="text-xs font-semibold text-gray-600 uppercase min-w-[120px] w-[120px]">Leitura e Avaliações</TableHead>
               <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center min-w-[70px] w-[70px]">Cliques</TableHead>
-              <TableHead className="text-xs font-semibold text-gray-600 uppercase text-center min-w-[95px] w-[95px] pr-4">Ação</TableHead>
+              <TableHead className={`text-xs font-semibold text-gray-600 uppercase text-center ${showAdminTeologiaControls ? "min-w-[135px] w-[135px]" : "min-w-[95px] w-[95px]"} pr-4`}>Ação</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading && students.length === 0 ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={i} className="animate-pulse">
-                  <TableCell colSpan={10} className="py-4">
+                  <TableCell colSpan={isTeologia ? 10 : showAdminTeologiaControls ? 11 : 10} className="py-4">
                     <div className="h-4 bg-gray-100 rounded-md w-full" />
                   </TableCell>
                 </TableRow>
               ))
             ) : students.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="py-12 text-center text-gray-400">
+                <TableCell colSpan={isTeologia ? 10 : showAdminTeologiaControls ? 11 : 10} className="py-12 text-center text-gray-400">
                   Nenhum aluno encontrado com os filtros aplicados.
                 </TableCell>
               </TableRow>
@@ -1223,15 +1620,48 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                 const tempoFase1 = parseFloat(student.tempo_fase1_minutos || "0")
                 const tempoFase2 = parseFloat(student.tempo_fase2_minutos || "0")
                 const tempoFase3 = parseFloat(student.tempo_fase3_minutos || "0")
+                const notaFase1 = formatPhaseGrade(student.nota_fase1)
+                const notaFase2 = formatPhaseGrade(student.nota_fase2)
+                const notaFase3 = formatPhaseGrade(student.nota_fase3)
                 const tempoLeitura = parseFloat(student.tempo_leitura_minutos || "0")
                 const tempoProvas = parseFloat(student.tempo_avaliacoes_minutos || "0")
+                const isStudentInactive = isInactiveEnrolment(student.enrolment_status)
+                const cleanMat = String(student.matricula || "").trim()
+                const isMatSelected = Boolean(cleanMat) && selectedMatriculas.includes(cleanMat)
+                const statusNorm = String(student.enrolment_status || "Ativo").toLowerCase()
+                const rowStatusClass =
+                  statusNorm.includes("suspens") || statusNorm.includes("trancad") || statusNorm.includes("inativ")
+                    ? "bg-amber-50/30 hover:bg-amber-50/50"
+                    : statusNorm.includes("cancel") || statusNorm.includes("deslig")
+                      ? "bg-rose-50/30 hover:bg-rose-50/50"
+                      : "hover:bg-gray-50/80"
 
                 return (
-                  <TableRow key={student.id} className="hover:bg-gray-50/80 transition-colors">
+                  <TableRow key={student.id} className={`${rowStatusClass} transition-colors`}>
+                    {showAdminTeologiaControls && (
+                      <TableCell className="py-3 pl-4 pr-1 text-center">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={isMatSelected}
+                            disabled={!cleanMat}
+                            onCheckedChange={() => toggleSelectMatricula(cleanMat)}
+                            title={cleanMat ? "Selecionar aluno para ações em lote" : "Aluno sem matrícula vinculada"}
+                          />
+                        </div>
+                      </TableCell>
+                    )}
+
                     {/* Estudante */}
-                    <TableCell className="py-3 min-w-[180px] max-w-[210px] pl-4">
-                      <div className="font-semibold text-gray-900 text-sm truncate" title={student.aluno_nome}>
-                        {student.aluno_nome || "Nome não informado"}
+                    <TableCell className={`py-3 min-w-[180px] max-w-[210px] ${showAdminTeologiaControls ? "pl-2" : "pl-4"}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-gray-900 text-sm truncate" title={student.aluno_nome}>
+                          {student.aluno_nome || "Nome não informado"}
+                        </span>
+                        {showAdminTeologiaControls && student.in_teologia_group && (
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                            Teologia
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
                         <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-[11px] text-gray-600 shrink-0">
@@ -1249,8 +1679,11 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                       <div className="text-sm font-medium text-gray-800 truncate" title={student.disciplina_nome}>
                         {student.disciplina_nome || "Disciplina não identificada"}
                       </div>
-                      <div className="text-xs text-indigo-600/80 font-mono truncate">
-                        {student.disciplina_codigo || ""}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-indigo-600/80 font-mono truncate">
+                          {student.disciplina_codigo || ""}
+                        </span>
+                        {renderEnrolmentStatusBadge(student.enrolment_status)}
                       </div>
                     </TableCell>
 
@@ -1261,12 +1694,23 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                       </div>
                     </TableCell>
 
-                    {/* Fluxo de Atendimento */}
-                    <TableCell className="py-3 text-center min-w-[125px] w-[125px]">
-                      <div className="flex justify-center">
-                        {renderKanbanStatusBadge(student.status_kanban)}
-                      </div>
-                    </TableCell>
+                    {/* Fluxo de Atendimento (oculto no submódulo Teologia) */}
+                    {!isTeologia && (
+                      <TableCell className="py-3 text-center min-w-[125px] w-[125px]">
+                        <div className="flex justify-center">
+                          {isStudentInactive && !student.status_kanban ? (
+                            <span
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50/70 text-amber-700/80 border border-amber-200/70"
+                              title="Matrícula suspensa/inativa — fluxo de atendimento não aplicável"
+                            >
+                              Não aplicável
+                            </span>
+                          ) : (
+                            renderKanbanStatusBadge(student.status_kanban)
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Último Acesso */}
                     <TableCell className="py-3 text-center min-w-[95px] w-[95px]">
@@ -1304,6 +1748,38 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                       </div>
                     </TableCell>
 
+                    {/* Notas por Fase (Exclusivo Teologia) */}
+                    {isTeologia && (
+                      <TableCell className="py-3 min-w-[105px] w-[105px]">
+                        <div className="flex flex-col gap-1 w-full text-xs">
+                          {[
+                            {
+                              label: "F1:",
+                              grade: notaFase1,
+                              badgeClass: "font-semibold font-mono text-blue-700 bg-blue-50/70 px-1.5 py-0.5 rounded text-[10px]",
+                            },
+                            {
+                              label: "F2:",
+                              grade: notaFase2,
+                              badgeClass: "font-semibold font-mono text-amber-700 bg-amber-50/70 px-1.5 py-0.5 rounded text-[10px]",
+                            },
+                            {
+                              label: "F3:",
+                              grade: notaFase3,
+                              badgeClass: "font-semibold font-mono text-purple-700 bg-purple-50/70 px-1.5 py-0.5 rounded text-[10px]",
+                            },
+                          ].map((item) => (
+                            <div key={item.label} className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-500 font-medium">{item.label}</span>
+                              <span className={item.grade !== null ? item.badgeClass : "text-gray-400 font-normal"}>
+                                {item.grade ?? "—"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    )}
+
                     {/* Leitura e Avaliações */}
                     <TableCell className="py-3 min-w-[120px] w-[120px]">
                       <div className="flex flex-col gap-1 w-full text-xs">
@@ -1339,16 +1815,45 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                     </TableCell>
 
                     {/* Ação */}
-                    <TableCell className="py-2.5 text-center min-w-[95px] w-[95px] pr-4">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenStudentLogs(student)}
-                        className="h-8 px-2.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium cursor-pointer gap-1 mx-auto text-xs"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> Detalhes
-                      </Button>
+                    <TableCell className={`py-2.5 text-center ${showAdminTeologiaControls ? "min-w-[135px] w-[135px]" : "min-w-[95px] w-[95px]"} pr-4`}>
+                      <div className="flex items-center justify-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenStudentLogs(student)}
+                          className="h-8 px-2.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium cursor-pointer gap-1 text-xs"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> {isTeologia ? "Detalhes" : isStudentInactive ? "Diagnóstico" : "Detalhes"}
+                        </Button>
+                        {showAdminTeologiaControls && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={!cleanMat || updatingTeologiaGroup}
+                            onClick={() => handleToggleSingleTeologia(student)}
+                            title={
+                              !cleanMat
+                                ? "Aluno sem matrícula vinculada"
+                                : student.in_teologia_group
+                                  ? "Remover aluno do grupo de Teologia"
+                                  : "Adicionar aluno ao grupo de Teologia"
+                            }
+                            className={`h-8 w-8 p-0 cursor-pointer ${
+                              student.in_teologia_group
+                                ? "text-purple-700 bg-purple-50 hover:bg-rose-50 hover:text-rose-700"
+                                : "text-gray-500 hover:text-purple-700 hover:bg-purple-50"
+                            }`}
+                          >
+                            {student.in_teologia_group ? (
+                              <UserMinus className="w-3.5 h-3.5" />
+                            ) : (
+                              <UserPlus className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -1417,8 +1922,11 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-medium text-gray-700 bg-white px-2.5 py-1 rounded-md border border-gray-200/80 shadow-2xs">
-                    {selectedStudent.disciplina_nome} <span className="text-indigo-600 font-mono">({selectedStudent.disciplina_codigo})</span>
+                  <span className="font-medium text-gray-700 bg-white px-2.5 py-1 rounded-md border border-gray-200/80 shadow-2xs inline-flex items-center gap-2">
+                    <span>
+                      {selectedStudent.disciplina_nome} <span className="text-indigo-600 font-mono">({selectedStudent.disciplina_codigo})</span>
+                    </span>
+                    {renderEnrolmentStatusBadge(selectedStudent.enrolment_status)}
                   </span>
                   {studentDiscente?.curso_nome && (
                     <span className="text-gray-600 bg-white px-2.5 py-1 rounded-md border border-gray-200/80 shadow-2xs">
@@ -1436,7 +1944,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
               <div className="flex items-center gap-2.5 shrink-0">
                 <div className="flex flex-col items-end gap-1.5">
                   {renderRiskBadge(selectedStudent.grupo_risco_calculado)}
-                  {renderKanbanStatusBadge(selectedStudent.status_kanban)}
+                  {!isRestrictedDetails && renderKanbanStatusBadge(selectedStudent.status_kanban)}
                 </div>
                 <button
                   type="button"
@@ -1451,18 +1959,20 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
 
             {/* Barra de Abas (Tabs Navigation) */}
             <div className="flex items-center gap-2 px-5 pt-3 border-b border-gray-100 bg-white shrink-0">
-              <button
-                type="button"
-                onClick={() => setDetailTab("acolhimento")}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 cursor-pointer ${
-                  detailTab === "acolhimento"
-                    ? "border-purple-600 text-purple-700 bg-purple-50/50"
-                    : "border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Acolhimento & WhatsApp</span>
-              </button>
+              {!isRestrictedDetails && (
+                <button
+                  type="button"
+                  onClick={() => setDetailTab("acolhimento")}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 cursor-pointer ${
+                    detailTab === "acolhimento"
+                      ? "border-purple-600 text-purple-700 bg-purple-50/50"
+                      : "border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Acolhimento & WhatsApp</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1477,22 +1987,24 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                 <span>Diagnóstico AVA & Materiais ({studentLogs.length})</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setDetailTab("historico")}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 cursor-pointer ${
-                  detailTab === "historico"
-                    ? "border-blue-600 text-blue-700 bg-blue-50/50"
-                    : "border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <Clock className="w-4 h-4" />
-                <span>Histórico & Tutoria</span>
-              </button>
+              {!isRestrictedDetails && (
+                <button
+                  type="button"
+                  onClick={() => setDetailTab("historico")}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all border-b-2 cursor-pointer ${
+                    detailTab === "historico"
+                      ? "border-blue-600 text-blue-700 bg-blue-50/50"
+                      : "border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Histórico & Tutoria</span>
+                </button>
+              )}
             </div>
 
             {/* Conteúdo da Aba 1: Acolhimento & WhatsApp */}
-            {detailTab === "acolhimento" && (
+            {!isRestrictedDetails && detailTab === "acolhimento" && (
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
                 {/* Stepper do Kanban */}
                 <div className="bg-white rounded-xl border border-gray-200/80 p-4 shadow-2xs space-y-3">
@@ -1752,6 +2264,63 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
             {/* Conteúdo da Aba 2: Diagnóstico AVA & Materiais */}
             {detailTab === "diagnostico" && (
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+                {isSelectedInactive && (
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Esta disciplina consta com matrícula <strong>{selectedStudent.enrolment_status || "Suspenso"}</strong> no AVA. O fluxo de atendimento e envio de mensagens está desabilitado, exibindo apenas o diagnóstico.
+                    </span>
+                  </div>
+                )}
+
+                {isTeologia && (
+                  <div className="bg-white p-4 rounded-xl border border-indigo-100 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-2">
+                        <Award className="w-4 h-4 text-indigo-600" />
+                        Notas por Fase no AVA (Total)
+                      </h4>
+                      <span className="text-[11px] text-gray-400">
+                        Totais das Fases 1, 2 e 3
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        {
+                          label: "Total Fase 1",
+                          val: studentGrades?.fase1 ?? selectedStudent.nota_fase1,
+                          badgeClass: "text-blue-700 bg-blue-50/70 border-blue-100",
+                        },
+                        {
+                          label: "Total Fase 2",
+                          val: studentGrades?.fase2 ?? selectedStudent.nota_fase2,
+                          badgeClass: "text-amber-700 bg-amber-50/70 border-amber-100",
+                        },
+                        {
+                          label: "Total Fase 3",
+                          val: studentGrades?.fase3 ?? selectedStudent.nota_fase3,
+                          badgeClass: "text-purple-700 bg-purple-50/70 border-purple-100",
+                        },
+                      ].map((fase) => {
+                        const display = formatPhaseGrade(fase.val) ?? "—"
+                        return (
+                          <div
+                            key={fase.label}
+                            className={`p-3 rounded-lg border flex flex-col justify-between ${fase.badgeClass}`}
+                          >
+                            <span className="text-[10px] uppercase font-bold opacity-80">
+                              {fase.label}
+                            </span>
+                            <span className="text-lg font-bold font-mono mt-1">
+                              {display}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Métricas Principais em Grid Espaçoso */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="bg-white p-3.5 rounded-xl border border-gray-200/80 shadow-2xs">
@@ -1830,10 +2399,12 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold uppercase text-gray-500 tracking-wider">
-                      Trilha de Navegação & Conteúdos Acessados
+                      Trilha de Navegação, Conteúdos &amp; Atividades da Disciplina
                     </h4>
                     <span className="text-xs text-gray-400 font-medium">
-                      {studentLogs.length} registros
+                      {studentLogs.length > 0
+                        ? `${studentLogs.filter(isLogAccessed).length} de ${studentLogs.length} acessados`
+                        : "0 registros"}
                     </span>
                   </div>
 
@@ -1843,51 +2414,74 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
                     </div>
                   ) : studentLogs.length === 0 ? (
                     <div className="py-12 text-center text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                      Nenhum log detalhado de atividade registrado para esta disciplina.
+                      Nenhum conteúdo ou atividade registrado para esta disciplina no AVA.
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                      {studentLogs.map((log) => (
-                        <div
-                          key={log.id}
-                          className="p-3 rounded-xl border border-gray-100 bg-white hover:border-indigo-200 transition-all flex items-start justify-between gap-3 shadow-2xs"
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="p-2 rounded-lg bg-gray-50 text-indigo-600 mt-0.5 shrink-0">
-                              {renderModuleIcon(log.tipo_modulo)}
-                            </span>
-                            <div>
-                              <div className="text-xs font-semibold text-gray-900">
-                                {log.conteudo_nome || "Conteúdo sem título"}
-                              </div>
-                              <div className="text-[11px] text-gray-400 flex flex-wrap items-center gap-1.5 mt-1">
-                                <span className="font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded">
-                                  {log.unidade_tematica_nome || "Geral"}
-                                </span>
-                                <span>•</span>
-                                <span className="capitalize">{log.tipo_modulo || "recurso"}</span>
-                                {log.data_ultimo_acesso_conteudo && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-gray-600 font-mono text-[10px]">
-                                      Último clique: {formatDateTime(log.data_ultimo_acesso_conteudo)}
+                      {studentLogs.map((log) => {
+                        const foiAcessado = isLogAccessed(log)
+                        return (
+                          <div
+                            key={log.id}
+                            className={`p-3 rounded-xl border transition-all flex items-start justify-between gap-3 shadow-2xs ${
+                              foiAcessado
+                                ? "border-gray-100 bg-white hover:border-indigo-200"
+                                : "border-gray-200/80 bg-gray-50/60 hover:border-amber-200"
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <span
+                                className={`p-2 rounded-lg mt-0.5 shrink-0 ${
+                                  foiAcessado
+                                    ? "bg-gray-50 text-indigo-600"
+                                    : "bg-white text-gray-400 border border-gray-200/70"
+                                }`}
+                              >
+                                {renderModuleIcon(log.tipo_modulo)}
+                              </span>
+                              <div>
+                                <div className={`text-xs font-semibold ${foiAcessado ? "text-gray-900" : "text-gray-700"}`}>
+                                  {log.conteudo_nome || "Conteúdo sem título"}
+                                </div>
+                                <div className="text-[11px] text-gray-400 flex flex-wrap items-center gap-1.5 mt-1">
+                                  <span className="font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded">
+                                    {log.unidade_tematica_nome || "Geral"}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="capitalize">{log.tipo_modulo || "recurso"}</span>
+                                  <span>•</span>
+                                  {foiAcessado ? (
+                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      Acessado
                                     </span>
-                                  </>
-                                )}
+                                  ) : (
+                                    <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                      Não acessado
+                                    </span>
+                                  )}
+                                  {foiAcessado && log.data_ultimo_acesso_conteudo && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-gray-600 font-mono text-[10px]">
+                                        Último clique: {formatDateTime(log.data_ultimo_acesso_conteudo)}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className={`text-xs font-bold ${foiAcessado ? "text-gray-900" : "text-gray-400"}`}>
+                                {formatFriendlyDuration(log.tempo_conteudo_minutos)}
+                              </div>
+                              <div className="text-[11px] text-gray-400">
+                                {log.qtd_cliques_acessos || 0} cliques
                               </div>
                             </div>
                           </div>
-
-                          <div className="text-right shrink-0">
-                            <div className="text-xs font-bold text-gray-900">
-                              {formatFriendlyDuration(log.tempo_conteudo_minutos)}
-                            </div>
-                            <div className="text-[11px] text-gray-400">
-                              {log.qtd_cliques_acessos} cliques
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -1895,7 +2489,7 @@ export function TutoriaDashboard({ sessionUser }: TutoriaDashboardProps) {
             )}
 
             {/* Conteúdo da Aba 3: Histórico & Tutoria */}
-            {detailTab === "historico" && (
+            {!isRestrictedDetails && detailTab === "historico" && (
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
                 {/* 1. Status Atual & Gestão de Carteira */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

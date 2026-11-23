@@ -42,6 +42,16 @@ export class EngagementFilterDto {
   statusKanban?: string;
 
   @IsOptional()
+  @IsString()
+  @IsIn(['todos', 'ativo', 'suspenso', 'cancelado'])
+  enrolmentStatus?: 'todos' | 'ativo' | 'suspenso' | 'cancelado';
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['todos', 'in', 'out'])
+  teologiaFilter?: 'todos' | 'in' | 'out';
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

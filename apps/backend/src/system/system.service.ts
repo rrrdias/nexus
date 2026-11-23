@@ -13,7 +13,7 @@ import {
   avaProgressReport,
   avaGradesReport,
 } from '../db/schema';
-import { eq, inArray, sql, desc } from 'drizzle-orm';
+import { and, eq, inArray, sql, desc } from 'drizzle-orm';
 
 @Injectable()
 export class SystemService {
@@ -32,6 +32,7 @@ export class SystemService {
   static clearSidebarCache(userId?: string) {
     if (userId) {
       SystemService.sidebarCache.delete(userId);
+      SystemService.sidebarCache.delete(`${userId}:superadmin`);
     } else {
       SystemService.sidebarCache.clear();
     }
@@ -45,11 +46,26 @@ export class SystemService {
     return this.db.select().from(systemModules).orderBy(systemModules.name);
   }
 
-  async getSidebarModules(userId: string) {
+  async getSidebarModules(userId: string, isSuperAdmin = false) {
+    const cacheKey = isSuperAdmin ? `${userId}:superadmin` : userId;
     const now = Date.now();
-    const cached = SystemService.sidebarCache.get(userId);
+    const cached = SystemService.sidebarCache.get(cacheKey);
     if (cached && now - cached.timestamp < SystemService.SIDEBAR_CACHE_TTL_MS) {
       return cached.modules;
+    }
+
+    if (isSuperAdmin) {
+      const activeModules = await this.db
+        .select()
+        .from(systemModules)
+        .where(eq(systemModules.isActive, true))
+        .orderBy(systemModules.name);
+
+      SystemService.sidebarCache.set(cacheKey, {
+        modules: activeModules,
+        timestamp: now,
+      });
+      return activeModules;
     }
 
     const [userGroupRecords, directAccess] = await Promise.all([
@@ -64,7 +80,12 @@ export class SystemService {
           systemModules,
           eq(usersSystemAccess.systemModuleId, systemModules.id),
         )
-        .where(eq(usersSystemAccess.userId, userId)),
+        .where(
+          and(
+            eq(usersSystemAccess.userId, userId),
+            eq(systemModules.isActive, true),
+          ),
+        ),
     ]);
     const groupIds = userGroupRecords.map((g) => g.groupId);
 
@@ -77,7 +98,12 @@ export class SystemService {
           systemModules,
           eq(groupSystemAccess.systemModuleId, systemModules.id),
         )
-        .where(inArray(groupSystemAccess.groupId, groupIds));
+        .where(
+          and(
+            inArray(groupSystemAccess.groupId, groupIds),
+            eq(systemModules.isActive, true),
+          ),
+        );
     }
 
     const allModules = [
@@ -88,7 +114,7 @@ export class SystemService {
       new Map(allModules.map((m) => [m.id, m])).values(),
     );
 
-    SystemService.sidebarCache.set(userId, {
+    SystemService.sidebarCache.set(cacheKey, {
       modules: uniqueModules,
       timestamp: now,
     });
