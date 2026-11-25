@@ -17,7 +17,7 @@ import { CreateLocalDto } from './dto/create-local.dto';
 import { UpdateLocalDto } from './dto/update-local.dto';
 import { CreateOptionDto } from './dto/create-option.dto';
 import { UpdateOptionDto } from './dto/update-option.dto';
-import { RequireAdmin, RequireModule } from '../auth/rbac.decorators';
+import { RequireModule } from '../auth/rbac.decorators';
 
 @RequireModule('scheduling', 'backoffice')
 @Controller('api/scheduling')
@@ -29,13 +29,11 @@ export class SchedulingController {
     return this.schedulingService.listLocals(todos === 'true');
   }
 
-  @RequireAdmin()
   @Post('locals')
   async createLocal(@Body() body: CreateLocalDto) {
     return this.schedulingService.createLocal(body);
   }
 
-  @RequireAdmin()
   @Put('locals/:id')
   async updateLocal(@Param('id') id: string, @Body() body: UpdateLocalDto) {
     return this.schedulingService.updateLocal(id, body);
@@ -57,13 +55,11 @@ export class SchedulingController {
     });
   }
 
-  @RequireAdmin()
   @Post('options')
   async createOption(@Body() body: CreateOptionDto) {
     return this.schedulingService.createOption(body);
   }
 
-  @RequireAdmin()
   @Put('options/:id')
   async updateOption(@Param('id') id: string, @Body() body: UpdateOptionDto) {
     return this.schedulingService.updateOption(id, body);
@@ -125,19 +121,16 @@ export class SchedulingController {
     return this.schedulingService.createBooking(dto);
   }
 
-  @RequireAdmin()
   @Post('bookings/:id/conclude')
   async concludeBooking(@Param('id') id: string) {
     return this.schedulingService.concludeBooking(id);
   }
 
-  @RequireAdmin()
   @Post('bookings/:id/absent')
   async markAbsentBooking(@Param('id') id: string) {
     return this.schedulingService.markAbsentBooking(id);
   }
 
-  @RequireAdmin()
   @Delete('bookings/:id')
   async cancelBooking(@Param('id') id: string) {
     return this.schedulingService.cancelBooking(id);
@@ -194,7 +187,6 @@ export class SchedulingController {
     res.end();
   }
 
-  @RequireAdmin()
   @Post('import')
   async importBookings(@Body() body: { bookings: any[] }) {
     if (!body.bookings || !Array.isArray(body.bookings)) {

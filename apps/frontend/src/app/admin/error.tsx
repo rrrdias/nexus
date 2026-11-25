@@ -52,7 +52,7 @@ export default function AdminError({
           type="button"
           variant="outline"
           onClick={() => {
-            window.location.href = "/nexus/admin/users"
+            window.location.href = "/nexus"
           }}
           className="w-full sm:w-auto border-slate-300 text-slate-700 hover:bg-slate-50 gap-2 min-h-[44px]"
         >

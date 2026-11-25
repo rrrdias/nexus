@@ -264,7 +264,7 @@ export function SidebarClient({ session, modules, initials, basePath = "" }: Sid
           }
 
 
-          if (sys.name === 'Backoffice Agendamentos') {
+          if (sys.slug === 'backoffice' || sys.slug === 'scheduling' || sys.name === 'Backoffice Agendamentos') {
             return (
               <div key={sys.id} className="group relative w-full text-left">
                 <button 
