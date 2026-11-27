@@ -43,6 +43,48 @@ type SessionUser = {
   isDisabled?: boolean;
 };
 
+/**
+ * Classifica o tipo da turma no AVA EaD a partir da subcategoria do Moodle.
+ */
+export function resolveTipoTurmaEad(
+  subcategoria?: string | null,
+): 'Regular' | 'Especial' | null {
+  const norm = String(subcategoria || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (!norm) return null;
+  if (norm.includes('especia')) return 'Especial';
+  if (norm.includes('regular')) return 'Regular';
+  return null;
+}
+
+/**
+ * Conta a quantidade distinta de Unidades Temáticas presentes nas listas
+ * de atividades/notas das fases de uma disciplina EaD.
+ */
+export function countUnidadesTematicas(
+  ...lists: Array<string | null | undefined>
+): number {
+  const unitNumbers = new Set<number>();
+  for (const rawList of lists) {
+    if (!rawList || typeof rawList !== 'string') continue;
+    for (const entry of rawList.split('|')) {
+      const title = entry.split(':')[0]?.trim();
+      if (!title) continue;
+      const match = title.match(/(?:unidade\s+tem[aá]tica|ut)\s*0*(\d+)/i);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > 0) {
+          unitNumbers.add(num);
+        }
+      }
+    }
+  }
+  return unitNumbers.size;
+}
+
 @Injectable()
 export class AvaReportsService {
   private readonly termosSemAcesso = [
@@ -1023,7 +1065,10 @@ export class AvaReportsService {
     }
   }
 
-  private buildConsolidatedConditions(filters: any) {
+  private buildConsolidatedConditions(
+    filters: any,
+    matchingCursosForUt?: string[] | null,
+  ) {
     const conditions: any[] = [];
     const sourceInstitution = filters.sourceInstitution || 'ead';
     conditions.push(
@@ -1115,7 +1160,107 @@ export class AvaReportsService {
       );
     }
 
+    if (String(sourceInstitution).toLowerCase() === 'ead') {
+      const tipoTurma = String(filters.tipo_turma || '')
+        .trim()
+        .toLowerCase();
+      if (tipoTurma === 'especial') {
+        conditions.push(
+          sql`lower(coalesce(${avaConsolidatedReport.subcategoria}, '')) LIKE '%especia%'`,
+        );
+      } else if (tipoTurma === 'regular') {
+        conditions.push(
+          sql`lower(coalesce(${avaConsolidatedReport.subcategoria}, '')) LIKE '%regular%'`,
+        );
+      }
+
+      if (matchingCursosForUt !== null && matchingCursosForUt !== undefined) {
+        if (matchingCursosForUt.length > 0) {
+          conditions.push(
+            inArray(avaConsolidatedReport.curso, matchingCursosForUt),
+          );
+        } else {
+          conditions.push(sql`1 = 0`);
+        }
+      }
+    }
+
     return and(...conditions);
+  }
+
+  private async getEadCourseUtMap(
+    sourceInstitution: string,
+    periodoFilter?: string,
+  ): Promise<Array<{ curso: string; unidadesTematicas: number }>> {
+    const cacheKey = `ava:dropdowns:ut-map:${sourceInstitution}:${periodoFilter || 'all'}`;
+    const compute = async () => {
+      const baseConditions: any[] = [
+        eq(avaConsolidatedReport.sourceInstitution, sourceInstitution),
+      ];
+      if (periodoFilter) {
+        baseConditions.push(
+          ilike(avaConsolidatedReport.periodo, `%${periodoFilter}%`),
+        );
+      }
+
+      const rows = await this.db
+        .select({
+          curso: avaConsolidatedReport.curso,
+          progressoListaFase1: sql<string | null>`max(${avaConsolidatedReport.progressoListaFase1})`,
+          progressoListaFase2: sql<string | null>`max(${avaConsolidatedReport.progressoListaFase2})`,
+          progressoListaFase3: sql<string | null>`max(${avaConsolidatedReport.progressoListaFase3})`,
+          notasListaFase1: sql<string | null>`max(${avaConsolidatedReport.notasListaFase1})`,
+          notasListaFase2: sql<string | null>`max(${avaConsolidatedReport.notasListaFase2})`,
+          notasListaFase3: sql<string | null>`max(${avaConsolidatedReport.notasListaFase3})`,
+        })
+        .from(avaConsolidatedReport)
+        .where(and(...baseConditions))
+        .groupBy(avaConsolidatedReport.curso);
+
+      return (rows || [])
+        .filter((r) => Boolean(r.curso))
+        .map((r) => ({
+          curso: r.curso as string,
+          unidadesTematicas: countUnidadesTematicas(
+            r.progressoListaFase1,
+            r.progressoListaFase2,
+            r.progressoListaFase3,
+            r.notasListaFase1,
+            r.notasListaFase2,
+            r.notasListaFase3,
+          ),
+        }));
+    };
+
+    return this.cacheService
+      ? this.cacheService.wrap(cacheKey, compute, 300)
+      : compute();
+  }
+
+  private async resolveConsolidatedWhereClause(filters: any) {
+    const sourceInstitution = String(filters.sourceInstitution || 'ead');
+    const isEad = sourceInstitution.toLowerCase() === 'ead';
+    const rawUt =
+      filters.unidades_tematicas !== undefined &&
+      filters.unidades_tematicas !== null &&
+      String(filters.unidades_tematicas).trim() !== ''
+        ? Number(filters.unidades_tematicas)
+        : NaN;
+
+    let matchingCursosForUt: string[] | null = null;
+    if (isEad && Number.isInteger(rawUt) && rawUt >= 0) {
+      const periodoFilter =
+        filters.periodo !== undefined ? filters.periodo : getDefaultPeriod();
+      const utMap = await this.getEadCourseUtMap(
+        sourceInstitution,
+        periodoFilter,
+      );
+      matchingCursosForUt = utMap
+        .filter((item) => item.unidadesTematicas === rawUt)
+        .map((item) => item.curso);
+    }
+
+    return this.buildConsolidatedConditions(filters, matchingCursosForUt);
   }
 
   async getConsolidatedData(
@@ -1127,7 +1272,7 @@ export class AvaReportsService {
     await this.assertAvaAccess(user);
 
     try {
-      const whereClause = this.buildConsolidatedConditions(filters);
+      const whereClause = await this.resolveConsolidatedWhereClause(filters);
       const offset = (page - 1) * size;
       const sourceInstitution = filters.sourceInstitution || 'ead';
 
@@ -1220,6 +1365,7 @@ export class AvaReportsService {
       const total_records = Number((statsRes as any)?.totalRecords || 0);
       const total_pages = Math.ceil(total_records / size) || 1;
 
+      const isEad = sourceInstitution.toLowerCase() === 'ead';
       const data = pageRows.map((row) => ({
         ...row,
         diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
@@ -1227,6 +1373,7 @@ export class AvaReportsService {
         notaFase2: row.notaFase2 ?? '-',
         notaFase3: row.notaFase3 ?? '-',
         mediaFinal: row.mediaFinal ?? '-',
+        ...(isEad ? this.buildEadCourseMetadata(row) : {}),
       }));
 
       const now = new Date();
@@ -1286,15 +1433,40 @@ export class AvaReportsService {
     }
   }
 
+  private buildEadCourseMetadata(row: {
+    subcategoria?: string | null;
+    progressoListaFase1?: string | null;
+    progressoListaFase2?: string | null;
+    progressoListaFase3?: string | null;
+    notasListaFase1?: string | null;
+    notasListaFase2?: string | null;
+    notasListaFase3?: string | null;
+  }) {
+    return {
+      tipoTurma: resolveTipoTurmaEad(row.subcategoria),
+      unidadesTematicas: countUnidadesTematicas(
+        row.progressoListaFase1,
+        row.progressoListaFase2,
+        row.progressoListaFase3,
+        row.notasListaFase1,
+        row.notasListaFase2,
+        row.notasListaFase3,
+      ),
+    };
+  }
+
   async getConsolidatedExportData(user: SessionUser, filters: any) {
     await this.assertAvaAccess(user);
 
     try {
-      const whereClause = this.buildConsolidatedConditions(filters);
+      const whereClause = await this.resolveConsolidatedWhereClause(filters);
+      const isEad =
+        String(filters.sourceInstitution || 'ead').toLowerCase() === 'ead';
 
       const rawData = await this.db
         .select({
           id: avaConsolidatedReport.id,
+          sourceInstitution: avaConsolidatedReport.sourceInstitution,
           alunoId: avaConsolidatedReport.alunoId,
           matricula: avaConsolidatedReport.matricula,
           usuario: avaConsolidatedReport.usuario,
@@ -1314,24 +1486,52 @@ export class AvaReportsService {
           progressoFase2: avaConsolidatedReport.progressoFase2,
           progressoFase3: avaConsolidatedReport.progressoFase3,
           progressoTotal: avaConsolidatedReport.progressoTotal,
+          progressoListaFase1: avaConsolidatedReport.progressoListaFase1,
+          progressoListaFase2: avaConsolidatedReport.progressoListaFase2,
+          progressoListaFase3: avaConsolidatedReport.progressoListaFase3,
           // Notas
           notaFase1: avaConsolidatedReport.notaFase1,
           notaFase2: avaConsolidatedReport.notaFase2,
           notaFase3: avaConsolidatedReport.notaFase3,
           mediaFinal: avaConsolidatedReport.mediaFinal,
+          notasListaFase1: avaConsolidatedReport.notasListaFase1,
+          notasListaFase2: avaConsolidatedReport.notasListaFase2,
+          notasListaFase3: avaConsolidatedReport.notasListaFase3,
         })
         .from(avaConsolidatedReport)
         .where(whereClause)
         .orderBy(avaConsolidatedReport.aluno, avaConsolidatedReport.curso);
 
-      return rawData.map((row) => ({
-        ...row,
-        diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
-        notaFase1: row.notaFase1 ?? '-',
-        notaFase2: row.notaFase2 ?? '-',
-        notaFase3: row.notaFase3 ?? '-',
-        mediaFinal: row.mediaFinal ?? '-',
-      }));
+      return rawData.map((row) => {
+        const {
+          progressoListaFase1,
+          progressoListaFase2,
+          progressoListaFase3,
+          notasListaFase1,
+          notasListaFase2,
+          notasListaFase3,
+          ...rest
+        } = row;
+        return {
+          ...rest,
+          diasSemAcesso: this.calculateDiasSemAcesso(row.lastaccess),
+          notaFase1: row.notaFase1 ?? '-',
+          notaFase2: row.notaFase2 ?? '-',
+          notaFase3: row.notaFase3 ?? '-',
+          mediaFinal: row.mediaFinal ?? '-',
+          ...(isEad
+            ? this.buildEadCourseMetadata({
+                subcategoria: row.subcategoria,
+                progressoListaFase1,
+                progressoListaFase2,
+                progressoListaFase3,
+                notasListaFase1,
+                notasListaFase2,
+                notasListaFase3,
+              })
+            : {}),
+        };
+      });
     } catch (error) {
       console.error('Erro ao exportar dados consolidados:', error);
       throw new Error('Falha ao exportar dados consolidados');

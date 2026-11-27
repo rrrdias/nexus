@@ -33,6 +33,9 @@ interface ConsolidatedRecord {
   userPhone1: string
   periodo: string
   curso: string
+  subcategoria?: string | null
+  tipoTurma?: string | null
+  unidadesTematicas?: number | null
   cursoPerfil: string
   periodoPerfil: string
   unidadeFisica: string
@@ -64,6 +67,7 @@ interface ConsolidatedRecord {
 interface ConsolidatedTableProps {
   data: ConsolidatedRecord[]
   isLoading?: boolean
+  showEadCourseMetadata?: boolean
 }
 
 function parseVal(val: string | null | undefined): number {
@@ -118,7 +122,11 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
+export function ConsolidatedTable({
+  data,
+  isLoading,
+  showEadCourseMetadata = false,
+}: ConsolidatedTableProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const [dialogState, setDialogState] = useState<{
@@ -440,13 +448,45 @@ export function ConsolidatedTable({ data, isLoading }: ConsolidatedTableProps) {
                           <span className="break-words">{parsedCourse.name}</span>
                         </div>
 
-                        {/* Linha 2: Código da Turma + Graduação */}
+                        {/* Linha 2: Código da Turma + Tipo/UTs (EaD) + Graduação */}
                         <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600">
                           {parsedCourse.code && (
                             <span className="px-1.5 py-0.5 rounded bg-blue-50/80 text-blue-700 border border-blue-200/70 font-mono font-bold text-[10px]">
                               {parsedCourse.code}
                             </span>
                           )}
+                          {showEadCourseMetadata && row.tipoTurma && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded border font-bold text-[10px] ${
+                                row.tipoTurma === "Especial"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                              title={`Tipo de turma: ${row.tipoTurma}`}
+                            >
+                              Turma {row.tipoTurma}
+                            </span>
+                          )}
+                          {showEadCourseMetadata &&
+                            row.unidadesTematicas !== null &&
+                            row.unidadesTematicas !== undefined && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded border font-mono font-bold text-[10px] ${
+                                  row.unidadesTematicas > 0
+                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                    : "bg-slate-50 text-slate-500 border-slate-200"
+                                }`}
+                                title={
+                                  row.unidadesTematicas > 0
+                                    ? `${row.unidadesTematicas} Unidade(s) Temática(s) na disciplina`
+                                    : "Disciplina sem Unidades Temáticas"
+                                }
+                              >
+                                {row.unidadesTematicas > 0
+                                  ? `${row.unidadesTematicas} ${row.unidadesTematicas === 1 ? "Unid. Temática" : "Unid. Temáticas"}`
+                                  : "Sem Unid. Temática"}
+                              </span>
+                            )}
                           {row.cursoPerfil && (
                             <span className="font-semibold text-slate-700 flex items-center gap-1">
                               <BookOpen className="w-3 h-3 text-slate-400 shrink-0" />

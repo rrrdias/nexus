@@ -1,4 +1,8 @@
-import { AvaReportsService } from './ava-reports.service';
+import {
+  AvaReportsService,
+  countUnidadesTematicas,
+  resolveTipoTurmaEad,
+} from './ava-reports.service';
 
 describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
   let service: AvaReportsService;
@@ -167,5 +171,120 @@ describe('AvaReportsService (Performance and SQL Aggregation Tests)', () => {
     expect(result.data[0].mediaFinal).toBe('8.1');
     expect(result.average_progress).toBe(77);
     expect(result.average_grade).toBe(81);
+  });
+
+  it('should resolve EaD tipoTurma and count distinct Unidades Tematicas accurately', () => {
+    expect(resolveTipoTurmaEad('REGULARES')).toBe('Regular');
+    expect(resolveTipoTurmaEad('ESPECIAIS')).toBe('Especial');
+    expect(resolveTipoTurmaEad('2026-2')).toBeNull();
+    expect(resolveTipoTurmaEad(null)).toBeNull();
+
+    // Deduplica UT 01..04 quando aparece tanto no livro quanto na atividade de fixacao
+    const count = countUnidadesTematicas(
+      'Unidade Temática 01:Concluído:10/08/2026|Atividade de Fixação - Unidade Temática 01:Concluído:10/08/2026|Unidade Temática 02:Pendente:-',
+      'Atividade de Fixação - Unidade Temática 05:Pendente:-|Unidade Temática 06:Pendente:-',
+      'Unidade Temática 09:Pendente:-|3ª Verificação de Aprendizagem:Pendente:-',
+    );
+    expect(count).toBe(5);
+
+    // Disciplinas especiais sem UTs retornam 0
+    expect(
+      countUnidadesTematicas(
+        'Entrega 1 — Carta de Apresentação:Pendente:-|Entrega 2 — Plano:Pendente:-',
+      ),
+    ).toBe(0);
+  });
+
+  it('should include tipoTurma and unidadesTematicas in getConsolidatedExportData only for EaD', async () => {
+    const mockRow = {
+      id: 'exp-1',
+      sourceInstitution: 'ead',
+      aluno: 'Aluno EaD',
+      curso: 'GESTÃO ORÇAMENTÁRIA – D0535T01-EAD-A20262',
+      subcategoria: 'REGULARES',
+      progressoListaFase1:
+        'Unidade Temática 01:Concluído:-|Unidade Temática 02:Concluído:-',
+      progressoListaFase2: 'Unidade Temática 05:Pendente:-',
+      progressoListaFase3: null,
+      notasListaFase1: null,
+      notasListaFase2: null,
+      notasListaFase3: null,
+      lastaccess: '25/08/2026',
+    };
+
+    db.orderBy.mockResolvedValueOnce([mockRow]).mockResolvedValueOnce([
+      { ...mockRow, sourceInstitution: 'uni' },
+    ]);
+
+    const eadExport = await service.getConsolidatedExportData(superAdminUser, {
+      sourceInstitution: 'ead',
+    });
+    expect(eadExport[0]).toMatchObject({
+      tipoTurma: 'Regular',
+      unidadesTematicas: 3,
+    });
+    expect((eadExport[0] as any).progressoListaFase1).toBeUndefined();
+
+    const uniExport = await service.getConsolidatedExportData(superAdminUser, {
+      sourceInstitution: 'uni',
+    });
+    expect((uniExport[0] as any).tipoTurma).toBeUndefined();
+    expect((uniExport[0] as any).unidadesTematicas).toBeUndefined();
+  });
+
+  it('should filter EaD consolidated export by unidades_tematicas and tipo_turma without impacting other institutions', async () => {
+    const courseRows = [
+      {
+        curso: 'DISCIPLINA 8 UTS - D100-EAD',
+        progressoListaFase1: 'Unidade Temática 01:Concluído:-|Unidade Temática 02:Pendente:-',
+        progressoListaFase2: 'Unidade Temática 05:Pendente:-|Unidade Temática 06:Pendente:-',
+        progressoListaFase3:
+          'Unidade Temática 09:Pendente:-|Unidade Temática 10:Pendente:-|Unidade Temática 11:Pendente:-|Unidade Temática 12:Pendente:-',
+        notasListaFase1: null,
+        notasListaFase2: null,
+        notasListaFase3: null,
+      },
+      {
+        curso: 'DISCIPLINA 12 UTS - D200-EAD',
+        progressoListaFase1:
+          'Unidade Temática 01:Concluído:-|Unidade Temática 02:Concluído:-|Unidade Temática 03:Concluído:-|Unidade Temática 04:Concluído:-',
+        progressoListaFase2:
+          'Unidade Temática 05:Pendente:-|Unidade Temática 06:Pendente:-|Unidade Temática 07:Pendente:-|Unidade Temática 08:Pendente:-',
+        progressoListaFase3:
+          'Unidade Temática 09:Pendente:-|Unidade Temática 10:Pendente:-|Unidade Temática 11:Pendente:-|Unidade Temática 12:Pendente:-',
+        notasListaFase1: null,
+        notasListaFase2: null,
+        notasListaFase3: null,
+      },
+    ];
+
+    db.groupBy.mockResolvedValueOnce(courseRows);
+    db.orderBy.mockResolvedValueOnce([
+      {
+        id: 'row-8ut',
+        sourceInstitution: 'ead',
+        aluno: 'Aluno Teste',
+        curso: 'DISCIPLINA 8 UTS - D100-EAD',
+        subcategoria: 'REGULARES',
+        progressoListaFase1: courseRows[0].progressoListaFase1,
+        progressoListaFase2: courseRows[0].progressoListaFase2,
+        progressoListaFase3: courseRows[0].progressoListaFase3,
+        lastaccess: '25/08/2026',
+      },
+    ]);
+
+    const res = await service.getConsolidatedExportData(superAdminUser, {
+      sourceInstitution: 'ead',
+      unidades_tematicas: '8',
+      tipo_turma: 'regular',
+    });
+
+    expect(db.groupBy).toHaveBeenCalledTimes(1);
+    expect(res).toHaveLength(1);
+    expect(res[0]).toMatchObject({
+      curso: 'DISCIPLINA 8 UTS - D100-EAD',
+      tipoTurma: 'Regular',
+      unidadesTematicas: 8,
+    });
   });
 });

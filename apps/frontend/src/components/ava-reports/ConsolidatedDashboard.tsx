@@ -403,10 +403,14 @@ export function ConsolidatedDashboard({ reportData, filters, institution = "ead"
         uniquePeriodos={unique_periodos}
         uniquePolos={unique_polos}
         uniqueCursos={unique_cursos}
+        institution={institution}
       />
 
       {/* Tabela Unificada com Colunas Duplas e Modal */}
-      <ConsolidatedTable data={data} />
+      <ConsolidatedTable
+        data={data}
+        showEadCourseMetadata={institution.toLowerCase() === "ead"}
+      />
 
       {/* Paginação */}
       <ConsolidatedPagination

@@ -366,10 +366,11 @@ export function ConsolidatedEadDashboard({ reportData, filters }: ConsolidatedEa
         uniquePeriodos={unique_periodos}
         uniquePolos={unique_polos}
         uniqueCursos={unique_cursos}
+        institution="ead"
       />
 
       {/* Tabela Unificada com Colunas Duplas e Modal */}
-      <ConsolidatedTable data={data} />
+      <ConsolidatedTable data={data} showEadCourseMetadata />
 
       {/* Paginação */}
       <ConsolidatedPagination

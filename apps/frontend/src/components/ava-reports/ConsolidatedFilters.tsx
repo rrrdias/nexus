@@ -11,12 +11,14 @@ interface ConsolidatedFiltersProps {
   uniquePeriodos?: string[]
   uniquePolos?: string[]
   uniqueCursos?: string[]
+  institution?: string
 }
 
 export function ConsolidatedFilters({ 
   uniquePeriodos = [DEFAULT_PERIOD, "2026-1", "2025-2", "2025-1"], 
   uniquePolos = [], 
-  uniqueCursos = [] 
+  uniqueCursos = [],
+  institution = "",
 }: ConsolidatedFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -24,6 +26,7 @@ export function ConsolidatedFilters({
   const [isPending, startTransition] = useTransition()
   const [isOpen, setIsOpen] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
+  const isEad = institution.toLowerCase() === "ead"
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
@@ -32,6 +35,8 @@ export function ConsolidatedFilters({
     curso: searchParams.get("curso") || "",
     enrolment_status: searchParams.get("enrolment_status") || "",
     lastaccess: searchParams.get("lastaccess") || "",
+    tipo_turma: searchParams.get("tipo_turma") || "",
+    unidades_tematicas: searchParams.get("unidades_tematicas") || "",
   })
 
   // Close popover when clicking outside
@@ -66,6 +71,12 @@ export function ConsolidatedFilters({
     if (filters.lastaccess) params.set("lastaccess", filters.lastaccess)
     else params.delete("lastaccess")
 
+    if (isEad && filters.tipo_turma) params.set("tipo_turma", filters.tipo_turma)
+    else params.delete("tipo_turma")
+
+    if (isEad && filters.unidades_tematicas) params.set("unidades_tematicas", filters.unidades_tematicas)
+    else params.delete("unidades_tematicas")
+
     params.set("page", "1") // Reset to page 1 on filter
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
@@ -81,6 +92,8 @@ export function ConsolidatedFilters({
       curso: "",
       enrolment_status: "",
       lastaccess: "",
+      tipo_turma: "",
+      unidades_tematicas: "",
     })
     startTransition(() => {
       router.push(pathname)
@@ -93,8 +106,15 @@ export function ConsolidatedFilters({
     filters.curso,
     filters.enrolment_status,
     filters.lastaccess,
+    isEad ? filters.tipo_turma : "",
+    isEad ? filters.unidades_tematicas : "",
     filters.periodo && filters.periodo !== DEFAULT_PERIOD ? filters.periodo : null,
   ].filter(Boolean).length
+
+  const hasAnyActiveFilter =
+    activeFiltersCount > 0 ||
+    filters.search.trim().length > 0 ||
+    Boolean(searchParams.get("search"))
 
 
   return (
@@ -239,6 +259,39 @@ export function ConsolidatedFilters({
                 </select>
               </div>
 
+              {isEad && (
+                <>
+                  {/* Tipo de Turma (EaD) */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tipo de Turma</label>
+                    <select
+                      value={filters.tipo_turma}
+                      onChange={(e) => setFilters(prev => ({ ...prev, tipo_turma: e.target.value }))}
+                      className="w-full text-xs rounded-lg border border-gray-2 bg-gray-50 p-2 text-gray-8 focus:outline-none focus:border-green-brand"
+                    >
+                      <option value="">Todas (Regulares e Especiais)</option>
+                      <option value="regular">Regulares</option>
+                      <option value="especial">Especiais</option>
+                    </select>
+                  </div>
+
+                  {/* Unidades Temáticas (EaD) */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Unidades Temáticas</label>
+                    <select
+                      value={filters.unidades_tematicas}
+                      onChange={(e) => setFilters(prev => ({ ...prev, unidades_tematicas: e.target.value }))}
+                      className="w-full text-xs rounded-lg border border-gray-2 bg-gray-50 p-2 text-gray-8 focus:outline-none focus:border-green-brand"
+                    >
+                      <option value="">Todas</option>
+                      <option value="8">8 Unidades</option>
+                      <option value="10">10 Unidades</option>
+                      <option value="12">12 Unidades</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
               {/* Botões do Popover */}
               <div className="pt-2 flex items-center justify-between border-t border-gray-1 gap-2">
                 <Button
@@ -258,6 +311,23 @@ export function ConsolidatedFilters({
             </div>
           )}
         </div>
+
+        {/* Botão Externo de Limpar Filtros */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleClear}
+          disabled={isPending || !hasAnyActiveFilter}
+          title="Limpar busca e filtros aplicados"
+          className={`h-10 px-3 text-xs font-semibold rounded-lg border-gray-2 gap-1.5 ${
+            hasAnyActiveFilter
+              ? "text-rose-600 border-rose-200 bg-rose-50/40 hover:bg-rose-50 hover:text-rose-700"
+              : "text-gray-4"
+          }`}
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>Limpar filtros</span>
+        </Button>
       </div>
     </div>
   )

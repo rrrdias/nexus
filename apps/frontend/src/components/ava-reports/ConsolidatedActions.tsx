@@ -70,17 +70,30 @@ export function ConsolidatedActions({
   const handleExport = async () => {
     setIsExporting(true)
     try {
-      const rawData = await exportConsolidatedAvaData(filters)
+      const rawData = await exportConsolidatedAvaData({
+        ...filters,
+        sourceInstitution: institution,
+      })
       if (!rawData || rawData.length === 0) {
         alert("Nenhum dado encontrado para exportação.")
         return
       }
 
+      const isEad = institution.toLowerCase() === "ead"
       const exportRows = rawData.map((item: any) => ({
         "Matrícula": item.matricula || "-",
         "Aluno": item.aluno || "-",
         "WhatsApp/Telefone": item.userPhone1 || "-",
         "Curso": item.curso || "-",
+        ...(isEad
+          ? {
+              "Tipo de Turma": item.tipoTurma || "-",
+              "Unidades Temáticas":
+                item.unidadesTematicas !== null && item.unidadesTematicas !== undefined
+                  ? item.unidadesTematicas
+                  : 0,
+            }
+          : {}),
         "Polo": item.unidadeFisica || "-",
         "Status Matrícula": item.enrolmentStatus || "-",
         "Último Acesso": item.lastaccess || "-",
